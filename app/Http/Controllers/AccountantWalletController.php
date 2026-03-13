@@ -8,9 +8,74 @@ use Illuminate\Http\Request;
 
 class AccountantWalletController extends Controller
 {
+    /**
+     * Get user IDs that the current user is allowed to see for wallet scope.
+     * Returns non-null for: headquarters (self + branch/annex/service_center), branch (self only),
+     * accountant created by HQ (HQ scope), or accountant created by branch (that branch + its annex/service_center/accountant).
+     */
+    private function getHeadquartersScopeUserIds(Request $request): ?array
+    {
+        $user = $request->user();
+        if ($user->role?->name === 'headquarters') {
+            return User::where('id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    $q->where('created_by_user_id', $user->id)
+                        ->whereHas('role', function ($r) {
+                            $r->whereIn('name', ['service_center', 'annex', 'branch']);
+                        });
+                })
+                ->pluck('id')
+                ->all();
+        }
+        if ($user->role?->name === 'branch') {
+            // Branch sees only their own wallet account
+            return [$user->id];
+        }
+        if ($user->role?->name === 'service_center') {
+            // Service Center sees only their own wallet account
+            return [$user->id];
+        }
+        if ($user->role?->name === 'accountant' && $user->created_by_user_id) {
+            $creator = User::with('role')->find($user->created_by_user_id);
+            if ($creator && $creator->role?->name === 'headquarters') {
+                $hqId = $creator->id;
+                return User::where('id', $hqId)
+                    ->orWhere(function ($q) use ($hqId) {
+                        $q->where('created_by_user_id', $hqId)
+                            ->whereHas('role', function ($r) {
+                                $r->whereIn('name', ['service_center', 'annex', 'branch']);
+                            });
+                    })
+                    ->pluck('id')
+                    ->all();
+            }
+            if ($creator && $creator->role?->name === 'branch') {
+                // Branch accountant: see only their branch (the creator) + users created by that branch
+                $branchId = $creator->id;
+                return User::where('id', $branchId)
+                    ->orWhere(function ($q) use ($branchId) {
+                        $q->where('created_by_user_id', $branchId)
+                            ->whereHas('role', function ($r) {
+                                $r->whereIn('name', ['annex', 'service_center', 'accountant']);
+                            });
+                    })
+                    ->pluck('id')
+                    ->all();
+            }
+        }
+        return null;
+    }
+
     public function index(Request $request)
     {
+        $allowedUserIds = $this->getHeadquartersScopeUserIds($request);
+        
         $query = WalletTransaction::with('user')->orderByDesc('created_at');
+        
+        // Filter by allowed users for headquarters
+        if ($allowedUserIds !== null) {
+            $query->whereIn('user_id', $allowedUserIds);
+        }
 
         // Filter by status
         if ($request->filled('status')) {
@@ -41,16 +106,23 @@ class AccountantWalletController extends Controller
 
         $transactions = $query->paginate(50)->withQueryString();
 
-        // Statistics
-        $totalTransactions = WalletTransaction::count();
-        $totalPending = WalletTransaction::where('status', WalletTransaction::STATUS_PENDING)->count();
-        $totalApproved = WalletTransaction::where('status', WalletTransaction::STATUS_ACCEPTED)->count();
-        $totalRejected = WalletTransaction::where('status', WalletTransaction::STATUS_REJECTED)->count();
-        $totalCredits = WalletTransaction::where('type', WalletTransaction::TYPE_CREDIT)
+        // Statistics - filtered for headquarters
+        $statsQuery = WalletTransaction::query();
+        if ($allowedUserIds !== null) {
+            $statsQuery->whereIn('user_id', $allowedUserIds);
+        }
+        
+        $totalTransactions = (clone $statsQuery)->count();
+        $totalPending = (clone $statsQuery)->where('status', WalletTransaction::STATUS_PENDING)->count();
+        $totalApproved = (clone $statsQuery)->where('status', WalletTransaction::STATUS_ACCEPTED)->count();
+        $totalRejected = (clone $statsQuery)->where('status', WalletTransaction::STATUS_REJECTED)->count();
+        $totalCredits = (clone $statsQuery)->where('type', WalletTransaction::TYPE_CREDIT)
             ->where('status', WalletTransaction::STATUS_ACCEPTED)
             ->sum('amount');
-        $totalDebits = WalletTransaction::where('type', WalletTransaction::TYPE_DEBIT)
+        $totalDebits = (clone $statsQuery)->where('type', WalletTransaction::TYPE_DEBIT)
             ->sum('amount');
+
+        $ownAccountOnly = in_array($request->user()?->role?->name, ['branch', 'service_center'], true);
 
         return view('admin.accountant.wallet.index', [
             'transactions' => $transactions,
@@ -59,6 +131,7 @@ class AccountantWalletController extends Controller
             'search' => $request->search,
             'dateFrom' => $request->date_from,
             'dateTo' => $request->date_to,
+            'ownAccountOnly' => $ownAccountOnly,
             'stats' => [
                 'total_transactions' => $totalTransactions,
                 'total_pending' => $totalPending,
@@ -72,9 +145,16 @@ class AccountantWalletController extends Controller
 
     public function users(Request $request)
     {
+        $allowedUserIds = $this->getHeadquartersScopeUserIds($request);
+
         $query = User::with('role')->whereNotNull('wallet_balance')
             ->where('wallet_balance', '>', 0)
             ->orderByDesc('wallet_balance');
+        
+        // Filter by allowed users for headquarters / headquarters accountant
+        if ($allowedUserIds !== null) {
+            $query->whereIn('id', $allowedUserIds);
+        }
 
         // Search by name or email
         if ($request->filled('search')) {
@@ -94,9 +174,14 @@ class AccountantWalletController extends Controller
 
         $users = $query->paginate(50)->withQueryString();
 
-        // Statistics
-        $totalUsers = User::whereNotNull('wallet_balance')->where('wallet_balance', '>', 0)->count();
-        $totalBalance = User::sum('wallet_balance');
+        // Statistics - filtered for headquarters
+        $statsQuery = User::whereNotNull('wallet_balance')->where('wallet_balance', '>', 0);
+        if ($allowedUserIds !== null) {
+            $statsQuery->whereIn('id', $allowedUserIds);
+        }
+        
+        $totalUsers = (clone $statsQuery)->count();
+        $totalBalance = (clone $statsQuery)->sum('wallet_balance');
 
         return view('admin.accountant.wallet.users', [
             'users' => $users,
@@ -111,6 +196,12 @@ class AccountantWalletController extends Controller
 
     public function userTransactions(Request $request, User $user)
     {
+        $allowedUserIds = $this->getHeadquartersScopeUserIds($request);
+
+        if ($allowedUserIds !== null && !in_array($user->id, $allowedUserIds)) {
+            abort(403, 'You can only view wallet transactions for your headquarters scope (Headquarters account and its Service Center, Annex, Branch users).');
+        }
+        
         $transactions = WalletTransaction::where('user_id', $user->id)
             ->orderByDesc('created_at')
             ->paginate(50);

@@ -24,6 +24,7 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'service_center_code',
         'kid',
         'password',
         'role_id',
@@ -79,6 +80,11 @@ class User extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
+    public function dpbvCollections(): HasMany
+    {
+        return $this->hasMany(DpbvCollection::class);
+    }
+
     public function hasRole(string $roleName): bool
     {
         return $this->role && $this->role->name === $roleName;
@@ -112,5 +118,25 @@ class User extends Authenticatable
     public function isDispatch(): bool
     {
         return $this->hasRole(Role::DISPATCH);
+    }
+
+    public function isHeadquarters(): bool
+    {
+        return $this->hasRole(Role::HEADQUARTERS);
+    }
+
+    public function isBranch(): bool
+    {
+        return $this->hasRole(Role::BRANCH);
+    }
+
+    public function isServiceCenter(): bool
+    {
+        return $this->hasRole(Role::SERVICE_CENTER);
+    }
+
+    public function isAnnex(): bool
+    {
+        return $this->hasRole(Role::ANNEX);
     }
 }

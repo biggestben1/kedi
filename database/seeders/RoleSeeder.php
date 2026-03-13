@@ -40,6 +40,26 @@ class RoleSeeder extends Seeder
                 'display_name' => 'Dispatch',
                 'description' => 'Order processing, packaging, shipment, delivery notes.',
             ],
+            [
+                'name' => Role::HEADQUARTERS,
+                'display_name' => 'Headquarters',
+                'description' => 'Access all invoices, full CRUD on products and categories.',
+            ],
+            [
+                'name' => Role::ANNEX,
+                'display_name' => 'Annex',
+                'description' => 'Annex user, created by headquarters.',
+            ],
+            [
+                'name' => Role::SERVICE_CENTER,
+                'display_name' => 'Service Center',
+                'description' => 'Service center user, created by headquarters.',
+            ],
+            [
+                'name' => Role::BRANCH,
+                'display_name' => 'Branch',
+                'description' => 'Branch with own stock, creates Annex users, creates invoices from branch stock.',
+            ],
         ];
 
         foreach ($roles as $role) {

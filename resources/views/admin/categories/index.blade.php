@@ -46,6 +46,7 @@
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
+                            <th class="text-center" style="width: 80px;">Image</th>
                             <th>Name</th>
                             <th>Slug</th>
                             <th class="text-end">Sort</th>
@@ -56,17 +57,24 @@
                     <tbody>
                         @forelse($categories as $category)
                             <tr>
-                                <td>{{ $category->name }}</td>
-                                <td>{{ $category->slug ?? '—' }}</td>
-                                <td class="text-end">{{ $category->sort_order }}</td>
-                                <td>
+                                <td class="text-center align-middle">
+                                    @if($category->image)
+                                        @if($category->image_url)<img src="{{ $category->image_url }}" alt="{{ $category->name }}" class="img-thumbnail" style="max-height: 40px; max-width: 60px; object-fit: contain;">@else<span class="text-muted">—</span>@endif
+                                    @else
+                                        <span class="text-muted small">—</span>
+                                    @endif
+                                </td>
+                                <td class="align-middle">{{ $category->name }}</td>
+                                <td class="align-middle">{{ $category->slug ?? '—' }}</td>
+                                <td class="text-end align-middle">{{ $category->sort_order }}</td>
+                                <td class="align-middle">
                                     @if($category->is_active)
                                         <span class="badge bg-success">Active</span>
                                     @else
                                         <span class="badge bg-secondary">Inactive</span>
                                     @endif
                                 </td>
-                                <td class="text-end">
+                                <td class="text-end align-middle">
                                     <a href="{{ route('admin.categories.edit', $category) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                                     <form action="{{ route('admin.categories.destroy', $category) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this category? Products will be unassigned.');">
                                         @csrf
@@ -77,7 +85,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="text-center text-muted p-4">No categories found.</td>
+                                <td colspan="6" class="text-center text-muted p-4">No categories found.</td>
                             </tr>
                         @endforelse
                     </tbody>

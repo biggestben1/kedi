@@ -12,7 +12,10 @@ class Order extends Model
     protected $fillable = [
         'invoice_number',
         'user_id',
+        'branch_user_id',
+        'invoice_id',
         'subtotal',
+        'shipping_cost',
         'total_bv',
         'total_pv',
         'payment_method',
@@ -27,12 +30,25 @@ class Order extends Model
         'shipping_state',
         'shipping_postal_code',
         'shipping_phone',
+        'kd_id',
+        'customer_name',
+        'delivery_type',
+        'is_dpbv_order',
+        'coupon_id',
+        'coupon_code',
+        'discount_amount',
+        'sc_referral_code',
+        'notes',
     ];
+
+    public const DELIVERY_WALK_IN = 'walk_in';
+    public const DELIVERY_SHIP = 'ship';
 
     protected function casts(): array
     {
         return [
             'subtotal' => 'decimal:2',
+            'shipping_cost' => 'decimal:2',
             'total_bv' => 'decimal:2',
             'total_pv' => 'decimal:2',
             'delivered_at' => 'datetime',
@@ -48,6 +64,7 @@ class Order extends Model
 
     public const PAYMENT_WALLET = 'wallet';
     public const PAYMENT_PAY_ON_DELIVERY = 'pay_on_delivery';
+    public const PAYMENT_DPBV = 'dpbv';
     public const STATUS_PENDING = 'pending';
     public const STATUS_PAID = 'paid';
     public const STATUS_PACKED = 'packed';
@@ -55,6 +72,7 @@ class Order extends Model
     public const STATUS_DELIVERED = 'delivered';
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_DRAFT = 'draft';
 
     /** Statuses that dispatch can work with (paid and beyond). */
     public static function dispatchableStatuses(): array
@@ -77,9 +95,28 @@ class Order extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function branchUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'branch_user_id');
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class);
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    /** Generate next order number (e.g. ORD-000001). */
+    public static function generateOrderNumber(): string
+    {
+        $last = Order::orderByDesc('id')->first();
+        $next = $last ? ((int) preg_replace('/[^0-9]/', '', $last->invoice_number ?? (string) $last->id)) + 1 : 1;
+
+        return 'ORD-' . str_pad((string) $next, 6, '0', STR_PAD_LEFT);
     }
 
     /** Display tracking number (external tracking_number, invoice_number, or ORD-{id}) */

@@ -26,6 +26,22 @@
         </div>
     @endif
 
+    @if(isset($stockDebug) && $stockDebug)
+        <div class="alert alert-info mb-3">
+            <strong>Stock debug:</strong>
+            User #{{ $stockDebug['user_id'] }} ({{ $stockDebug['user_name'] }}) | Role: {{ $stockDebug['role'] ?? '—' }} |
+            branchUserId: {{ $stockDebug['branch_user_id'] ?? 'null' }} |
+            showStockAsZero: {{ $stockDebug['show_stock_as_zero'] ? 'yes' : 'no' }} |
+            branch_stock rows: {{ $stockDebug['branch_stock_rows'] ?? 0 }}<br>
+            First product "{{ $stockDebug['first_product'] ?? '—' }}": {{ $stockDebug['first_product_stock'] ?? 0 }} |
+            @if(!empty($stockDebug['sample_with_stock']))
+                Example WITH stock: {{ $stockDebug['sample_with_stock'] }}
+            @else
+                No products with stock in branch_stock
+            @endif
+        </div>
+    @endif
+
     <div class="card">
         <div class="card-header">
             <div class="d-flex flex-wrap gap-2 align-items-center w-100">
@@ -35,9 +51,11 @@
                         <i class="fe fe-filter me-1"></i>Filters
                     </button>
                 </div>
+                @if(!in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']))
                 <a href="{{ route('admin.products.create') }}" class="btn btn-primary ms-auto">
                     <i class="fe fe-plus me-2"></i>Create Product
                 </a>
+                @endif
             </div>
             <div class="collapse mt-3" id="products-filter-collapse">
                 <div class="d-flex flex-wrap gap-3 align-items-end">
@@ -69,16 +87,29 @@
                             <th class="text-end">Stock</th>
                             <th class="text-end">BV</th>
                             <th class="text-end">PV</th>
+                            <th>DPBV</th>
                             <th>Status</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="products-tbody">
-                        @forelse($products as $product)
+                            @forelse($products as $product)
+                            @php
+                                $displayStock = ($showStockAsZero ?? false) ? 0 : $product->stock;
+                                if (!($showStockAsZero ?? false) && isset($headquartersUserId) && $headquartersUserId) {
+                                    $displayStock = \App\Models\HeadquartersStock::getQuantity($headquartersUserId, $product->id);
+                                } elseif (!($showStockAsZero ?? false) && isset($branchUserId) && $branchUserId) {
+                                    $displayStock = \App\Models\BranchStock::getQuantity($branchUserId, $product->id);
+                                } elseif (!($showStockAsZero ?? false) && isset($serviceCenterUserId) && $serviceCenterUserId) {
+                                    $displayStock = \App\Models\ServiceCenterStock::getQuantity($serviceCenterUserId, $product->id);
+                                } elseif (!($showStockAsZero ?? false) && isset($annexUserId) && $annexUserId) {
+                                    $displayStock = \App\Models\AnnexStock::getQuantity($annexUserId, $product->id);
+                                }
+                            @endphp
                             <tr data-product-row>
                                 <td>
-                                    @if($product->image)
-                                        <img src="{{ asset('storage/' . $product->image) }}" alt="" class="rounded" style="max-width: 48px; max-height: 48px; object-fit: cover;">
+                                    @if($product->image_url)
+                                        <img src="{{ $product->image_url }}" alt="" class="rounded" style="max-width: 48px; max-height: 48px; object-fit: cover;">
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif
@@ -89,9 +120,16 @@
                                 <td>{{ $product->pack_size ?? '—' }}</td>
                                 <td class="text-end">{{ $product->formatted_cost_price }}</td>
                                 <td class="text-end">{{ $product->formatted_price }}</td>
-                                <td class="text-end">{{ $product->stock }}</td>
+                                <td class="text-end">{{ $displayStock }}</td>
                                 <td class="text-end">{{ number_format($product->bv, 1) }}</td>
                                 <td class="text-end">{{ number_format($product->pv, 1) }}</td>
+                                <td>
+                                    @if($product->can_use_dpbv ?? true)
+                                        <span class="badge bg-info">Allowed</span>
+                                    @else
+                                        <span class="badge bg-warning">Not Allowed</span>
+                                    @endif
+                                </td>
                                 <td>
                                     @if($product->is_active)
                                         <span class="badge bg-success">Active</span>
@@ -100,12 +138,16 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
+                                    @if(!in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']))
                                     <a href="{{ route('admin.products.edit', $product) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                                     <form action="{{ route('admin.products.destroy', $product) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this product?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                     </form>
+                                    @else
+                                    <span class="text-muted">—</span>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
@@ -247,6 +289,7 @@
     var baseUrl = '{{ route("admin.products.index") }}';
     var csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     var debounceTimer;
+    var isServiceCenterViewOnly = {{ in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']) ? 'true' : 'false' }};
 
     function buildQueryParams() {
         var params = new URLSearchParams();
@@ -264,10 +307,13 @@
         var statusBadge = p.is_active
             ? '<span class="badge bg-success">Active</span>'
             : '<span class="badge bg-secondary">Inactive</span>';
-        var formHtml = '<form action="' + p.destroy_url + '" method="POST" class="d-inline" onsubmit="return confirm(\'Delete this product?\');">' +
-            '<input type="hidden" name="_token" value="' + (csrfToken || '') + '">' +
-            '<input type="hidden" name="_method" value="DELETE">' +
-            '<button type="submit" class="btn btn-sm btn-outline-danger">Delete</button></form>';
+        var actionsHtml = isServiceCenterViewOnly
+            ? '<span class="text-muted">—</span>'
+            : '<a href="' + p.edit_url + '" class="btn btn-sm btn-outline-primary">Edit</a> ' +
+              '<form action="' + p.destroy_url + '" method="POST" class="d-inline" onsubmit="return confirm(\'Delete this product?\');">' +
+              '<input type="hidden" name="_token" value="' + (csrfToken || '') + '">' +
+              '<input type="hidden" name="_method" value="DELETE">' +
+              '<button type="submit" class="btn btn-sm btn-outline-danger">Delete</button></form>';
         return '<tr data-product-row>' +
             '<td>' + imgHtml + '</td>' +
             '<td>' + (p.item_code || '') + '</td>' +
@@ -276,13 +322,12 @@
             '<td>' + (p.pack_size || '—') + '</td>' +
             '<td class="text-end">' + (p.cost_price || '—') + '</td>' +
             '<td class="text-end">' + (p.price || '') + '</td>' +
-            '<td class="text-end">' + (p.stock || 0) + '</td>' +
+            '<td class="text-end">' + (p.stock !== undefined ? p.stock : 0) + '</td>' +
             '<td class="text-end">' + (p.bv || '') + '</td>' +
             '<td class="text-end">' + (p.pv || '') + '</td>' +
+            '<td>' + (p.can_use_dpbv !== false ? '<span class="badge bg-info">Allowed</span>' : '<span class="badge bg-warning">Not Allowed</span>') + '</td>' +
             '<td>' + statusBadge + '</td>' +
-            '<td class="text-end">' +
-            '<a href="' + p.edit_url + '" class="btn btn-sm btn-outline-primary">Edit</a> ' + formHtml +
-            '</td></tr>';
+            '<td class="text-end">' + actionsHtml + '</td></tr>';
     }
 
     function doSearch() {
@@ -306,7 +351,7 @@
             if (paginationEl) paginationEl.style.display = 'none';
         })
         .catch(function() {
-            if (tbody) tbody.innerHTML = '<tr><td colspan="12" class="text-center text-danger p-4">Search failed. Reload the page.</td></tr>';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="13" class="text-center text-danger p-4">Search failed. Reload the page.</td></tr>';
         });
     }
 

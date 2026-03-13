@@ -47,6 +47,12 @@
                     @error('phone')<div class="text-danger small">{{ $message }}</div>@enderror
                 </div>
 
+                <div class="col-md-6">
+                    <label class="form-label">Service Center Code (optional)</label>
+                    <input type="text" name="service_center_code" class="form-control" value="{{ old('service_center_code') }}">
+                    @error('service_center_code')<div class="text-danger small">{{ $message }}</div>@enderror
+                </div>
+
                 @if(auth()->user()->role?->name === 'reseller')
                 <div class="col-md-6">
                     <label class="form-label">Kid (optional)</label>
@@ -60,7 +66,7 @@
                     <select name="role_id" class="form-select" required>
                         <option value="">-- Select role --</option>
                         @foreach($roles as $role)
-                            <option value="{{ $role->id }}" {{ old('role_id') == $role->id ? 'selected' : '' }}>
+                            <option value="{{ $role->id }}" {{ old('role_id', $defaultRoleId ?? '') == $role->id ? 'selected' : '' }}>
                                 {{ $role->display_name }}
                             </option>
                         @endforeach

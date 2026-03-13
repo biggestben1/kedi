@@ -1,15 +1,15 @@
 @extends('layouts.admin')
 
-@section('title', 'Wallet Management - All Transactions')
+@section('title', $ownAccountOnly ?? false ? 'My Wallet' : 'Wallet Management - All Transactions')
 
 @section('content')
     <div class="page-header">
-        <h1 class="page-title">Wallet Management - All Transactions</h1>
+        <h1 class="page-title">{{ ($ownAccountOnly ?? false) ? 'My Wallet' : 'Wallet Management - All Transactions' }}</h1>
         <div>
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('admin') }}">Admin</a></li>
                 <li class="breadcrumb-item"><a href="{{ route('admin.accountant.wallet.index') }}">Wallet Management</a></li>
-                <li class="breadcrumb-item active" aria-current="page">All Transactions</li>
+                <li class="breadcrumb-item active" aria-current="page">{{ ($ownAccountOnly ?? false) ? 'My Transactions' : 'All Transactions' }}</li>
             </ol>
         </div>
     </div>
@@ -87,16 +87,18 @@
 
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">All Wallet Transactions</h3>
+            <h3 class="card-title">{{ ($ownAccountOnly ?? false) ? 'My Transactions' : 'All Wallet Transactions' }}</h3>
         </div>
         <div class="card-body">
             <!-- Filters -->
             <form method="GET" action="{{ route('admin.accountant.wallet.index') }}" class="mb-4">
                 <div class="row g-3">
+                    @if(!($ownAccountOnly ?? false))
                     <div class="col-md-3">
                         <label class="form-label">Search User</label>
                         <input type="text" name="search" class="form-control" value="{{ $search }}" placeholder="Name or email">
                     </div>
+                    @endif
                     <div class="col-md-2">
                         <label class="form-label">Status</label>
                         <select name="status" class="form-select">
@@ -134,7 +136,9 @@
                     <thead>
                         <tr>
                             <th>Date</th>
+                            @if(!($ownAccountOnly ?? false))
                             <th>User</th>
+                            @endif
                             <th>Type</th>
                             <th class="text-end">Amount</th>
                             <th>Status</th>
@@ -146,10 +150,12 @@
                         @forelse($transactions as $tx)
                         <tr>
                             <td>{{ $tx->created_at->format('M d, Y H:i') }}</td>
+                            @if(!($ownAccountOnly ?? false))
                             <td>
                                 <strong>{{ $tx->user?->name }}</strong><br>
                                 <small class="text-muted">{{ $tx->user?->email }}</small>
                             </td>
+                            @endif
                             <td>
                                 @if($tx->type === 'credit')
                                     <span class="badge bg-success">Credit</span>
@@ -184,7 +190,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="7" class="text-center text-muted p-4">No transactions found.</td>
+                            <td colspan="{{ ($ownAccountOnly ?? false) ? 6 : 7 }}" class="text-center text-muted p-4">No transactions found.</td>
                         </tr>
                         @endforelse
                     </tbody>

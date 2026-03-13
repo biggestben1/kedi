@@ -18,6 +18,53 @@ class PharmacyReportsController extends Controller
 {
     private const PAID_STATUSES = [Order::STATUS_PAID, Order::STATUS_COMPLETED];
 
+    /** Get allowed user IDs for headquarters, branch, or service_center scope. Null = all users. */
+    private function getAllowedUserIdsForReports(?\App\Models\User $user): ?array
+    {
+        if (! $user) {
+            return null;
+        }
+        $role = $user->role?->name ?? '';
+        if ($role === 'headquarters') {
+            return User::where('id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    $q->where('created_by_user_id', $user->id)
+                        ->whereHas('role', fn ($r) => $r->whereIn('name', ['service_center', 'annex', 'branch']));
+                })
+                ->pluck('id')
+                ->all();
+        }
+        if ($role === 'branch') {
+            return User::where('id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    $q->where('created_by_user_id', $user->id)
+                        ->whereHas('role', fn ($r) => $r->whereIn('name', ['service_center', 'annex', 'accountant']));
+                })
+                ->pluck('id')
+                ->all();
+        }
+        if ($role === 'service_center') {
+            return User::where('id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    $q->where('created_by_user_id', $user->id)
+                        ->whereHas('role', fn ($r) => $r->whereIn('name', ['annex', 'accountant', 'dispatch']));
+                })
+                ->pluck('id')
+                ->all();
+        }
+        if ($role === 'annex') {
+            return User::where('id', $user->id)
+                ->orWhere(function ($q) use ($user) {
+                    $q->where('created_by_user_id', $user->id)
+                        ->whereHas('role', fn ($r) => $r->whereIn('name', ['accountant', 'dispatch']));
+                })
+                ->pluck('id')
+                ->all();
+        }
+
+        return null;
+    }
+
     /** Parse request filters into from, to, categoryId, productId, customerId, paymentMethod */
     private function parseFilters(Request $request): array
     {
@@ -42,10 +89,11 @@ class PharmacyReportsController extends Controller
         $productId = $filters['productId'];
         $customerId = $filters['customerId'];
         $paymentMethod = $filters['paymentMethod'];
+        $allowedUserIds = $filters['allowedUserIds'] ?? null;
 
         $query = OrderItem::query()
             ->with(['order.user'])
-            ->whereHas('order', function ($q) use ($from, $to, $customerId, $paymentMethod) {
+            ->whereHas('order', function ($q) use ($from, $to, $customerId, $paymentMethod, $allowedUserIds) {
                 $q->whereIn('status', self::PAID_STATUSES)
                     ->whereBetween('created_at', [$from, $to]);
                 if ($customerId) {
@@ -53,6 +101,9 @@ class PharmacyReportsController extends Controller
                 }
                 if ($paymentMethod) {
                     $q->where('payment_method', $paymentMethod);
+                }
+                if ($allowedUserIds !== null) {
+                    $q->whereIn('user_id', $allowedUserIds);
                 }
             });
 
@@ -97,6 +148,8 @@ class PharmacyReportsController extends Controller
     public function index(Request $request)
     {
         $filters = $this->parseFilters($request);
+        $user = $request->user();
+        $filters['allowedUserIds'] = $this->getAllowedUserIdsForReports($user);
         $from = $filters['from'];
         $to = $filters['to'];
         $categoryId = $filters['categoryId'];
@@ -124,15 +177,24 @@ class PharmacyReportsController extends Controller
         $expiryProducts = Product::whereNotNull('expiry_date')->orderBy('expiry_date')->get();
         $lowStockProducts = Product::whereRaw('min_stock > 0 AND stock <= min_stock')->orderBy('stock')->get();
 
-        $topSelling = OrderItem::whereHas('order', fn($q) => $q->whereIn('status', self::PAID_STATUSES)->whereBetween('created_at', [$from, $to]))
+        $allowedUserIds = $filters['allowedUserIds'] ?? null;
+        $topSelling = OrderItem::whereHas('order', function ($q) use ($from, $to, $allowedUserIds) {
+            $q->whereIn('status', self::PAID_STATUSES)->whereBetween('created_at', [$from, $to]);
+            if ($allowedUserIds !== null) {
+                $q->whereIn('user_id', $allowedUserIds);
+            }
+        })
             ->select('product_name', 'item_code', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(line_total) as total_sales'))
             ->groupBy('product_name', 'item_code')
             ->orderByDesc('total_qty')
             ->limit(20)
             ->get();
 
-        $customerReport = Order::whereIn('status', self::PAID_STATUSES)
-            ->whereBetween('created_at', [$from, $to])
+        $customerReportQuery = Order::whereIn('status', self::PAID_STATUSES)->whereBetween('created_at', [$from, $to]);
+        if ($allowedUserIds !== null) {
+            $customerReportQuery->whereIn('user_id', $allowedUserIds);
+        }
+        $customerReport = $customerReportQuery
             ->select('user_id', DB::raw('COUNT(*) as order_count'), DB::raw('SUM(subtotal) as total_spent'))
             ->groupBy('user_id')
             ->with('user')
@@ -140,7 +202,11 @@ class PharmacyReportsController extends Controller
             ->limit(50)
             ->get();
 
-        $ordersForPL = Order::whereIn('status', self::PAID_STATUSES)->whereBetween('created_at', [$from, $to])->with('items')->get();
+        $ordersForPLQuery = Order::whereIn('status', self::PAID_STATUSES)->whereBetween('created_at', [$from, $to]);
+        if ($allowedUserIds !== null) {
+            $ordersForPLQuery->whereIn('user_id', $allowedUserIds);
+        }
+        $ordersForPL = $ordersForPLQuery->with('items')->get();
         $totalSalesPL = $ordersForPL->sum('subtotal');
         $totalCostPL = 0;
         foreach ($ordersForPL as $order) {
@@ -154,7 +220,11 @@ class PharmacyReportsController extends Controller
 
         $categories = Category::orderBy('name')->get();
         $products = Product::orderBy('name')->get(['id', 'name', 'item_code']);
-        $customers = User::whereHas('orders')->orderBy('name')->get(['id', 'name', 'email']);
+        $customersQuery = User::whereHas('orders');
+        if ($allowedUserIds !== null) {
+            $customersQuery->whereIn('id', $allowedUserIds);
+        }
+        $customers = $customersQuery->orderBy('name')->get(['id', 'name', 'email']);
         $paymentMethods = [
             Order::PAYMENT_WALLET => 'Wallet',
             Order::PAYMENT_PAY_ON_DELIVERY => 'Pay on Delivery',
@@ -193,6 +263,7 @@ class PharmacyReportsController extends Controller
     public function exportPdf(Request $request): \Illuminate\Http\Response
     {
         $filters = $this->parseFilters($request);
+        $filters['allowedUserIds'] = $this->getAllowedUserIdsForReports($request->user());
         $salesLines = $this->buildSalesLines($filters);
         $pdf = Pdf::loadView('admin.pharmacy.reports-pdf', [
             'salesLines' => $salesLines,
@@ -205,6 +276,7 @@ class PharmacyReportsController extends Controller
     public function exportExcel(Request $request): StreamedResponse
     {
         $filters = $this->parseFilters($request);
+        $filters['allowedUserIds'] = $this->getAllowedUserIdsForReports($request->user());
         $salesLines = $this->buildSalesLines($filters);
         $filename = 'pharmacy-sales-report-' . $filters['from']->format('Y-m-d') . '-to-' . $filters['to']->format('Y-m-d') . '.csv';
 

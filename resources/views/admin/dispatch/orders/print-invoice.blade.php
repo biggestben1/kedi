@@ -33,7 +33,8 @@
     </div>
 
     <p><strong>Bill to</strong><br>
-        {{ $order->user?->name }}<br>
+        @if($order->kd_id)<strong>KD No:</strong> {{ $order->kd_id }}<br>@endif
+        <strong>Name:</strong> {{ $order->customer_name ?? $order->user?->name ?? '—' }}<br>
         {{ $order->user?->email }}<br>
         @if($order->shipping_phone){{ $order->shipping_phone }}@endif
     </p>
@@ -65,8 +66,18 @@
         </tbody>
         <tfoot>
             <tr>
-                <td colspan="3" class="text-end"><strong>Subtotal</strong></td>
-                <td class="text-end"><strong>₦{{ number_format($order->subtotal, 2) }}</strong></td>
+                <td colspan="3" class="text-end">Subtotal</td>
+                <td class="text-end">₦{{ number_format($order->subtotal, 2) }}</td>
+            </tr>
+            @if($order->shipping_cost > 0)
+            <tr>
+                <td colspan="3" class="text-end">Shipping Cost</td>
+                <td class="text-end">₦{{ number_format($order->shipping_cost, 2) }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td colspan="3" class="text-end"><strong>Total</strong></td>
+                <td class="text-end"><strong>₦{{ number_format($order->subtotal + $order->shipping_cost, 2) }}</strong></td>
             </tr>
         </tfoot>
     </table>

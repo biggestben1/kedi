@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Login – {{ config('app.name', 'Laravel') }}</title>
+    <title>Login – {{ config('app.name') }}</title>
 
-    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}" />
+    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
     <link id="style" href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -16,6 +16,16 @@
     <link href="{{ asset('sash/assets/css/skin-modes.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
+    <style>
+        .col-login .header-brand-img {
+            background-color: #fff !important;
+            max-width: 200px;
+            max-height: 80px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+    </style>
 </head>
 
 <body class="app sidebar-mini ltr">
@@ -29,7 +39,7 @@
             <div class="">
                 <div class="col col-login mx-auto mt-7">
                     <div class="text-center">
-                        <img src="{{ asset('images/logo.png') }}" class="header-brand-img" alt="{{ config('app.name') }}">
+                        <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img" alt="{{ config('app.name') }}">
                     </div>
                 </div>
 
@@ -39,6 +49,9 @@
                             @csrf
                             <span class="login100-form-title pb-5">Login</span>
 
+                            @if (session('status'))
+                                <div class="alert alert-success mb-3">{{ session('status') }}</div>
+                            @endif
                             @if ($errors->any())
                                 <div class="alert alert-danger mb-3">
                                     @foreach ($errors->all() as $error)
@@ -48,17 +61,7 @@
                             @endif
 
                             <div class="panel panel-primary">
-                                <div class="tab-menu-heading">
-                                    <div class="tabs-menu1">
-                                        <ul class="nav panel-tabs">
-                                            <li class="mx-0"><a href="#tab5" class="active" data-bs-toggle="tab">Email</a></li>
-                                            <li class="mx-0"><a href="#tab6" data-bs-toggle="tab">Mobile</a></li>
-                                        </ul>
-                                    </div>
-                                </div>
-                                <div class="panel-body tabs-menu-body p-0 pt-5">
-                                    <div class="tab-content">
-                                        <div class="tab-pane active" id="tab5">
+                                <div class="panel-body p-0 pt-3">
                                             <div class="wrap-input100 validate-input input-group">
                                                 <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
                                                     <i class="zmdi zmdi-email text-muted" aria-hidden="true"></i>
@@ -76,34 +79,12 @@
                                                 <label class="form-check-label" for="remember">Remember me</label>
                                             </div>
                                             <div class="text-end pt-4">
-                                                <p class="mb-0"><a href="{{ url('/') }}" class="text-primary ms-1">Forgot Password?</a></p>
+                                                <p class="mb-0"><a href="{{ route('password.request') }}" class="text-primary ms-1">Forgot Password?</a></p>
                                             </div>
                                             <div class="container-login100-form-btn">
                                                 <button type="submit" class="login100-form-btn btn-primary w-100">Login</button>
                                             </div>
-                                            <div class="text-center pt-3">
-                                                <p class="text-dark mb-0">Not a member? <a href="{{ route('register') }}" class="text-primary ms-1">Sign UP</a></p>
-                                            </div>
-                                        </div>
-                                        <div class="tab-pane" id="tab6">
-                                            <div id="mobile-num" class="wrap-input100 validate-input input-group mb-4">
-                                                <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
-                                                    <span>+91</span>
-                                                </a>
-                                                <input class="input100 border-start-0 form-control ms-0" placeholder="Mobile number">
-                                            </div>
-                                            <div id="login-otp" class="justify-content-around mb-5">
-                                                <input class="form-control text-center w-15" id="txt1" maxlength="1">
-                                                <input class="form-control text-center w-15" id="txt2" maxlength="1">
-                                                <input class="form-control text-center w-15" id="txt3" maxlength="1">
-                                                <input class="form-control text-center w-15" id="txt4" maxlength="1">
-                                            </div>
-                                            <span>Note : Login with registered mobile number to generate OTP.</span>
-                                            <div class="container-login100-form-btn">
-                                                <a href="javascript:void(0)" class="login100-form-btn btn-primary" id="generate-otp">Proceed</a>
-                                            </div>
-                                        </div>
-                                    </div>
+
                                 </div>
                             </div>
                         </form>

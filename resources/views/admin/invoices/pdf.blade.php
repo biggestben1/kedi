@@ -41,6 +41,7 @@
                 <th>Unit</th>
                 <th class="text-end">Unit Price</th>
                 <th class="text-end">Line Total</th>
+                <th>Status</th>
             </tr>
         </thead>
         <tbody>
@@ -52,6 +53,15 @@
                     <td>{{ $item->unit ?? '—' }}</td>
                     <td class="text-end">{{ number_format($item->unit_price, 2) }}</td>
                     <td class="text-end">{{ number_format($item->line_total, 2) }}</td>
+                    <td>
+                        @if(in_array($item->id, $outOfStockItemIds ?? []))
+                            Back order
+                        @elseif(in_array($item->id, $inStockItemIds ?? []))
+                            In stock
+                        @else
+                            —
+                        @endif
+                    </td>
                 </tr>
             @endforeach
         </tbody>

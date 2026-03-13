@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Register – {{ config('app.name', 'Laravel') }}</title>
+    <title>Register – {{ config('app.name') }}</title>
 
-    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}" />
+    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
     <link id="style" href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -16,6 +16,16 @@
     <link href="{{ asset('sash/assets/css/skin-modes.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
+    <style>
+        .col-login .header-brand-img {
+            background-color: #fff !important;
+            max-width: 200px;
+            max-height: 80px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+    </style>
 </head>
 
 <body class="app sidebar-mini ltr">
@@ -29,7 +39,7 @@
             <div class="">
                 <div class="col col-login mx-auto mt-7">
                     <div class="text-center">
-                        <img src="{{ asset('images/logo.png') }}" class="header-brand-img m-0" alt="{{ config('app.name') }}">
+                        <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img m-0" alt="{{ config('app.name') }}">
                     </div>
                 </div>
                 <div class="container-login100">
@@ -75,24 +85,6 @@
                             </div>
                             <div class="text-center pt-3">
                                 <p class="text-dark mb-0">Already have account? <a href="{{ route('login') }}" class="text-primary ms-1">Sign In</a></p>
-                            </div>
-                            <label class="login-social-icon"><span>Register with Social</span></label>
-                            <div class="d-flex justify-content-center">
-                                <a href="javascript:void(0)">
-                                    <div class="social-login me-4 text-center">
-                                        <i class="fa fa-google"></i>
-                                    </div>
-                                </a>
-                                <a href="javascript:void(0)">
-                                    <div class="social-login me-4 text-center">
-                                        <i class="fa fa-facebook"></i>
-                                    </div>
-                                </a>
-                                <a href="javascript:void(0)">
-                                    <div class="social-login text-center">
-                                        <i class="fa fa-twitter"></i>
-                                    </div>
-                                </a>
                             </div>
                         </form>
                     </div>

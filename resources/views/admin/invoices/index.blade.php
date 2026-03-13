@@ -92,6 +92,19 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
+                                    @if($invoice->user_id && !$invoice->order)
+                                        @if(in_array($invoice->id, $invoiceIdsRequireApproval ?? []))
+                                            <a href="{{ route('admin.invoices.show', $invoice) }}" class="btn btn-sm btn-success"><i class="fe fe-check me-1"></i>Approve (opens invoice)</a>
+                                        @else
+                                            <form action="{{ route('admin.invoices.move-to-dispatch', $invoice) }}" method="POST" class="d-inline" onsubmit="return confirm('Move this invoice to dispatch? An order will be created for the dispatcher to process.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-success"><i class="fe fe-truck me-1"></i>Move to dispatch</button>
+                                            </form>
+                                        @endif
+                                    @elseif($invoice->order)
+                                    <a href="{{ route('admin.dispatch.orders.show', $invoice->order) }}" class="btn btn-sm btn-outline-success"><i class="fe fe-truck me-1"></i>In dispatch</a>
+                                    @endif
+                                    <a href="{{ route('admin.invoices.show', $invoice) }}" class="btn btn-sm btn-outline-info" title="View"><i class="fe fe-eye me-1"></i>View</a>
                                     <a href="{{ route('admin.invoices.pdf', $invoice) }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" title="Download PDF"><i class="fe fe-file-text me-1"></i>PDF</a>
                                     <a href="{{ route('admin.invoices.edit', $invoice) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                                     <form action="{{ route('admin.invoices.destroy', $invoice) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this invoice?');">

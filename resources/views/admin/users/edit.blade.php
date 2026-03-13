@@ -27,6 +27,18 @@
         </div>
     @endif
 
+    @if ($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Please fix the following errors:</strong>
+            <ul class="mb-0 mt-1">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">{{ $user->name }}</h3>
@@ -52,6 +64,12 @@
                     <label class="form-label">Phone (optional)</label>
                     <input type="text" name="phone" class="form-control" value="{{ old('phone', $user->phone) }}">
                     @error('phone')<div class="text-danger small">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Service Center Code (optional)</label>
+                    <input type="text" name="service_center_code" class="form-control" value="{{ old('service_center_code', $user->service_center_code) }}">
+                    @error('service_center_code')<div class="text-danger small">{{ $message }}</div>@enderror
                 </div>
 
                 @if(auth()->user()->role?->name === 'reseller')

@@ -21,12 +21,13 @@ class RestrictResellerAdmin
         $routeName = $request->route()?->getName() ?? '';
         $allowed = $routeName === 'admin'
             || str_starts_with($routeName, 'admin.users')
-            || str_starts_with($routeName, 'admin.invoices');
+            || str_starts_with($routeName, 'admin.invoices')
+            || str_starts_with($routeName, 'admin.kd');
 
         if ($allowed) {
             return $next($request);
         }
 
-        abort(403, 'Access denied. Resellers can only access Users and Invoices.');
+        abort(403, 'Access denied. Resellers can only access Users, Invoices, and Borrow.');
     }
 }

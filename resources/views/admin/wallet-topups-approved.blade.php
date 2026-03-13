@@ -51,7 +51,7 @@
                                 <td class="text-end">₦{{ $tx->balance_after !== null ? number_format($tx->balance_after, 2) : '—' }}</td>
                                 <td>
                                     @if($tx->proof_path)
-                                        <a href="{{ asset('storage/' . $tx->proof_path) }}" target="_blank">View proof</a>
+                                        <a href="{{ url('api/v1/storage/' . $tx->proof_path) }}" target="_blank">View proof</a>
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif

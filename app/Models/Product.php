@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
     /** Role names that see member price; everyone else sees retail price (cost_price). */
-    public const MEMBER_ROLES = ['super_admin', 'wholesale_staff', 'reseller', 'customer'];
+    public const MEMBER_ROLES = ['super_admin', 'wholesale_staff', 'reseller', 'customer', 'branch', 'headquarters'];
 
     protected $fillable = [
         'category_id',
@@ -38,6 +39,7 @@ class Product extends Model
             'expiry_date' => 'date',
             'min_stock' => 'integer',
             'is_active' => 'boolean',
+            'can_use_dpbv' => 'boolean',
         ];
     }
 
@@ -100,5 +102,17 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /** Full URL for the product image (served via API to avoid 403 on direct storage). */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image) {
+            return null;
+        }
+
+        return Storage::disk('public')->exists($this->image)
+            ? url('api/v1/storage/' . $this->image)
+            : null;
     }
 }

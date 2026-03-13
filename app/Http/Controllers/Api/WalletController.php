@@ -42,7 +42,7 @@ class WalletController extends Controller
     public function topUp(Request $request): JsonResponse
     {
         $request->validate([
-            'amount' => 'required|numeric|min:1|max:99999999',
+            'amount' => 'required|numeric|min:1|max:1000000000000',
             'reference' => 'nullable|string|max:255',
             'proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);

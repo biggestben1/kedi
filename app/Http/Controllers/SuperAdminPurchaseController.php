@@ -7,6 +7,7 @@ use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SuperAdminPurchaseController extends Controller
 {
@@ -43,30 +44,35 @@ class SuperAdminPurchaseController extends Controller
             'items.*.cost_price' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $purchase = Purchase::create([
-            'supplier_id' => $data['supplier_id'],
-            'purchase_date' => $data['purchase_date'],
-            'purchase_invoice' => $data['purchase_invoice'] ?? null,
-            'payment_status' => $data['payment_status'],
-        ]);
-
-        foreach ($data['items'] as $row) {
-            $product = Product::find($row['product_id']);
-            $qty = (int) $row['quantity'];
-            $cost = (float) $row['cost_price'];
-            $lineTotal = $qty * $cost;
-            PurchaseItem::create([
-                'purchase_id' => $purchase->id,
-                'product_id' => $product->id,
-                'item_code' => $product->item_code,
-                'product_name' => $product->name . ($product->pack_size ? " ({$product->pack_size})" : ''),
-                'quantity' => $qty,
-                'cost_price' => $cost,
-                'line_total' => $lineTotal,
+        $purchase = DB::transaction(function () use ($data) {
+            $purchase = Purchase::create([
+                'supplier_id' => $data['supplier_id'],
+                'purchase_date' => $data['purchase_date'],
+                'purchase_invoice' => $data['purchase_invoice'] ?? null,
+                'payment_status' => $data['payment_status'],
             ]);
-        }
 
-        return redirect()->route('admin.purchases.index')->with('success', 'Purchase invoice created.');
+            foreach ($data['items'] as $row) {
+                $product = Product::find($row['product_id']);
+                $qty = (int) $row['quantity'];
+                $cost = (float) $row['cost_price'];
+                $lineTotal = $qty * $cost;
+                PurchaseItem::create([
+                    'purchase_id' => $purchase->id,
+                    'product_id' => $product->id,
+                    'item_code' => $product->item_code,
+                    'product_name' => $product->name . ($product->pack_size ? " ({$product->pack_size})" : ''),
+                    'quantity' => $qty,
+                    'cost_price' => $cost,
+                    'line_total' => $lineTotal,
+                ]);
+                $product->increment('stock', $qty);
+            }
+
+            return $purchase;
+        });
+
+        return redirect()->route('admin.purchases.index')->with('success', 'Purchase invoice created. Stock has been added to products.');
     }
 
     public function edit(Purchase $purchase)
@@ -103,46 +109,66 @@ class SuperAdminPurchaseController extends Controller
         ]);
 
         $keepIds = [];
-        foreach ($data['items'] as $row) {
-            $product = Product::find($row['product_id']);
-            $qty = (int) $row['quantity'];
-            $cost = (float) $row['cost_price'];
-            $lineTotal = $qty * $cost;
-            if (!empty($row['id'])) {
-                $item = PurchaseItem::where('purchase_id', $purchase->id)->find($row['id']);
-                if ($item) {
-                    $item->update([
-                        'product_id' => $product->id,
-                        'item_code' => $product->item_code,
-                        'product_name' => $product->name . ($product->pack_size ? " ({$product->pack_size})" : ''),
-                        'quantity' => $qty,
-                        'cost_price' => $cost,
-                        'line_total' => $lineTotal,
-                    ]);
-                    $keepIds[] = $item->id;
-                    continue;
+        DB::transaction(function () use ($data, $purchase, &$keepIds) {
+            foreach ($data['items'] as $row) {
+                $product = Product::find($row['product_id']);
+                $qty = (int) $row['quantity'];
+                $cost = (float) $row['cost_price'];
+                $lineTotal = $qty * $cost;
+                if (!empty($row['id'])) {
+                    $item = PurchaseItem::where('purchase_id', $purchase->id)->find($row['id']);
+                    if ($item) {
+                        $oldQty = (int) $item->quantity;
+                        if ($item->product_id === $product->id && $qty !== $oldQty) {
+                            $product->increment('stock', $qty - $oldQty);
+                        } elseif ($item->product_id !== $product->id) {
+                            Product::where('id', $item->product_id)->decrement('stock', $oldQty);
+                            $product->increment('stock', $qty);
+                        }
+                        $item->update([
+                            'product_id' => $product->id,
+                            'item_code' => $product->item_code,
+                            'product_name' => $product->name . ($product->pack_size ? " ({$product->pack_size})" : ''),
+                            'quantity' => $qty,
+                            'cost_price' => $cost,
+                            'line_total' => $lineTotal,
+                        ]);
+                        $keepIds[] = $item->id;
+                        continue;
+                    }
                 }
+                $newItem = PurchaseItem::create([
+                    'purchase_id' => $purchase->id,
+                    'product_id' => $product->id,
+                    'item_code' => $product->item_code,
+                    'product_name' => $product->name . ($product->pack_size ? " ({$product->pack_size})" : ''),
+                    'quantity' => $qty,
+                    'cost_price' => $cost,
+                    'line_total' => $lineTotal,
+                ]);
+                $product->increment('stock', $qty);
+                $keepIds[] = $newItem->id;
             }
-            $newItem = PurchaseItem::create([
-                'purchase_id' => $purchase->id,
-                'product_id' => $product->id,
-                'item_code' => $product->item_code,
-                'product_name' => $product->name . ($product->pack_size ? " ({$product->pack_size})" : ''),
-                'quantity' => $qty,
-                'cost_price' => $cost,
-                'line_total' => $lineTotal,
-            ]);
-            $keepIds[] = $newItem->id;
-        }
-        $purchase->items()->whereNotIn('id', $keepIds)->delete();
+            $deletedItems = $purchase->items()->whereNotIn('id', $keepIds)->get();
+            foreach ($deletedItems as $item) {
+                Product::where('id', $item->product_id)->decrement('stock', (int) $item->quantity);
+            }
+            $purchase->items()->whereNotIn('id', $keepIds)->delete();
+        });
 
         return redirect()->route('admin.purchases.index')->with('success', 'Purchase updated.');
     }
 
     public function destroy(Purchase $purchase)
     {
-        $purchase->items()->delete();
-        $purchase->delete();
+        $purchase->load('items');
+        DB::transaction(function () use ($purchase) {
+            foreach ($purchase->items as $item) {
+                Product::where('id', $item->product_id)->decrement('stock', (int) $item->quantity);
+            }
+            $purchase->items()->delete();
+            $purchase->delete();
+        });
         return redirect()->route('admin.purchases.index')->with('success', 'Purchase deleted.');
     }
 }

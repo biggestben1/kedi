@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Announcement;
 use App\Models\Product;
 use Illuminate\Http\Request;
 
@@ -35,6 +36,7 @@ class DashboardController extends Controller
         }
 
         $cartCount = array_sum($cart);
+
 
         return view('dashboard', compact('cartItems', 'cartSubtotal', 'cartBv', 'cartPv', 'cartCount'));
     }

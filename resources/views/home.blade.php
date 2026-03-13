@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>KEDI Shop – {{ config('app.name', 'Laravel') }}</title>
-    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}" />
+    <title>KEDI Shop – {{ config('app.name') }}</title>
+    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}?v=3" />
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -15,10 +15,9 @@
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
     <style>
-        /* Override Sash theme: logo-horizontal and header logos are hidden by default */
+        /* Hide header logo (right side); keep sidebar logo only */
         .app-header .logo-horizontal {
-            display: block !important;
-            min-width: 120px;
+            display: none !important;
         }
         .app-header .logo-horizontal img {
             max-height: 52px;
@@ -34,10 +33,44 @@
             max-width: 100%;
             display: block !important;
             visibility: visible !important;
+            background-color: #fff !important;
         }
         /* Slightly bigger font for Categories block on shop home */
         .kedi-categories-heading { font-size: 1.1rem !important; }
         .kedi-categories-list, .kedi-categories-list a { font-size: 1rem !important; }
+        /* Fix cart dropdown scrolling */
+        .shopping-cart .header-dropdown-list.message-menu {
+            overflow-y: auto !important;
+            max-height: 320px;
+        }
+        /* Fix main content scrolling */
+        .main-content.app-content {
+            overflow-y: auto;
+        }
+        .page-main {
+            min-height: 100vh;
+            overflow: visible;
+        }
+        /* Fix cart offcanvas (mobile) scrolling */
+        #cartOffcanvas .offcanvas-body {
+            overflow-y: auto;
+        }
+        /* Sidebar: fixed height and scrollable menu */
+        .app-sidebar {
+            height: 100vh;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+        }
+        .app-sidebar .side-header {
+            flex-shrink: 0;
+        }
+        .app-sidebar .main-sidemenu {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto !important;
+            overflow-x: hidden;
+        }
     </style>
 </head>
 <body class="app sidebar-mini ltr">
@@ -53,7 +86,7 @@
                     <div class="d-flex">
                         <a aria-label="Hide Sidebar" class="app-sidebar__toggle" data-bs-toggle="sidebar" href="javascript:void(0)"></a>
                         <a class="logo-horizontal" href="{{ url('/') }}">
-                            <img src="{{ asset('images/logo.png') }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}" onerror="this.onerror=null;this.src='{{ asset('sash/assets/images/brand/logo.png') }}';">
+                            <img src="{{ asset('images/logo.png') }}?v=3" class="header-brand-img light-logo1" alt="{{ config('app.name') }}" onerror="this.onerror=null;this.src='{{ asset('sash/assets/images/brand/logo.png') }}?v=3';">
                         </a>
                         <div class="d-flex order-lg-2 ms-auto header-right-icons">
                             <button class="navbar-toggler navresponsive-toggler d-lg-none ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent-4" aria-controls="navbarSupportedContent-4" aria-expanded="false" aria-label="Toggle navigation">
@@ -82,6 +115,11 @@
                                                     <div id="cartDropdownItems">
                                                         @forelse($cartItems as $item)
                                                         <div class="dropdown-item d-flex p-4">
+                                                            @if($item->product->image_url)
+                                                            <div class="me-3 flex-shrink-0">
+                                                                <img src="{{ $item->product->image_url }}" alt="{{ $item->product->name }}" class="rounded" style="width: 48px; height: 48px; object-fit: cover;">
+                                                            </div>
+                                                            @endif
                                                             <div class="wd-50p">
                                                                 <h5 class="mb-1">{{ $item->product->item_code }} – {{ $item->product->name }}</h5>
                                                                 @if($item->product->category)
@@ -108,7 +146,13 @@
                                                 <div class="dropdown-divider m-0" id="cartDropdownDivider" style="{{ count($cartItems) > 0 ? '' : 'display:none;' }}"></div>
                                                 <div class="dropdown-footer" id="cartDropdownFooter" style="{{ count($cartItems) > 0 ? '' : 'display:none;' }}">
                                                     @auth
-                                                    <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-pill btn-sm py-2"><i class="fe fe-credit-card me-1"></i> Checkout</a>
+                                                    @if($canBuyWithDpbv ?? false)
+                                                        <form action="{{ route('checkout.dpbv') }}" method="POST" class="mb-2" onsubmit="return confirm('Buy with DPBV? This will auto-generate KD NO and deduct from your DPBV balance.');">
+                                                            @csrf
+                                                            <button type="submit" class="btn btn-success btn-pill btn-sm py-2 w-100"><i class="fe fe-award me-1"></i> Buy with DPBV</button>
+                                                        </form>
+                                                    @endif
+                                                    <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-pill btn-sm py-2 js-checkout-link"><i class="fe fe-credit-card me-1"></i> Checkout</a>
                                                     @else
                                                     <a href="{{ route('login') }}" class="btn btn-primary btn-pill btn-sm py-2">Login to Checkout</a>
                                                     @endauth
@@ -131,10 +175,27 @@
                                                 <div class="dropdown-divider m-0"></div>
                                                 <a class="dropdown-item" href="{{ route('dashboard') }}"><i class="dropdown-icon fe fe-user"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
+                                                <a class="dropdown-item" href="{{ route('orders.index', ['status' => 'draft']) }}"><i class="dropdown-icon fe fe-file-text"></i> My Drafts</a>
+                                                @if(auth()->user()->role?->name === 'service_center')
+                                                <a class="dropdown-item" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="dropdown-icon fe fe-users"></i> Referral Orders</a>
+                                                @endif
                                                 <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
                                                 <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
-                                                @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch')
-                                                <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> {{ auth()->user()->role?->name === 'reseller' ? 'Go to Reseller' : (auth()->user()->role?->name === 'accountant' ? 'Go to Accountant Panel' : (auth()->user()->role?->name === 'dispatch' ? 'Go to Dispatch Panel' : 'Go to Admin')) }}</a>
+                                                <a class="dropdown-item" href="{{ route('password.change') }}"><i class="dropdown-icon fe fe-lock"></i> Change Password</a>
+                                                @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center')
+                                                @php
+                                                    $role = auth()->user()->role?->name;
+                                                    $adminLabel = match($role) {
+                                                        'reseller' => 'Go to Reseller',
+                                                        'accountant' => 'Go to Accountant Panel',
+                                                        'dispatch' => 'Go to Dispatch Panel',
+                                                        'headquarters' => 'Admin Dashboard',
+                                                        'branch' => 'Go to Branch Admin',
+                                                        'service_center' => 'Go to Service Center Admin',
+                                                        default => 'Go to Admin',
+                                                    };
+                                                @endphp
+                                                <a class="dropdown-item" href="{{ $role === 'headquarters' ? route('admin.pharmacy.dashboard') : route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> {{ $adminLabel }}</a>
                                                 @endif
                                                 <form method="POST" action="{{ route('logout') }}">
                                                     @csrf
@@ -142,7 +203,6 @@
                                                 </form>
                                                 @else
                                                 <a class="dropdown-item" href="{{ route('login') }}"><i class="dropdown-icon fe fe-log-in"></i> Login</a>
-                                                <a class="dropdown-item" href="{{ route('register') }}"><i class="dropdown-icon fe fe-user-plus"></i> Register</a>
                                                 @endauth
                                             </div>
                                         </div>
@@ -161,7 +221,7 @@
                 <div class="app-sidebar">
                     <div class="side-header">
                         <a class="header-brand1" href="{{ url('/') }}">
-                            <img src="{{ asset('images/logo.png') }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}" onerror="this.onerror=null;this.src='{{ asset('sash/assets/images/brand/logo.png') }}';">
+                            <img src="{{ asset('images/logo.png') }}?v=3" class="header-brand-img light-logo1" alt="{{ config('app.name') }}" onerror="this.onerror=null;this.src='{{ asset('sash/assets/images/brand/logo.png') }}?v=3';">
                         </a>
                     </div>
                     <div class="main-sidemenu">
@@ -179,24 +239,59 @@
                                 <a class="side-menu__item" href="{{ route('orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Orders</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ route('orders.index', ['status' => 'draft']) }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Drafts</span></a>
+                            </li>
+                            @if(auth()->user()->role?->name === 'service_center')
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Referral Orders</span></a>
+                            </li>
+                            @endif
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Wallet</span></a>
                             </li>
-                            @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch')
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">{{ auth()->user()->role?->name === 'reseller' ? 'Reseller' : (auth()->user()->role?->name === 'accountant' ? 'Accountant Panel' : (auth()->user()->role?->name === 'dispatch' ? 'Dispatch Panel' : 'Admin')) }}</span></a>
+                                <a class="side-menu__item" href="{{ route('dpbv.index') }}"><i class="side-menu__icon fe fe-award"></i><span class="side-menu__label">My DPBV</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('promo.index') }}"><i class="side-menu__icon fe fe-gift"></i><span class="side-menu__label">My Promo</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('bonus.index') }}"><i class="side-menu__icon fe fe-trending-up"></i><span class="side-menu__label">My Bonus</span></a>
+                            </li>
+                            @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
+                            @php
+                                $sideRole = auth()->user()->role?->name;
+                                $sideAdminLabel = match($sideRole) {
+                                    'reseller' => 'Reseller',
+                                    'accountant' => 'Accountant Panel',
+                                    'dispatch' => 'Dispatch Panel',
+                                    'headquarters' => 'Admin Dashboard',
+                                    'branch' => 'Branch Admin',
+                                    'service_center' => 'Service Center Admin',
+                                    'annex' => 'Annex Admin',
+                                    default => 'Admin',
+                                };
+                            @endphp
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ in_array($sideRole, ['headquarters', 'branch', 'service_center', 'annex']) ? route('admin.pharmacy.dashboard') : route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">{{ $sideAdminLabel }}</span></a>
+                            </li>
+                            @if(auth()->user()->isSuperAdmin())
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('admin.expenditures.index') }}"><i class="side-menu__icon fe fe-credit-card"></i><span class="side-menu__label">Expenditures</span></a>
                             </li>
                             @endif
+                            @endif
                             @endauth
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('contact.show') }}"><i class="side-menu__icon fe fe-mail"></i><span class="side-menu__label">Contact Us</span></a>
+                            </li>
                             <li class="sub-category"><h3>Account</h3></li>
                             @guest
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('login') }}"><i class="side-menu__icon fe fe-log-in"></i><span class="side-menu__label">Login</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ route('register') }}"><i class="side-menu__icon fe fe-user-plus"></i><span class="side-menu__label">Register</span></a>
                             </li>
                             @else
                             <li class="slide">
@@ -220,11 +315,11 @@
                 <div class="side-app">
                     <div class="main-container container-fluid">
                         <div class="page-header">
-                            <h1 class="page-title">Shop</h1>
+                            <h1 class="page-title">Shop @auth - {{ auth()->user()->name }} @endauth</h1>
                             <div>
                                 <ol class="breadcrumb">
                                     <li class="breadcrumb-item"><a href="{{ url('/') }}">E-Commerce</a></li>
-                                    <li class="breadcrumb-item active" aria-current="page">Shop</li>
+                                    <li class="breadcrumb-item active" aria-current="page">Shop @auth - {{ auth()->user()->name }} @endauth</li>
                                 </ol>
                             </div>
                         </div>
@@ -248,6 +343,58 @@
                             </div>
                         @endif
 
+                        @if($showKdModal ?? false)
+                        <div class="alert alert-info mb-3">
+                            <strong><i class="fe fe-info me-1"></i> Optional:</strong> Enter your KD NO and Customer Name below to associate with orders. You can shop without them and add them later.
+                        </div>
+                        @endif
+                        
+                        @auth
+                        @php
+                            $dpbvBalanceNaira = (float) ($dpbvNairaEquivalent ?? 0);
+                            $dpbvCartTotal = (float) ($cartSubtotal ?? 0);
+                            $dpbvHasItems = (int) ($cartCount ?? 0) > 0;
+                            $dpbvHasBalance = $dpbvBalanceNaira > 0;
+                            $dpbvAllItemsAllowed = true;
+                            foreach (($cartItems ?? []) as $it) {
+                                if (!($it->product->can_use_dpbv ?? true)) {
+                                    $dpbvAllItemsAllowed = false;
+                                    break;
+                                }
+                            }
+                        @endphp
+                        <div class="alert {{ $dpbvHasBalance ? 'alert-success' : 'alert-info' }} mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <strong><i class="fe fe-award me-1"></i> DPBV Balance:</strong>
+                                {{ number_format($totalDpbv ?? 0, 2) }} DPBV = ₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }}
+                            </div>
+                            @if($canBuyWithDpbv ?? false)
+                                <form action="{{ route('checkout.dpbv') }}" method="POST" class="d-inline" onsubmit="return confirm('Buy with DPBV? This will auto-generate KD NO and deduct from your DPBV balance (₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }} available).');">
+                                    @csrf
+                                    <button type="submit" class="btn btn-success btn-sm"><i class="fe fe-award me-1"></i> Buy with DPBV</button>
+                                </form>
+                            @elseif(! $dpbvHasItems)
+                                <span class="text-muted small">Add items to cart to buy with DPBV.</span>
+                            @elseif(! $dpbvAllItemsAllowed)
+                                <span class="text-muted small">Some items in your cart cannot be purchased with DPBV.</span>
+                            @elseif($dpbvBalanceNaira <= 0)
+                                <span class="text-muted small">No DPBV balance available.</span>
+                            @elseif($dpbvBalanceNaira < $dpbvCartTotal)
+                                <span class="text-muted small">Cart total exceeds your DPBV balance.</span>
+                            @else
+                                <span class="text-muted small">DPBV is not available for this cart.</span>
+                            @endif
+                        </div>
+                        @endauth
+                        
+                        @auth
+                        <div class="row">
+                            <div class="col-12 text-center mb-4">
+                                <h3 class="fw-bold">Welcome! {{ auth()->user()->name }}</h3>
+                            </div>
+                        </div>
+                        @endauth
+
                         <div class="row row-cards">
                             <div class="col-xl-3 col-lg-4">
                                 <div class="row">
@@ -264,7 +411,10 @@
                                                         <a href="{{ url('/') }}" class="{{ !request()->filled('category_id') ? 'fw-semibold text-primary' : 'text-muted' }}">All</a>
                                                     </li>
                                                     @foreach($categories ?? [] as $cat)
-                                                    <li class="mb-1">
+                                                    <li class="mb-1 d-flex align-items-center gap-2">
+                                                        @if($cat->image_url)
+                                                            <img src="{{ $cat->image_url }}" alt="{{ $cat->name }}" class="img-thumbnail" style="max-height: 32px; max-width: 48px; object-fit: contain;">
+                                                        @endif
                                                         <a href="{{ url('/') }}?category_id={{ $cat->id }}" class="{{ (request()->query('category_id') == $cat->id) ? 'fw-semibold text-primary' : 'text-muted' }}">{{ $cat->name }}</a>
                                                     </li>
                                                     @endforeach
@@ -286,7 +436,13 @@
                                                 <p class="mb-1"><strong>Subtotal:</strong> <span id="cartSummarySubtotal">₦{{ number_format($cartSubtotal, 0) }}</span></p>
                                                 <p class="mb-2 small text-muted">BV: <span id="cartSummaryBv">{{ number_format($cartBv, 1) }}</span> &nbsp; PV: <span id="cartSummaryPv">{{ number_format($cartPv, 1) }}</span></p>
                                                 @auth
-                                                <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-sm w-100 mb-2"><i class="fe fe-credit-card me-1"></i> Checkout</a>
+                                                @if($canBuyWithDpbv ?? false)
+                                                    <form action="{{ route('checkout.dpbv') }}" method="POST" class="mb-2" onsubmit="return confirm('Buy with DPBV? This will auto-generate KD NO and deduct from your DPBV balance (₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }} available).');">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-success btn-sm w-100"><i class="fe fe-award me-1"></i> Buy with DPBV</button>
+                                                    </form>
+                                                @endif
+                                                <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-sm w-100 mb-2 js-checkout-link"><i class="fe fe-credit-card me-1"></i> Checkout</a>
                                                 @else
                                                 <a href="{{ route('login') }}" class="btn btn-primary btn-sm w-100 mb-2">Login to Checkout</a>
                                                 @endauth
@@ -333,8 +489,12 @@
                                                         <div class="card">
                                                             <div class="product-grid6">
                                                                 <div class="product-image6 p-5">
-                                                                    <a href="javascript:void(0)" class="bg-light d-block text-center py-4">
-                                                                        <span class="badge bg-primary fs-14">{{ $product->item_code }}</span>
+                                                                    <a href="javascript:void(0)" class="bg-light d-block text-center py-4" style="min-height: 140px; display: flex; align-items: center; justify-content: center;">
+                                                                        @if($product->image_url)
+                                                                            <img src="{{ $product->image_url }}" alt="{{ $product->display_name }}" style="max-height: 140px; max-width: 100%; object-fit: contain;">
+                                                                        @else
+                                                                            <span class="badge bg-primary fs-14">{{ $product->item_code }}</span>
+                                                                        @endif
                                                                     </a>
                                                                 </div>
                                                                 <div class="card-body pt-0">
@@ -370,7 +530,11 @@
                                                             <div class="card-body">
                                                                 <div class="row align-items-center">
                                                                     <div class="col-auto">
-                                                                        <span class="badge bg-primary fs-14">{{ $product->item_code }}</span>
+                                                                        @if($product->image_url)
+                                                                            <img src="{{ $product->image_url }}" alt="{{ $product->display_name }}" class="rounded" style="width: 64px; height: 64px; object-fit: cover;">
+                                                                        @else
+                                                                            <span class="badge bg-primary fs-14">{{ $product->item_code }}</span>
+                                                                        @endif
                                                                     </div>
                                                                     <div class="col">
                                                                         <h5 class="mb-1">{{ $product->display_name }}</h5>
@@ -418,6 +582,11 @@
                     @foreach($cartItems as $item)
                         <div class="list-group-item">
                             <div class="d-flex justify-content-between align-items-start">
+                                @if($item->product->image_url)
+                                <div class="me-2 flex-shrink-0">
+                                                                    <img src="{{ $item->product->image_url }}" alt="{{ $item->product->name }}" class="rounded" style="width: 48px; height: 48px; object-fit: cover;">
+                                </div>
+                                @endif
                                 <div class="me-2">
                                     <strong>{{ $item->product->item_code }}</strong> {{ $item->product->name }}<br>
                                     @if($item->product->category)
@@ -439,7 +608,13 @@
                 <p><strong>Subtotal:</strong> <span id="cartOffcanvasSubtotal">₦{{ number_format($cartSubtotal, 0) }}</span></p>
                 <p class="small text-muted">BV: <span id="cartOffcanvasBv">{{ number_format($cartBv, 1) }}</span> &nbsp; PV: <span id="cartOffcanvasPv">{{ number_format($cartPv, 1) }}</span></p>
                 @auth
-                <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-sm w-100 mb-2">Checkout</a>
+                @if($canBuyWithDpbv ?? false)
+                    <form action="{{ route('checkout.dpbv') }}" method="POST" class="mb-2" onsubmit="return confirm('Buy with DPBV? This will auto-generate KD NO and deduct from your DPBV balance.');">
+                        @csrf
+                        <button type="submit" class="btn btn-success btn-sm w-100"><i class="fe fe-award me-1"></i> Buy with DPBV</button>
+                    </form>
+                @endif
+                <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-sm w-100 mb-2 js-checkout-link">Checkout</a>
                 @else
                 <a href="{{ route('login') }}" class="btn btn-primary btn-sm w-100 mb-2">Login to Checkout</a>
                 @endauth
@@ -455,11 +630,86 @@
             <div class="row align-items-center flex-row-reverse">
                 <div class="col-md-12 col-sm-12 text-center">
                     Copyright © <span id="year"></span> <a href="{{ url('/') }}">KEDI</a>. All rights reserved.
+                    <span class="ms-2">|</span>
+                    <a href="{{ route('contact.show') }}" class="ms-2">Contact Us</a>
                 </div>
             </div>
         </div>
     </footer>
     <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
+
+    @if($showKdModal ?? false)
+    <!-- KD NO & Customer Name modal - optional; guests can shop without and add later -->
+    <div class="modal fade" id="kdInfoModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="kdInfoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="kdInfoModalLabel"><i class="fe fe-user me-2"></i>Enter KD NO & Customer Name</h5>
+                </div>
+                <form action="{{ route('kd-info.store') }}" method="POST" id="kdInfoForm">
+                    @csrf
+                    <div class="modal-body">
+                        <p class="text-muted mb-3">You can shop without KD NO and Customer Name – add them later when you have them. Or auto-generate one (saved to your account, editable later) or enter manually.</p>
+                        <div class="mb-3">
+                            <label for="kd_id" class="form-label">KD NO</label>
+                            <div class="input-group">
+                                <input type="text" name="kd_id" id="kd_id" class="form-control @error('kd_id') is-invalid @enderror" placeholder="Enter your KD number" value="{{ old('kd_id', session('kd_id')) }}" autofocus>
+                                <button type="button" class="btn btn-outline-info" id="kdSearchBtn" title="Search for KD NO in system"><i class="fe fe-search me-1"></i>Search</button>
+                                <button type="button" class="btn btn-outline-secondary" id="kdAutoGenerateBtn" title="Auto-generate and save to your account"><i class="fe fe-zap me-1"></i>Auto Generate</button>
+                            </div>
+                            <div id="kdSearchResult" class="mt-2"></div>
+                            @error('kd_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="mb-3" id="customerNameField" style="display: {{ old('customer_name', session('customer_name')) ? 'block' : 'none' }};">
+                            <label for="customer_name" class="form-label">Customer Name</label>
+                            <input type="text" name="customer_name" id="customer_name" class="form-control @error('customer_name') is-invalid @enderror" placeholder="Enter customer name" value="{{ old('customer_name', session('customer_name')) }}">
+                            @error('customer_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">I'll browse only</button>
+                        <button type="submit" class="btn btn-primary" id="kdInfoSubmit"><i class="fe fe-check me-1"></i>Continue Shopping</button>
+                        @auth
+                        @php
+                            $dpbvBalanceNairaModal = (float) ($dpbvNairaEquivalent ?? 0);
+                            $dpbvCartTotalModal = (float) ($cartSubtotal ?? 0);
+                            $dpbvHasItemsModal = (int) ($cartCount ?? 0) > 0;
+                            $dpbvAllItemsAllowedModal = true;
+                            foreach (($cartItems ?? []) as $it) {
+                                if (!($it->product->can_use_dpbv ?? true)) {
+                                    $dpbvAllItemsAllowedModal = false;
+                                    break;
+                                }
+                            }
+                            $dpbvDisabledReason = null;
+                            if (!($canBuyWithDpbv ?? false)) {
+                                if (! $dpbvHasItemsModal) {
+                                    $dpbvDisabledReason = 'Add items to cart to buy with DPBV.';
+                                } elseif (! $dpbvAllItemsAllowedModal) {
+                                    $dpbvDisabledReason = 'Some items in your cart cannot be purchased with DPBV.';
+                                } elseif ($dpbvBalanceNairaModal <= 0) {
+                                    $dpbvDisabledReason = 'No DPBV balance available.';
+                                } elseif ($dpbvBalanceNairaModal < $dpbvCartTotalModal) {
+                                    $dpbvDisabledReason = 'Cart total exceeds your DPBV balance.';
+                                } else {
+                                    $dpbvDisabledReason = 'DPBV is not available for this cart.';
+                                }
+                            }
+                        @endphp
+                        <button
+                            type="button"
+                            class="btn btn-success"
+                            id="dpbvAutoGenBtn"
+                            {{ ($canBuyWithDpbv ?? false) ? '' : 'disabled' }}
+                            title="{{ $dpbvDisabledReason ?? '' }}"
+                        ><i class="fe fe-award me-1"></i>Buy with DPBV</button>
+                        @endauth
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <script src="{{ asset('sash/assets/js/jquery.min.js') }}"></script>
     <script src="{{ asset('sash/assets/plugins/bootstrap/js/popper.min.js') }}"></script>
@@ -517,9 +767,12 @@
                 const categoryName = it.product.category && it.product.category.name ? it.product.category.name : '';
                 const qty = it.quantity;
                 const line = it.line_total;
+                const imgUrl = it.product.image_url || '';
                 const categoryHtml = categoryName ? `<small class=\"text-muted\">Category: ${categoryName}</small>` : '';
+                const imgHtml = imgUrl ? `<div class=\"me-3 flex-shrink-0\"><img src=\"${imgUrl}\" alt=\"${name}\" class=\"rounded\" style=\"width: 48px; height: 48px; object-fit: cover;\"></div>` : '';
                 return `
                     <div class=\"dropdown-item d-flex p-4\">
+                        ${imgHtml}
                         <div class=\"wd-50p\">
                             <h5 class=\"mb-1\">${code} – ${name}</h5>
                             ${categoryHtml}
@@ -551,10 +804,13 @@
                 const categoryName = it.product.category && it.product.category.name ? it.product.category.name : '';
                 const qty = it.quantity;
                 const line = it.line_total;
+                const imgUrl = it.product.image_url || '';
                 const categoryHtml = categoryName ? `<small class=\"text-muted\">Category: ${categoryName}</small><br>` : '';
+                const imgHtml = imgUrl ? `<div class=\"me-2 flex-shrink-0\"><img src=\"${imgUrl}\" alt=\"${name}\" class=\"rounded\" style=\"width: 48px; height: 48px; object-fit: cover;\"></div>` : '';
                 return `
                     <div class=\"list-group-item\">
                         <div class=\"d-flex justify-content-between align-items-start\">
+                            ${imgHtml}
                             <div class=\"me-2\">
                                 <strong>${code}</strong> ${name}<br>
                                 ${categoryHtml}
@@ -653,6 +909,219 @@
             return refreshCart();
         }
 
+        const kdInfoRequired = false; // Guests can shop without KD; they can add it later
+
+        // Search KD NO button
+        const kdSearchBtn = document.getElementById('kdSearchBtn');
+        if (kdSearchBtn) {
+            kdSearchBtn.addEventListener('click', async function() {
+                const btn = this;
+                const kdInput = document.getElementById('kd_id');
+                const nameInput = document.getElementById('customer_name');
+                const nameField = document.getElementById('customerNameField');
+                const resultDiv = document.getElementById('kdSearchResult');
+                
+                if (!kdInput || !kdInput.value.trim()) {
+                    if (resultDiv) {
+                        resultDiv.innerHTML = '<div class="alert alert-warning small mb-0">Please enter a KD NO to search.</div>';
+                    }
+                    return;
+                }
+
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fe fe-loader me-1"></i>Searching...';
+                if (resultDiv) resultDiv.innerHTML = '';
+                if (nameField) nameField.style.display = 'none';
+                if (nameInput) nameInput.value = '';
+
+                try {
+                    const res = await fetch('{{ route("kd-info.search") }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 
+                            'Accept': 'application/json', 
+                            'Content-Type': 'application/x-www-form-urlencoded', 
+                            'X-CSRF-TOKEN': CSRF, 
+                            'X-Requested-With': 'XMLHttpRequest' 
+                        },
+                        body: 'kd_no=' + encodeURIComponent(kdInput.value.trim()) + '&_token=' + encodeURIComponent(CSRF),
+                    });
+                    const data = await res.json().catch(function() { return {}; });
+                    
+                    if (!res.ok || data.error) {
+                        if (resultDiv) {
+                            resultDiv.innerHTML = '<div class="alert alert-danger small mb-0">' + (data.error || 'Search failed.') + '</div>';
+                        }
+                    } else if (data.found && data.belongs_to_user) {
+                        // KD NO found and belongs to user - auto-fill and show customer name field
+                        if (kdInput) kdInput.value = data.kd_no || kdInput.value;
+                        if (nameInput) nameInput.value = data.customer_name || '';
+                        const nameField = document.getElementById('customerNameField');
+                        if (nameField) nameField.style.display = 'block';
+                        if (resultDiv) {
+                            resultDiv.innerHTML = '<div class="alert alert-success small mb-0"><i class="fe fe-check me-1"></i>' + (data.message || 'KD NO found and customer name auto-filled.') + '</div>';
+                        }
+                    } else if (data.found && !data.belongs_to_user) {
+                        // KD NO found but doesn't belong to user
+                        if (resultDiv) {
+                            resultDiv.innerHTML = '<div class="alert alert-warning small mb-0"><i class="fe fe-alert-triangle me-1"></i>' + (data.message || 'KD NO found but does not belong to your account.') + ' <a href="{{ route("admin.kd.registration.create") }}" target="_blank" class="alert-link">Please register this KD NO</a> first.</div>';
+                        }
+                        if (nameField) nameField.style.display = 'none';
+                        if (nameInput) nameInput.value = '';
+                    } else {
+                        // KD NO not found - show red alert
+                        if (resultDiv) {
+                            resultDiv.innerHTML = '<div class="alert alert-danger small mb-0"><i class="fe fe-x-circle me-1"></i>' + (data.message || 'KD NO not found in the system.') + ' <a href="{{ route("admin.kd.registration.create") }}" target="_blank" class="alert-link">Please register this KD NO</a> first.</div>';
+                        }
+                        if (nameField) nameField.style.display = 'none';
+                        if (nameInput) nameInput.value = '';
+                    }
+                } catch (err) {
+                    if (resultDiv) {
+                        resultDiv.innerHTML = '<div class="alert alert-danger small mb-0">Search failed: ' + (err?.message || 'Unknown error') + '</div>';
+                    }
+                    if (nameField) nameField.style.display = 'none';
+                    if (nameInput) nameInput.value = '';
+                }
+                
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fe fe-search me-1"></i>Search';
+            });
+        }
+
+        // KD Auto Generate button
+        const kdAutoGenBtn = document.getElementById('kdAutoGenerateBtn');
+        if (kdAutoGenBtn) {
+            kdAutoGenBtn.addEventListener('click', async function() {
+                const btn = this;
+                btn.disabled = true;
+                btn.innerHTML = '<i class=\"fe fe-loader me-1\"></i>Generating...';
+                try {
+                    const res = await fetch('{{ route("kd-info.auto-generate") }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+                        body: '_token=' + encodeURIComponent(CSRF),
+                    });
+                    const data = await res.json().catch(function() { return {}; });
+                    if (res.ok && (data.kd_id || data.customer_name)) {
+                        const kdInput = document.getElementById('kd_id');
+                        const nameInput = document.getElementById('customer_name');
+                        const nameField = document.getElementById('customerNameField');
+                        if (kdInput) kdInput.value = data.kd_id || '';
+                        if (nameInput) nameInput.value = data.customer_name || '';
+                        if (nameField) nameField.style.display = 'block';
+                    } else if (!res.ok && data.error) {
+                        alert(data.error);
+                    }
+                    if (data.message && res.ok) {
+                        const m = document.querySelector('.modal-body');
+                        if (m) {
+                            const alert = document.createElement('div');
+                            alert.className = 'alert alert-success alert-dismissible fade show small';
+                            alert.innerHTML = data.message + ' <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\"></button>';
+                            m.insertBefore(alert, m.firstChild);
+                            setTimeout(() => alert.remove(), 4000);
+                        }
+                    }
+                } catch (err) {
+                    alert(err?.error || err?.message || 'Failed to generate.');
+                }
+                btn.disabled = false;
+                btn.innerHTML = '<i class=\"fe fe-zap me-1\"></i>Auto Generate';
+            });
+        }
+
+        // DPBV Auto-generate and Buy button
+        const dpbvAutoGenBtn = document.getElementById('dpbvAutoGenBtn');
+        if (dpbvAutoGenBtn) {
+            dpbvAutoGenBtn.addEventListener('click', async function() {
+                const btn = this;
+                btn.disabled = true;
+                btn.innerHTML = '<i class=\"fe fe-loader me-1\"></i>Processing...';
+                try {
+                    // Step 1: Auto-generate KD NO and name
+                    const res = await fetch('{{ route("kd-info.auto-generate") }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+                        body: '_token=' + encodeURIComponent(CSRF),
+                    });
+                    const data = await res.json().catch(function() { return {}; });
+                    
+                    if (!res.ok || data.error) {
+                        alert(data.error || 'Failed to generate KD NO.');
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class=\"fe fe-award me-1\"></i>Buy with DPBV';
+                        return;
+                    }
+
+                    // Step 2: Display generated KD NO and name in the fields
+                    const kdInput = document.getElementById('kd_id');
+                    const nameInput = document.getElementById('customer_name');
+                    if (kdInput) kdInput.value = data.kd_id || '';
+                    if (nameInput) nameInput.value = data.customer_name || '';
+
+                    // Step 3: Save to database via store endpoint
+                    const saveRes = await fetch('{{ route("kd-info.store") }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 
+                            'Accept': 'application/json', 
+                            'Content-Type': 'application/x-www-form-urlencoded', 
+                            'X-CSRF-TOKEN': CSRF, 
+                            'X-Requested-With': 'XMLHttpRequest' 
+                        },
+                        body: 'kd_id=' + encodeURIComponent(data.kd_id || '') + '&customer_name=' + encodeURIComponent(data.customer_name || '')
+                    });
+                    const saveData = await saveRes.json().catch(function() { return { success: true }; });
+
+                    // Step 4: Close modal and redirect to DPBV checkout
+                    const modalEl = document.getElementById('kdInfoModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+
+                    // Show success message
+                    const m = document.querySelector('.main-content');
+                    if (m) {
+                        const alert = document.createElement('div');
+                        alert.className = 'alert alert-success alert-dismissible fade show';
+                        alert.innerHTML = 'KD NO (' + (data.kd_id || '') + ') and name (' + (data.customer_name || '') + ') generated and saved! ' + 
+                            '<button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\"></button>';
+                        m.insertBefore(alert, m.firstChild);
+                        setTimeout(() => alert.remove(), 5000);
+                    }
+
+                    // Redirect to DPBV checkout if cart has items
+                    const cartCount = parseInt(document.getElementById('headerCartCount')?.textContent || '0');
+                    if (cartCount > 0) {
+                        // Submit DPBV checkout form
+                        setTimeout(function() {
+                            const dpbvForm = document.createElement('form');
+                            dpbvForm.method = 'POST';
+                            dpbvForm.action = '{{ route("checkout.dpbv") }}';
+                            const csrfInput = document.createElement('input');
+                            csrfInput.type = 'hidden';
+                            csrfInput.name = '_token';
+                            csrfInput.value = CSRF;
+                            dpbvForm.appendChild(csrfInput);
+                            document.body.appendChild(dpbvForm);
+                            dpbvForm.submit();
+                        }, 500);
+                    } else {
+                        // Reload page to show updated KD info
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    }
+                } catch (err) {
+                    alert(err?.error || err?.message || 'Failed to process DPBV order.');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class=\"fe fe-award me-1\"></i>Buy with DPBV';
+                }
+            });
+        }
+
         // AJAX add-to-cart
         document.querySelectorAll('.add-to-cart-form').forEach(function(form) {
             form.addEventListener('submit', async function(e) {
@@ -670,12 +1139,19 @@
                 } catch (err) {
                     if (btn) { btn.disabled = false; btn.innerHTML = '<i class=\"fe fe-shopping-cart me-2\"></i>Add to cart'; }
                     const msg = err?.message || err?.error || (err?.status ? ('Request failed (HTTP ' + err.status + ')') : null) || 'Failed to add to cart';
-                    alert(msg);
+                    const isKdRequired = (err?.error || '').toLowerCase().includes('kd no') || (err?.error || '').toLowerCase().includes('customer name');
+                    if (isKdRequired) {
+                        const m = document.getElementById('kdInfoModal');
+                        if (m) { try { new bootstrap.Modal(m, { backdrop: 'static', keyboard: false }).show(); } catch (_) {} }
+                    } else {
+                        alert(msg);
+                    }
                 }
             });
         });
 
         // Cart + / - / remove / clear (event delegation)
+
         document.addEventListener('click', async function(e) {
             const inc = e.target.closest('.js-cart-inc');
             const dec = e.target.closest('.js-cart-dec');
@@ -711,6 +1187,19 @@
         });
 
         refreshCart().catch(() => {});
+
+        // Show KD modal on load (must run after Bootstrap is loaded)
+        (function() {
+            var m = document.getElementById('kdInfoModal');
+            if (m && typeof bootstrap !== 'undefined') {
+                var modal = new bootstrap.Modal(m, { backdrop: 'static', keyboard: false });
+                modal.show();
+                document.getElementById('kdInfoForm')?.addEventListener('submit', function() {
+                    document.getElementById('kdInfoSubmit')?.setAttribute('disabled', 'disabled');
+                });
+            }
+        })();
+
         (function() {
             var searchInput = document.getElementById('productSearch');
             var productItems = document.querySelectorAll('.product-item');

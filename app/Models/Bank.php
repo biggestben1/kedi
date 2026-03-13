@@ -3,9 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Bank extends Model
 {
+    public function headquartersUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'headquarters_user_id');
+    }
     protected $fillable = [
         'name',
         'code',
@@ -14,6 +19,7 @@ class Bank extends Model
         'notes',
         'sort_order',
         'is_active',
+        'headquarters_user_id',
     ];
 
     protected function casts(): array

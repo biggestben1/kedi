@@ -15,6 +15,10 @@ class Role extends Model
     public const CUSTOMER = 'customer';
     public const ACCOUNTANT = 'accountant';
     public const DISPATCH = 'dispatch';
+    public const HEADQUARTERS = 'headquarters';
+    public const ANNEX = 'annex';
+    public const SERVICE_CENTER = 'service_center';
+    public const BRANCH = 'branch';
 
     public function users(): HasMany
     {
@@ -49,5 +53,25 @@ class Role extends Model
     public function isDispatch(): bool
     {
         return $this->name === self::DISPATCH;
+    }
+
+    public function isHeadquarters(): bool
+    {
+        return $this->name === self::HEADQUARTERS;
+    }
+
+    public function isAnnex(): bool
+    {
+        return $this->name === self::ANNEX;
+    }
+
+    public function isServiceCenter(): bool
+    {
+        return $this->name === self::SERVICE_CENTER;
+    }
+
+    public function isBranch(): bool
+    {
+        return $this->name === self::BRANCH;
     }
 }

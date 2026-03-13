@@ -13,8 +13,19 @@ class CategoryController extends Controller
         $categories = Category::where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'name', 'slug', 'sort_order']);
+            ->get(['id', 'name', 'slug', 'image', 'sort_order']);
 
-        return response()->json(['data' => $categories]);
+        $data = $categories->map(function ($cat) {
+            return [
+                'id' => $cat->id,
+                'name' => $cat->name,
+                'slug' => $cat->slug,
+                'image' => $cat->image,
+                'image_url' => $cat->image_url,
+                'sort_order' => $cat->sort_order,
+            ];
+        });
+
+        return response()->json(['data' => $data]);
     }
 }

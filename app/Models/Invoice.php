@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Invoice extends Model
 {
@@ -17,6 +18,7 @@ class Invoice extends Model
     protected $fillable = [
         'invoice_number',
         'user_id',
+        'branch_user_id',
         'customer_name',
         'customer_email',
         'customer_phone',
@@ -29,6 +31,8 @@ class Invoice extends Model
         'total',
         'status',
         'notes',
+        'is_approved',
+        'approved_at',
     ];
 
     protected function casts(): array
@@ -40,6 +44,8 @@ class Invoice extends Model
             'tax' => 'decimal:2',
             'discount' => 'decimal:2',
             'total' => 'decimal:2',
+            'is_approved' => 'boolean',
+            'approved_at' => 'datetime',
         ];
     }
 
@@ -48,8 +54,23 @@ class Invoice extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function branchUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'branch_user_id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(InvoiceItem::class)->orderBy('sort_order');
+    }
+
+    public function order(): HasOne
+    {
+        return $this->hasOne(Order::class);
+    }
+
+    public function backOrders(): HasMany
+    {
+        return $this->hasMany(BackOrder::class);
     }
 }

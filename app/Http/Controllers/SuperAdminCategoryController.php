@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class SuperAdminCategoryController extends Controller
@@ -38,6 +39,7 @@ class SuperAdminCategoryController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:100', 'unique:categories,slug'],
+            'image' => ['nullable', 'file', 'mimes:jpeg,jpg,png,gif,webp,bmp', 'max:5120'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['boolean'],
         ]);
@@ -47,9 +49,15 @@ class SuperAdminCategoryController extends Controller
             $slug = $slug . '-' . time();
         }
 
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('categories', 'public');
+        }
+
         Category::create([
             'name' => $data['name'],
             'slug' => $slug,
+            'image' => $imagePath,
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'is_active' => $request->boolean('is_active'),
         ]);
@@ -67,6 +75,7 @@ class SuperAdminCategoryController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:100', 'unique:categories,slug,' . $category->id],
+            'image' => ['nullable', 'file', 'mimes:jpeg,jpg,png,gif,webp,bmp', 'max:5120'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['boolean'],
         ]);
@@ -76,9 +85,18 @@ class SuperAdminCategoryController extends Controller
             $slug = $category->slug;
         }
 
+        $imagePath = $category->image;
+        if ($request->hasFile('image')) {
+            if ($category->image && Storage::disk('public')->exists($category->image)) {
+                Storage::disk('public')->delete($category->image);
+            }
+            $imagePath = $request->file('image')->store('categories', 'public');
+        }
+
         $category->update([
             'name' => $data['name'],
             'slug' => $slug ?: $category->slug,
+            'image' => $imagePath,
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'is_active' => $request->boolean('is_active'),
         ]);

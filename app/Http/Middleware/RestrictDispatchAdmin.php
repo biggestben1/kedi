@@ -18,6 +18,7 @@ class RestrictDispatchAdmin
         'admin.dispatch.orders.show',
         'admin.dispatch.orders.update-status',
         'admin.dispatch.orders.update-tracking',
+        'admin.dispatch.orders.update-shipping-cost',
         'admin.dispatch.orders.invoice',
         'admin.dispatch.orders.delivery-note',
         'admin.dispatch.orders.shipment-label',
@@ -37,12 +38,13 @@ class RestrictDispatchAdmin
 
         $routeName = $request->route()?->getName() ?? '';
         $allowed = in_array($routeName, $this->allowedRouteNames, true)
-            || str_starts_with($routeName, 'admin.dispatch.');
+            || str_starts_with($routeName, 'admin.dispatch.')
+            || str_starts_with($routeName, 'admin.kd');
 
         if ($allowed) {
             return $next($request);
         }
 
-        abort(403, 'Access denied. Dispatch can only access Orders and view Products.');
+        abort(403, 'Access denied. Dispatch can only access Orders, Products, and Borrow.');
     }
 }

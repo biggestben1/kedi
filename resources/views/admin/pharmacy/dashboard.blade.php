@@ -1,14 +1,15 @@
 @extends('layouts.admin')
 
-@section('title', 'Pharmacy Dashboard')
+@section('title', 'Dashboard')
 
 @section('content')
     <div class="page-header">
-        <h1 class="page-title">{{ $wholesaleOnly ? 'Wholesale Dashboard' : 'Pharmacy Dashboard' }}</h1>
+        <h1 class="page-title">{{ $wholesaleOnly ? 'Wholesale Dashboard' : ($serviceCenterOnly ?? false ? 'Service Center Dashboard' : ($annexOnly ?? false ? 'Annex Dashboard' : 'Dashboard')) }}</h1>
+        <h3 class="text-muted mb-0">Welcome, <strong>{{ auth()->user()->name }}</strong></h3>
         <div>
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('admin') }}">Admin</a></li>
-                <li class="breadcrumb-item active" aria-current="page">{{ $wholesaleOnly ? 'Wholesale Dashboard' : 'Pharmacy Dashboard' }}</li>
+                <li class="breadcrumb-item active" aria-current="page">{{ $wholesaleOnly ? 'Wholesale Dashboard' : 'Dashboard' }}</li>
             </ol>
         </div>
     </div>
@@ -35,7 +36,7 @@
                                 <h6 class="text-danger">Drugs Expiring Soon (30 days)</h6>
                                 <ul class="list-unstyled mb-0 small">
                                     @foreach($alertsExpiringSoon->take(5) as $p)
-                                        <li><a href="{{ route('admin.products.edit', $p) }}">{{ $p->name }}</a> — {{ $p->expiry_date?->format('M d, Y') }}</li>
+                                        <li><a href="{{ in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']) ? route('admin.products.index') : route('admin.products.edit', $p) }}">{{ $p->name }}</a> — {{ $p->expiry_date?->format('M d, Y') }}</li>
                                     @endforeach
                                     @if($alertsExpiringSoon->count() > 5)
                                         <li class="text-muted">+{{ $alertsExpiringSoon->count() - 5 }} more</li>
@@ -48,7 +49,7 @@
                                 <h6 class="text-danger">Out of Stock</h6>
                                 <ul class="list-unstyled mb-0 small">
                                     @foreach($alertsOutOfStock->take(5) as $p)
-                                        <li><a href="{{ route('admin.products.edit', $p) }}">{{ $p->name }}</a></li>
+                                        <li><a href="{{ in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']) ? route('admin.products.index') : route('admin.products.edit', $p) }}">{{ $p->name }}</a></li>
                                     @endforeach
                                     @if($alertsOutOfStock->count() > 5)
                                         <li class="text-muted">+{{ $alertsOutOfStock->count() - 5 }} more</li>
@@ -61,7 +62,7 @@
                                 <h6 class="text-warning">Low Stock (Reorder)</h6>
                                 <ul class="list-unstyled mb-0 small">
                                     @foreach($alertsLowStock->take(5) as $p)
-                                        <li><a href="{{ route('admin.products.edit', $p) }}">{{ $p->name }}</a> — {{ $p->stock }} left (min: {{ $p->min_stock }})</li>
+                                        <li><a href="{{ in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']) ? route('admin.products.index') : route('admin.products.edit', $p) }}">{{ $p->name }}</a> — {{ $p->stock }} left (min: {{ $p->min_stock }})</li>
                                     @endforeach
                                     @if($alertsLowStock->count() > 5)
                                         <li class="text-muted">+{{ $alertsLowStock->count() - 5 }} more</li>
@@ -80,6 +81,7 @@
         </div>
     </div>
     @endif
+
 
     {{-- A. Sales Summary (wholesale-only when wholesale_staff) --}}
     <div class="row mb-4">
@@ -227,37 +229,38 @@
     </div>
     @endif
 
-    {{-- D. Customer & Reseller Overview (wholesale: resellers/wholesale_staff only) --}}
+    {{-- D. Branch Overview (hidden for Branch/Service Center/Annex — they are under a branch) --}}
+    @unless(($branchOnly ?? false) || ($serviceCenterOnly ?? false) || ($annexOnly ?? false))
     <div class="row mb-4">
         <div class="col-12">
-            <h5 class="mb-3">{{ $wholesaleOnly ? 'Resellers & Wholesale Buyers' : 'Customer & Reseller Overview' }}</h5>
+            <h5 class="mb-3">Branch</h5>
         </div>
         <div class="col-md-4">
             <div class="card">
                 <div class="card-body">
-                    <h6 class="text-muted">{{ $wholesaleOnly ? 'Resellers / Wholesale Buyers' : 'Total Customers' }}</h6>
-                    <h3 class="mb-0">{{ $totalCustomers }}</h3>
+                    <h6 class="text-muted">Total Branches</h6>
+                    <h3 class="mb-0">{{ $totalBranches }}</h3>
                 </div>
             </div>
         </div>
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">{{ $wholesaleOnly ? 'Top Wholesale Buyers' : 'Top Buying Customers' }}</h3>
+                    <h3 class="card-title">Top Buying Branches</h3>
                 </div>
                 <div class="card-body p-0">
-                    @if($topBuyingCustomers->isEmpty())
+                    @if($topBuyingBranches->isEmpty())
                         <p class="text-muted p-4 mb-0">No orders yet.</p>
                     @else
                         <table class="table table-hover mb-0">
                             <thead>
                                 <tr>
-                                    <th>Customer</th>
+                                    <th>Branch</th>
                                     <th class="text-end">Total Spent</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($topBuyingCustomers as $row)
+                                @foreach($topBuyingBranches as $row)
                                     <tr>
                                         <td>{{ $row->user?->name ?? '—' }} <small class="text-muted">({{ $row->user?->email }})</small></td>
                                         <td class="text-end">₦{{ number_format($row->total, 0) }}</td>
@@ -270,6 +273,202 @@
             </div>
         </div>
     </div>
+    @endunless
+
+    {{-- D.1. Top Performing Branches --}}
+    @unless(($branchOnly ?? false) || ($serviceCenterOnly ?? false) || ($annexOnly ?? false))
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5 class="mb-3">Top Performing Branches</h5>
+        </div>
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Branch Performance Rankings</h3>
+                </div>
+                <div class="card-body p-0">
+                    @if($topPerformingBranches->isEmpty())
+                        <p class="text-muted p-4 mb-0">No branch performance data yet.</p>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Branch</th>
+                                        <th class="text-end">Total Sales</th>
+                                        <th class="text-end">Total Orders</th>
+                                        <th class="text-end">Avg Order Value</th>
+                                        <th class="text-end">This Month Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($topPerformingBranches as $index => $branch)
+                                        <tr>
+                                            <td>
+                                                @if($index === 0)
+                                                    <span class="badge bg-warning text-dark">🥇 1st</span>
+                                                @elseif($index === 1)
+                                                    <span class="badge bg-secondary">🥈 2nd</span>
+                                                @elseif($index === 2)
+                                                    <span class="badge bg-danger">🥉 3rd</span>
+                                                @else
+                                                    <span class="text-muted">#{{ $index + 1 }}</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <strong>{{ $branch->user?->name ?? '—' }}</strong>
+                                                <br><small class="text-muted">{{ $branch->user?->email ?? '—' }}</small>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong class="text-success">₦{{ number_format($branch->total_sales ?? 0, 0) }}</strong>
+                                            </td>
+                                            <td class="text-end">{{ number_format($branch->total_orders ?? 0) }}</td>
+                                            <td class="text-end">₦{{ number_format($branch->avg_order_value ?? 0, 0) }}</td>
+                                            <td class="text-end">
+                                                <strong class="text-primary">₦{{ number_format($branch->this_month_sales ?? 0, 0) }}</strong>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+    @endunless
+
+    {{-- D.2. Service Center Performance Rankings (hidden for Service Center/Annex — they see their own stats in summary) --}}
+    @unless(($serviceCenterOnly ?? false) || ($annexOnly ?? false))
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5 class="mb-3">Service Center Performance Rankings</h5>
+        </div>
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Service Center Performance Rankings</h3>
+                </div>
+                <div class="card-body p-0">
+                    @if($topPerformingServiceCenters->isEmpty())
+                        <p class="text-muted p-4 mb-0">No service center performance data yet.</p>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Service Center</th>
+                                        <th class="text-end">Total Sales</th>
+                                        <th class="text-end">Total Orders</th>
+                                        <th class="text-end">Avg Order Value</th>
+                                        <th class="text-end">This Month Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($topPerformingServiceCenters as $index => $serviceCenter)
+                                        <tr>
+                                            <td>
+                                                @if($index === 0)
+                                                    <span class="badge bg-warning text-dark">🥇 1st</span>
+                                                @elseif($index === 1)
+                                                    <span class="badge bg-secondary">🥈 2nd</span>
+                                                @elseif($index === 2)
+                                                    <span class="badge bg-danger">🥉 3rd</span>
+                                                @else
+                                                    <span class="text-muted">#{{ $index + 1 }}</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <strong>{{ $serviceCenter->user?->name ?? '—' }}</strong>
+                                                <br><small class="text-muted">{{ $serviceCenter->user?->email ?? '—' }}</small>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong class="text-success">₦{{ number_format($serviceCenter->total_sales ?? 0, 0) }}</strong>
+                                            </td>
+                                            <td class="text-end">{{ number_format($serviceCenter->total_orders ?? 0) }}</td>
+                                            <td class="text-end">₦{{ number_format($serviceCenter->avg_order_value ?? 0, 0) }}</td>
+                                            <td class="text-end">
+                                                <strong class="text-primary">₦{{ number_format($serviceCenter->this_month_sales ?? 0, 0) }}</strong>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+    @endunless
+
+    {{-- D.3. Annex Performance Rankings (hidden for Annex — they see their own stats in summary) --}}
+    @unless($annexOnly ?? false)
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5 class="mb-3">Annex Performance Rankings</h5>
+        </div>
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Annex Performance Rankings</h3>
+                </div>
+                <div class="card-body p-0">
+                    @if($topPerformingAnnexes->isEmpty())
+                        <p class="text-muted p-4 mb-0">No annex performance data yet.</p>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Annex</th>
+                                        <th class="text-end">Total Sales</th>
+                                        <th class="text-end">Total Orders</th>
+                                        <th class="text-end">Avg Order Value</th>
+                                        <th class="text-end">This Month Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($topPerformingAnnexes as $index => $annex)
+                                        <tr>
+                                            <td>
+                                                @if($index === 0)
+                                                    <span class="badge bg-warning text-dark">🥇 1st</span>
+                                                @elseif($index === 1)
+                                                    <span class="badge bg-secondary">🥈 2nd</span>
+                                                @elseif($index === 2)
+                                                    <span class="badge bg-danger">🥉 3rd</span>
+                                                @else
+                                                    <span class="text-muted">#{{ $index + 1 }}</span>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <strong>{{ $annex->user?->name ?? '—' }}</strong>
+                                                <br><small class="text-muted">{{ $annex->user?->email ?? '—' }}</small>
+                                            </td>
+                                            <td class="text-end">
+                                                <strong class="text-success">₦{{ number_format($annex->total_sales ?? 0, 0) }}</strong>
+                                            </td>
+                                            <td class="text-end">{{ number_format($annex->total_orders ?? 0) }}</td>
+                                            <td class="text-end">₦{{ number_format($annex->avg_order_value ?? 0, 0) }}</td>
+                                            <td class="text-end">
+                                                <strong class="text-primary">₦{{ number_format($annex->this_month_sales ?? 0, 0) }}</strong>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+    @endunless
 
     {{-- E. Financial Overview (wholesale-only when wholesale_staff) --}}
     <div class="row mb-4">
@@ -312,7 +511,182 @@
         </div>
     </div>
 
-    {{-- G. Charts Section (wholesale sales when wholesale_staff) --}}
+    {{-- F. DPBV Spending Overview (All Accounts) - Hidden for Annex --}}
+    @if(auth()->user()->role?->name !== 'annex')
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5 class="mb-3">DPBV Spending Overview <small class="text-muted">(All Accounts)</small></h5>
+        </div>
+        <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
+            <div class="card overflow-hidden border-info">
+                <div class="card-body">
+                    <h6 class="text-muted">DPBV Spent Today</h6>
+                    <h3 class="mb-0 text-info">{{ number_format($dpbvSpentToday ?? 0, 2) }}</h3>
+                    <small class="text-muted">₦{{ number_format($dpbvSpentTodayNaira ?? 0, 2) }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
+            <div class="card overflow-hidden border-info">
+                <div class="card-body">
+                    <h6 class="text-muted">DPBV Spent This Week</h6>
+                    <h3 class="mb-0 text-info">{{ number_format($dpbvSpentThisWeek ?? 0, 2) }}</h3>
+                    <small class="text-muted">₦{{ number_format($dpbvSpentThisWeekNaira ?? 0, 2) }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
+            <div class="card overflow-hidden border-info">
+                <div class="card-body">
+                    <h6 class="text-muted">DPBV Spent This Month</h6>
+                    <h3 class="mb-0 text-info">{{ number_format($dpbvSpentThisMonth ?? 0, 2) }}</h3>
+                    <small class="text-muted">₦{{ number_format($dpbvSpentThisMonthNaira ?? 0, 2) }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
+            <div class="card overflow-hidden border-danger">
+                <div class="card-body">
+                    <h6 class="text-muted">Total DPBV Spent</h6>
+                    <h3 class="mb-0 text-danger">{{ number_format($totalDpbvSpent ?? 0, 2) }}</h3>
+                    <small class="text-muted">₦{{ number_format($totalDpbvSpentNaira ?? 0, 2) }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- G. KD Registration Credit Overview --}}
+    <div class="row mb-4">
+        <div class="col-12">
+            <h5 class="mb-3">KD Registration Credit Overview</h5>
+        </div>
+        <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
+            <div class="card overflow-hidden border-success">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Credit Balance</h6>
+                    <h3 class="mb-0 text-success">₦{{ number_format($totalCreditBalance ?? 0, 2) }}</h3>
+                    <small class="text-muted">All KD registrations</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
+            <div class="card overflow-hidden border-warning">
+                <div class="card-body">
+                    <h6 class="text-muted">Credit Used Today</h6>
+                    <h3 class="mb-0 text-warning">₦{{ number_format($creditUsedToday ?? 0, 2) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
+            <div class="card overflow-hidden border-warning">
+                <div class="card-body">
+                    <h6 class="text-muted">Credit Used This Week</h6>
+                    <h3 class="mb-0 text-warning">₦{{ number_format($creditUsedThisWeek ?? 0, 2) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
+            <div class="card overflow-hidden border-warning">
+                <div class="card-body">
+                    <h6 class="text-muted">Credit Used This Month</h6>
+                    <h3 class="mb-0 text-warning">₦{{ number_format($creditUsedThisMonth ?? 0, 2) }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
+            <div class="card overflow-hidden border-danger">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Credit Used</h6>
+                    <h3 class="mb-0 text-danger">₦{{ number_format($totalCreditUsed ?? 0, 2) }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- H. Top KD Registrations by Credit Balance --}}
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Top KD Registrations by Credit Balance</h3>
+                </div>
+                <div class="card-body p-0">
+                    @if(($topKdByCredit ?? collect())->isEmpty())
+                        <p class="text-muted p-4 mb-0">No KD registrations with credit balance.</p>
+                    @else
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>KD NO</th>
+                                    <th>Name</th>
+                                    <th class="text-end">Credit Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($topKdByCredit as $kd)
+                                    <tr>
+                                        <td><strong>{{ $kd['kd_no'] }}</strong></td>
+                                        <td><strong>{{ $kd['full_name'] }}</strong></td>
+                                        <td class="text-end">
+                                            <strong class="text-success">₦{{ number_format($kd['balance'], 2) }}</strong>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @endif
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Recent Credit Transactions</h3>
+                </div>
+                <div class="card-body p-0">
+                    @if(($recentCreditTransactions ?? collect())->isEmpty())
+                        <p class="text-muted p-4 mb-0">No credit transactions yet.</p>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>KD NO</th>
+                                        <th>Type</th>
+                                        <th class="text-end">Amount</th>
+                                        <th>Created By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($recentCreditTransactions as $transaction)
+                                        <tr>
+                                            <td>{{ $transaction->created_at->format('M d, Y H:i') }}</td>
+                                            <td><strong>{{ $transaction->kdRegistration->kd_no ?? '—' }}</strong></td>
+                                            <td>
+                                                <span class="badge bg-{{ $transaction->type === 'credit' ? 'success' : 'danger' }}">
+                                                    {{ ucfirst($transaction->type) }}
+                                                </span>
+                                            </td>
+                                            <td class="text-end">
+                                                <span class="{{ $transaction->type === 'credit' ? 'text-success' : 'text-danger' }}">
+                                                    {{ $transaction->type === 'credit' ? '+' : '-' }}₦{{ number_format($transaction->amount, 2) }}
+                                                </span>
+                                            </td>
+                                            <td>{{ $transaction->createdBy->name ?? '—' }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- I. Charts Section (wholesale sales when wholesale_staff) --}}
     <div class="row">
         <div class="col-lg-8">
             <div class="card">

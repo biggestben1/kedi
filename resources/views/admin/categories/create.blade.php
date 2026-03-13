@@ -26,7 +26,7 @@
             <h3 class="card-title">New Category</h3>
         </div>
         <div class="card-body">
-            <form method="POST" action="{{ route('admin.categories.store') }}" class="row g-3">
+            <form method="POST" action="{{ route('admin.categories.store') }}" enctype="multipart/form-data" class="row g-3">
                 @csrf
 
                 <div class="col-md-6">
@@ -45,6 +45,13 @@
                     <label class="form-label">Sort order (optional)</label>
                     <input type="number" name="sort_order" class="form-control" value="{{ old('sort_order', 0) }}" min="0">
                     @error('sort_order')<div class="text-danger small">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Image (optional)</label>
+                    <input type="file" name="image" class="form-control" accept="image/*">
+                    <small class="text-muted">Max 5MB. JPG, PNG, GIF, WEBP, BMP.</small>
+                    @error('image')<div class="text-danger small">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="col-12">

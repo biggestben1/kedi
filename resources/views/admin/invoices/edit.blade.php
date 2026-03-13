@@ -110,6 +110,7 @@
                                 <th style="width:80px">Unit</th>
                                 <th style="width:120px">Unit Price</th>
                                 <th style="width:120px">Line Total</th>
+                                <th style="width:100px">Status</th>
                                 <th style="width:80px"></th>
                             </tr>
                         </thead>
@@ -122,6 +123,15 @@
                                 <td><input type="text" name="items[{{ $index }}][unit]" class="form-control form-control-sm" value="{{ old("items.{$index}.unit", $item->unit) }}" placeholder="pcs"></td>
                                 <td><input type="number" name="items[{{ $index }}][unit_price]" class="form-control form-control-sm item-price" step="0.01" min="0" value="{{ old("items.{$index}.unit_price", $item->unit_price) }}" required></td>
                                 <td><input type="text" class="form-control form-control-sm line-total" readonly value="{{ number_format($item->line_total, 2) }}"></td>
+                                <td>
+                                    @if(in_array($item->id, $outOfStockItemIds ?? []))
+                                        <span class="badge bg-warning text-dark">Back order</span>
+                                    @elseif(in_array($item->id, $inStockItemIds ?? []))
+                                        <span class="badge bg-success">In stock</span>
+                                    @else
+                                        <span class="badge bg-secondary">—</span>
+                                    @endif
+                                </td>
                                 <td>
                                     <input type="hidden" name="items[{{ $index }}][id]" value="{{ $item->id }}">
                                     <button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove row">×</button>
@@ -136,17 +146,17 @@
                                 <td></td>
                             </tr>
                             <tr>
-                                <td colspan="5" class="text-end"><label class="mb-0">Tax:</label></td>
+                                <td colspan="6" class="text-end"><label class="mb-0">Tax:</label></td>
                                 <td><input type="number" name="tax" class="form-control form-control-sm" step="0.01" min="0" value="{{ old('tax', $invoice->tax) }}" id="tax-input"></td>
                                 <td></td>
                             </tr>
                             <tr>
-                                <td colspan="5" class="text-end"><label class="mb-0">Discount:</label></td>
+                                <td colspan="6" class="text-end"><label class="mb-0">Discount:</label></td>
                                 <td><input type="number" name="discount" class="form-control form-control-sm" step="0.01" min="0" value="{{ old('discount', $invoice->discount) }}" id="discount-input"></td>
                                 <td></td>
                             </tr>
                             <tr>
-                                <td colspan="5" class="text-end"><strong>Total:</strong></td>
+                                <td colspan="6" class="text-end"><strong>Total:</strong></td>
                                 <td><input type="text" class="form-control form-control-sm" id="total-display" readonly value="{{ number_format($invoice->total, 2) }}"></td>
                                 <td></td>
                             </tr>
@@ -183,6 +193,7 @@
                 <td><input type="text" name="items[__INDEX__][unit]" class="form-control form-control-sm" placeholder="pcs"></td>
                 <td><input type="number" name="items[__INDEX__][unit_price]" class="form-control form-control-sm item-price" step="0.01" min="0" value="0" required></td>
                 <td><input type="text" class="form-control form-control-sm line-total" readonly value="0.00"></td>
+                <td><span class="badge bg-secondary">—</span></td>
                 <td><button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove row">×</button></td>
             </tr>
         `;

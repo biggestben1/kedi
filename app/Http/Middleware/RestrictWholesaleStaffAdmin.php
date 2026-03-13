@@ -24,6 +24,11 @@ class RestrictWholesaleStaffAdmin
         'admin.users.edit',
         'admin.users.update',
         'admin.users.destroy',
+        'admin.products.index',
+        'admin.products.edit',
+        'admin.purchases.index',
+        'admin.purchases.create',
+        'admin.purchases.edit',
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -41,12 +46,14 @@ class RestrictWholesaleStaffAdmin
         $allowed = in_array($routeName, $this->allowedRouteNames, true)
             || str_starts_with($routeName, 'admin.pharmacy.reports')
             || str_starts_with($routeName, 'admin.users')
-            || str_starts_with($routeName, 'admin.invoices');
+            || str_starts_with($routeName, 'admin.invoices')
+            || str_starts_with($routeName, 'admin.products')
+            || str_starts_with($routeName, 'admin.purchases');
 
         if ($allowed) {
             return $next($request);
         }
 
-        abort(403, 'Access denied. Wholesale staff can only access Dashboard, Reports, Users, and Invoices.');
+        abort(403, 'Access denied. Wholesale staff can only access Dashboard, Reports, Users, Invoices, and Borrow.');
     }
 }

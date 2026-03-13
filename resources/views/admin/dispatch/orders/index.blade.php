@@ -51,7 +51,8 @@
                     <thead>
                         <tr>
                             <th>Order #</th>
-                            <th>Customer</th>
+                            <th>KD No</th>
+                            <th>Customer Name</th>
                             <th>Date</th>
                             <th>Status</th>
                             <th class="text-end">Total</th>
@@ -59,7 +60,15 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($orders as $order)
+                        @forelse($ordersByCustomer as $userId => $customerOrders)
+                        <tr class="table-secondary">
+                            <td colspan="7" class="py-2">
+                                <strong>{{ $customerOrders->first()->user?->name ?? 'Unknown' }}</strong>
+                                <small class="text-muted ms-2">{{ $customerOrders->first()->user?->email }}</small>
+                                <span class="badge bg-light text-dark ms-2">{{ $customerOrders->count() }} order(s)</span>
+                            </td>
+                        </tr>
+                        @foreach($customerOrders as $order)
                         <tr>
                             <td>
                                 <strong>{{ $order->invoice_number ?? 'ORD-' . $order->id }}</strong>
@@ -67,10 +76,8 @@
                                     <br><small class="text-muted">Track: {{ $order->tracking_number }}</small>
                                 @endif
                             </td>
-                            <td>
-                                {{ $order->user?->name }}<br>
-                                <small class="text-muted">{{ $order->user?->email }}</small>
-                            </td>
+                            <td>{{ $order->kd_id ?? '—' }}</td>
+                            <td>{{ $order->customer_name ?? $order->user?->name ?? '—' }}</td>
                             <td>{{ $order->created_at->format('M d, Y H:i') }}</td>
                             <td>
                                 @if($order->status === 'paid')
@@ -87,12 +94,14 @@
                             </td>
                             <td class="text-end">₦{{ number_format($order->subtotal, 2) }}</td>
                             <td class="text-end">
+                                <a href="{{ route('admin.dispatch.orders.view', $order) }}" class="btn btn-sm btn-outline-secondary">View</a>
                                 <a href="{{ route('admin.dispatch.orders.show', $order) }}" class="btn btn-sm btn-primary">Process</a>
                             </td>
                         </tr>
+                        @endforeach
                         @empty
                         <tr>
-                            <td colspan="6" class="text-center text-muted p-4">No orders to dispatch.</td>
+                            <td colspan="7" class="text-center text-muted p-4">No orders to dispatch.</td>
                         </tr>
                         @endforelse
                     </tbody>

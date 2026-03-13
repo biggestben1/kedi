@@ -34,10 +34,23 @@ class CustomerInvoiceController extends Controller
         $products = Product::where('is_active', true)->orderBy('name')->get();
         $cartCount = array_sum($request->session()->get('cart', []));
 
+        $prefillQuantities = [];
+        $addedItems = $request->session()->get('added_items', []);
+        if (! empty($addedItems)) {
+            foreach ($addedItems as $row) {
+                $product = Product::where('item_code', $row['item_code'] ?? '')->where('is_active', true)->first();
+                if ($product) {
+                    $prefillQuantities[$product->id] = ($prefillQuantities[$product->id] ?? 0) + (int) ($row['quantity'] ?? 0);
+                }
+            }
+            $request->session()->forget('added_items');
+        }
+
         return view('invoices.create', [
             'user' => $user,
             'products' => $products,
             'cartCount' => $cartCount,
+            'prefillQuantities' => $prefillQuantities,
         ]);
     }
 
@@ -134,7 +147,7 @@ class CustomerInvoiceController extends Controller
         $total = $subtotal + $tax - $discount;
 
         $invoice = null;
-        DB::transaction(function () use ($data, $items, $subtotal, $tax, $discount, $total, &$invoice) {
+        DB::transaction(function () use ($data, $items, $subtotal, $tax, $discount, $total, $user, &$invoice) {
             $invoice = Invoice::create([
                 'invoice_number' => $data['invoice_number'],
                 'user_id' => $data['user_id'],

@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'restrict.wholesale_staff_admin' => \App\Http\Middleware\RestrictWholesaleStaffAdmin::class,
             'restrict.reseller_admin' => \App\Http\Middleware\RestrictResellerAdmin::class,
             'restrict.dispatch_admin' => \App\Http\Middleware\RestrictDispatchAdmin::class,
+            'restrict.headquarters_admin' => \App\Http\Middleware\RestrictHeadquartersAdmin::class,
+            'restrict.branch_admin' => \App\Http\Middleware\RestrictBranchAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

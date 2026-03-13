@@ -122,12 +122,20 @@
                 <div class="col-md-4"></div>
 
                 <div class="col-12">
-                    <div class="form-check">
+                    <div class="form-check mb-2">
                         <input type="hidden" name="is_active" value="0">
                         <input type="checkbox" name="is_active" class="form-check-input" value="1" id="is_active" {{ old('is_active', true) ? 'checked' : '' }}>
                         <label class="form-check-label" for="is_active">Active (visible on shop)</label>
                     </div>
                     @error('is_active')<div class="text-danger small">{{ $message }}</div>@enderror
+                    
+                    <div class="form-check">
+                        <input type="hidden" name="can_use_dpbv" value="0">
+                        <input type="checkbox" name="can_use_dpbv" class="form-check-input" value="1" id="can_use_dpbv" {{ old('can_use_dpbv', true) ? 'checked' : '' }}>
+                        <label class="form-check-label" for="can_use_dpbv">Can be sold with DPBV</label>
+                        <small class="text-muted d-block">Uncheck to prevent this product from being purchased using DPBV</small>
+                    </div>
+                    @error('can_use_dpbv')<div class="text-danger small">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="col-12 d-flex gap-2">

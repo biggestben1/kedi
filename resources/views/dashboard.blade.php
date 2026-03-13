@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Dashboard – KEDI {{ config('app.name', 'Laravel') }}</title>
-    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}" />
+    <title>Dashboard – {{ config('app.name') }}</title>
+    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -15,9 +15,25 @@
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
     <style>
-        .app-header .logo-horizontal { display: block !important; min-width: 120px; }
+        .app-header .logo-horizontal { display: none !important; }
         .app-header .logo-horizontal img { max-height: 52px; max-width: 200px; width: auto; height: auto; object-fit: contain; display: block !important; visibility: visible !important; }
-        .app-sidebar .side-header .header-brand-img { max-height: 58px; max-width: 100%; display: block !important; visibility: visible !important; }
+        .app-sidebar .side-header .header-brand-img { max-height: 58px; max-width: 100%; display: block !important; visibility: visible !important; background-color: #fff !important; }
+        /* Sidebar: fixed height and scrollable menu */
+        .app-sidebar {
+            height: 100vh;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+        }
+        .app-sidebar .side-header {
+            flex-shrink: 0;
+        }
+        .app-sidebar .main-sidemenu {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto !important;
+            overflow-x: hidden;
+        }
     </style>
 </head>
 <body class="app sidebar-mini ltr">
@@ -33,7 +49,7 @@
                     <div class="d-flex">
                         <a aria-label="Hide Sidebar" class="app-sidebar__toggle" data-bs-toggle="sidebar" href="javascript:void(0)"></a>
                         <a class="logo-horizontal" href="{{ url('/') }}">
-                            <img src="{{ asset('images/logo.png') }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
+                            <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
                         </a>
                         <div class="main-header-center ms-3 d-none d-lg-block">
                             <a href="{{ url('/') }}" class="btn btn-outline-primary btn-sm">Back to Shop</a>
@@ -66,8 +82,26 @@
                                                 <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
                                                 <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
                                                 <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
-                                                @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch')
-                                                <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> {{ auth()->user()->role?->name === 'reseller' ? 'Reseller' : (auth()->user()->role?->name === 'accountant' ? 'Accountant Panel' : (auth()->user()->role?->name === 'dispatch' ? 'Dispatch Panel' : 'Admin')) }}</a>
+                                                <a class="dropdown-item" href="{{ route('dpbv.index') }}"><i class="dropdown-icon fe fe-award"></i> My DPBV</a>
+                                                <a class="dropdown-item" href="{{ route('promo.index') }}"><i class="dropdown-icon fe fe-gift"></i> My Promo</a>
+                                                <a class="dropdown-item" href="{{ route('bonus.index') }}"><i class="dropdown-icon fe fe-trending-up"></i> My Bonus</a>
+                                                <a class="dropdown-item" href="{{ route('contact.show') }}"><i class="dropdown-icon fe fe-mail"></i> Contact Us</a>
+                                                <a class="dropdown-item" href="{{ route('password.change') }}"><i class="dropdown-icon fe fe-lock"></i> Change Password</a>
+                                                @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
+                                                @php
+                                                    $dashRole = auth()->user()->role?->name;
+                                                    $dashAdminLabel = match($dashRole) {
+                                                        'reseller' => 'Reseller',
+                                                        'accountant' => 'Accountant Panel',
+                                                        'dispatch' => 'Dispatch Panel',
+                                                        'headquarters' => 'Admin Dashboard',
+                                                        'branch' => 'Branch Admin',
+                                                        'service_center' => 'Service Center Admin',
+                                                        'annex' => 'Annex Admin',
+                                                        default => 'Admin',
+                                                    };
+                                                @endphp
+                                                <a class="dropdown-item" href="{{ in_array($dashRole, ['headquarters', 'branch', 'service_center', 'annex']) ? route('admin.pharmacy.dashboard') : route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> {{ $dashAdminLabel }}</a>
                                                 @endif
                                                 <form method="POST" action="{{ route('logout') }}">
                                                     @csrf
@@ -90,7 +124,7 @@
                 <div class="app-sidebar">
                     <div class="side-header">
                         <a class="header-brand1" href="{{ url('/') }}">
-                            <img src="{{ asset('images/logo.png') }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
+                            <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
                         </a>
                     </div>
                     <div class="main-sidemenu">
@@ -106,18 +140,50 @@
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Orders</span></a>
                             </li>
+                            @if(auth()->user()->role?->name === 'service_center')
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Referral Orders</span></a>
+                            </li>
+                            @endif
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Wallet</span></a>
                             </li>
-                            @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant')
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">{{ auth()->user()->role?->name === 'reseller' ? 'Reseller' : (auth()->user()->role?->name === 'accountant' ? 'Accountant Panel' : 'Admin') }}</span></a>
+                                <a class="side-menu__item" href="{{ route('dpbv.index') }}"><i class="side-menu__icon fe fe-award"></i><span class="side-menu__label">My DPBV</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('promo.index') }}"><i class="side-menu__icon fe fe-gift"></i><span class="side-menu__label">My Promo</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('bonus.index') }}"><i class="side-menu__icon fe fe-trending-up"></i><span class="side-menu__label">My Bonus</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('contact.show') }}"><i class="side-menu__icon fe fe-mail"></i><span class="side-menu__label">Contact Us</span></a>
+                            </li>
+                            @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
+                            @php
+                                $dashSideRole = auth()->user()->role?->name;
+                                $dashSideAdminLabel = match($dashSideRole) {
+                                    'reseller' => 'Reseller',
+                                    'accountant' => 'Accountant Panel',
+                                    'dispatch' => 'Dispatch Panel',
+                                    'headquarters' => 'Admin Dashboard',
+                                    'branch' => 'Branch Admin',
+                                    'service_center' => 'Service Center Admin',
+                                    default => 'Admin',
+                                };
+                            @endphp
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ $dashSideRole === 'headquarters' ? route('admin.pharmacy.dashboard') : route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">{{ $dashSideAdminLabel }}</span></a>
                             </li>
                             @endif
                             <li class="sub-category"><h3>Account</h3></li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('password.change') }}"><i class="side-menu__icon fe fe-lock"></i><span class="side-menu__label">Change Password</span></a>
+                            </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('dashboard') }}"><i class="side-menu__icon fe fe-user"></i><span class="side-menu__label">Profile</span></a>
                             </li>
@@ -173,12 +239,29 @@
                                         <p class="mb-0 text-muted">Phone: {{ auth()->user()->phone }}</p>
                                         @endif
                                         <hr class="my-4">
-                                        <a href="{{ url('/') }}" class="btn btn-primary me-2"><i class="fe fe-shopping-bag me-2"></i>Go to Shop</a>
-                                        <a href="{{ route('orders.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-package me-2"></i>My Orders</a>
-                                        <a href="{{ route('invoices.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-file-text me-2"></i>My Invoices</a>
+                                        <a href="{{ url('/') }}" class="btn btn-primary me-2"><i class="fe fe-shopping-bag me-1"></i>Go to Shop</a>
+                                        <a href="{{ route('orders.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-package me-1"></i>My Orders</a>
+                                        <a href="{{ route('orders.index', ['status' => 'draft']) }}" class="btn btn-outline-info me-2"><i class="fe fe-file-text me-1"></i>My Drafts</a>
+                                        @if(auth()->user()->role?->name === 'service_center')
+                                        <a href="{{ route('admin.pharmacy.referred-orders') }}" class="btn btn-outline-success me-2"><i class="fe fe-users me-1"></i>Referral Orders</a>
+                                        @endif
+                                        <a href="{{ route('invoices.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-file-text me-1"></i>My Invoices</a>
                                         <a href="{{ route('wallet.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-dollar-sign me-2"></i>Wallet</a>
-                                        @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch')
-                                        <a href="{{ route('admin') }}" class="btn btn-outline-secondary me-2"><i class="fe fe-settings me-2"></i>{{ auth()->user()->role?->name === 'reseller' ? 'Reseller' : (auth()->user()->role?->name === 'accountant' ? 'Accountant Panel' : (auth()->user()->role?->name === 'dispatch' ? 'Dispatch Panel' : 'Admin')) }}</a>
+                                        @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
+                                        @php
+                                            $dashBtnRole = auth()->user()->role?->name;
+                                            $dashBtnLabel = match($dashBtnRole) {
+                                                'reseller' => 'Reseller',
+                                                'accountant' => 'Accountant Panel',
+                                                'dispatch' => 'Dispatch Panel',
+                                                'headquarters' => 'Admin Dashboard',
+                                                'branch' => 'Branch Admin',
+                                                'service_center' => 'Service Center Admin',
+                                                'annex' => 'Annex Admin',
+                                                default => 'Admin',
+                                            };
+                                        @endphp
+                                        <a href="{{ in_array($dashBtnRole, ['headquarters', 'branch', 'service_center', 'annex']) ? route('admin.pharmacy.dashboard') : route('admin') }}" class="btn btn-outline-secondary me-2"><i class="fe fe-settings me-2"></i>{{ $dashBtnLabel }}</a>
                                         @endif
                                         @if(count($cartItems) > 0)
                                         <a href="{{ route('checkout.show') }}" class="btn btn-success"><i class="fe fe-credit-card me-2"></i>Checkout</a>
@@ -186,6 +269,7 @@
                                     </div>
                                 </div>
                             </div>
+                            @include('partials.announcements')
                             @if(count($cartItems) > 0)
                             <div class="col-lg-12 mt-3">
                                 <div class="card">

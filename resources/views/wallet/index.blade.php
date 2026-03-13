@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Wallet – KEDI {{ config('app.name', 'Laravel') }}</title>
-    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}" />
+    <title>Wallet – {{ config('app.name') }}</title>
+    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -15,9 +15,9 @@
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
     <style>
-        .app-header .logo-horizontal { display: block !important; min-width: 120px; }
+        .app-header .logo-horizontal { display: none !important; }
         .app-header .logo-horizontal img { max-height: 52px; max-width: 200px; width: auto; height: auto; object-fit: contain; display: block !important; visibility: visible !important; }
-        .app-sidebar .side-header .header-brand-img { max-height: 58px; max-width: 100%; display: block !important; visibility: visible !important; }
+        .app-sidebar .side-header .header-brand-img { max-height: 58px; max-width: 100%; display: block !important; visibility: visible !important; background-color: #fff !important; }
     </style>
 </head>
 <body class="app sidebar-mini ltr">
@@ -32,7 +32,7 @@
                     <div class="d-flex">
                         <a aria-label="Hide Sidebar" class="app-sidebar__toggle" data-bs-toggle="sidebar" href="javascript:void(0)"></a>
                         <a class="logo-horizontal" href="{{ url('/') }}">
-                            <img src="{{ asset('images/logo.png') }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
+                            <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
                         </a>
                         <div class="main-header-center ms-3 d-none d-lg-block">
                             <a href="{{ url('/') }}" class="btn btn-outline-primary btn-sm">Back to Shop</a>
@@ -63,8 +63,24 @@
                                                 <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
                                                 <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
                                                 <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
-                                                @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller')
-                                                <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> {{ auth()->user()->role?->name === 'reseller' ? 'Reseller' : 'Admin' }}</a>
+                                                <a class="dropdown-item" href="{{ route('dpbv.index') }}"><i class="dropdown-icon fe fe-award"></i> My DPBV</a>
+                                                <a class="dropdown-item" href="{{ route('promo.index') }}"><i class="dropdown-icon fe fe-gift"></i> My Promo</a>
+                                                <a class="dropdown-item" href="{{ route('bonus.index') }}"><i class="dropdown-icon fe fe-trending-up"></i> My Bonus</a>
+                                                <a class="dropdown-item" href="{{ route('password.change') }}"><i class="dropdown-icon fe fe-lock"></i> Change Password</a>
+                                                @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
+                                                @php
+                                                    $walletRole = auth()->user()->role?->name;
+                                                    $walletAdminLabel = match($walletRole) {
+                                                        'reseller' => 'Reseller',
+                                                        'accountant' => 'Accountant Panel',
+                                                        'dispatch' => 'Dispatch Panel',
+                                                        'headquarters' => 'Admin Dashboard',
+                                                        'branch' => 'Branch Admin',
+                                                        'service_center' => 'Service Center Admin',
+                                                        default => 'Admin',
+                                                    };
+                                                @endphp
+                                                <a class="dropdown-item" href="{{ $walletRole === 'headquarters' ? route('admin.pharmacy.dashboard') : route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> {{ $walletAdminLabel }}</a>
                                                 @endif
                                                 <form method="POST" action="{{ route('logout') }}">
                                                     @csrf
@@ -85,7 +101,7 @@
                 <div class="app-sidebar">
                     <div class="side-header">
                         <a class="header-brand1" href="{{ url('/') }}">
-                            <img src="{{ asset('images/logo.png') }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
+                            <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
                         </a>
                     </div>
                     <div class="main-sidemenu">
@@ -110,9 +126,31 @@
                             <li class="slide">
                                 <a class="side-menu__item active" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Wallet</span></a>
                             </li>
-                            @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller')
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">{{ auth()->user()->role?->name === 'reseller' ? 'Reseller' : 'Admin' }}</span></a>
+                                <a class="side-menu__item" href="{{ route('dpbv.index') }}"><i class="side-menu__icon fe fe-award"></i><span class="side-menu__label">My DPBV</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('promo.index') }}"><i class="side-menu__icon fe fe-gift"></i><span class="side-menu__label">My Promo</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('bonus.index') }}"><i class="side-menu__icon fe fe-trending-up"></i><span class="side-menu__label">My Bonus</span></a>
+                            </li>
+                            @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
+                            @php
+                                $walletSideRole = auth()->user()->role?->name;
+                                $walletSideAdminLabel = match($walletSideRole) {
+                                    'reseller' => 'Reseller',
+                                    'accountant' => 'Accountant Panel',
+                                    'dispatch' => 'Dispatch Panel',
+                                    'headquarters' => 'Admin Dashboard',
+                                    'branch' => 'Branch Admin',
+                                    'service_center' => 'Service Center Admin',
+                                    'annex' => 'Annex Admin',
+                                    default => 'Admin',
+                                };
+                            @endphp
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ in_array($walletSideRole, ['headquarters', 'branch', 'service_center', 'annex']) ? route('admin.pharmacy.dashboard') : route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">{{ $walletSideAdminLabel }}</span></a>
                             </li>
                             @endif
                             <li class="sub-category"><h3>Account</h3></li>
@@ -289,7 +327,7 @@
                                                             <td class="text-end">₦{{ number_format($tx->balance_after ?? 0, 2) }}</td>
                                                             <td>
                                                                 @if($tx->proof_path)
-                                                                    <a href="{{ asset('storage/' . $tx->proof_path) }}" target="_blank">View</a>
+                                                                    <a href="{{ url('api/v1/storage/' . $tx->proof_path) }}" target="_blank">View</a>
                                                                 @else
                                                                     <span class="text-muted">—</span>
                                                                 @endif

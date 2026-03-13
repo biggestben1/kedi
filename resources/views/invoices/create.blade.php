@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Create Invoice – {{ config('app.name', 'Laravel') }}</title>
-    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}" />
+    <title>Create Invoice – {{ config('app.name') }}</title>
+    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -15,9 +15,9 @@
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
     <style>
-        .app-header .logo-horizontal { display: block !important; min-width: 120px; }
+        .app-header .logo-horizontal { display: none !important; }
         .app-header .logo-horizontal img { max-height: 52px; max-width: 200px; width: auto; height: auto; object-fit: contain; display: block !important; visibility: visible !important; }
-        .app-sidebar .side-header .header-brand-img { max-height: 58px; max-width: 100%; display: block !important; visibility: visible !important; }
+        .app-sidebar .side-header .header-brand-img { max-height: 58px; max-width: 100%; display: block !important; visibility: visible !important; background-color: #fff !important; }
     </style>
 </head>
 <body class="app sidebar-mini ltr">
@@ -32,7 +32,7 @@
                     <div class="d-flex">
                         <a aria-label="Hide Sidebar" class="app-sidebar__toggle" data-bs-toggle="sidebar" href="javascript:void(0)"></a>
                         <a class="logo-horizontal" href="{{ url('/') }}">
-                            <img src="{{ asset('images/logo.png') }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
+                            <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
                         </a>
                         <div class="main-header-center ms-3 d-none d-lg-block">
                             <a href="{{ url('/') }}" class="btn btn-outline-primary btn-sm">Back to Shop</a>
@@ -63,8 +63,21 @@
                                                 <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
                                                 <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
                                                 <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
-                                                @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller')
-                                                <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> {{ auth()->user()->role?->name === 'reseller' ? 'Reseller' : 'Admin' }}</a>
+                                                <a class="dropdown-item" href="{{ route('password.change') }}"><i class="dropdown-icon fe fe-lock"></i> Change Password</a>
+                                                @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
+                                                @php
+                                                    $createInvRole = auth()->user()->role?->name;
+                                                    $createInvAdminLabel = match($createInvRole) {
+                                                        'reseller' => 'Reseller',
+                                                        'accountant' => 'Accountant Panel',
+                                                        'dispatch' => 'Dispatch Panel',
+                                                        'headquarters' => 'Admin Dashboard',
+                                                        'branch' => 'Branch Admin',
+                                                        'service_center' => 'Service Center Admin',
+                                                        default => 'Admin',
+                                                    };
+                                                @endphp
+                                                <a class="dropdown-item" href="{{ $createInvRole === 'headquarters' ? route('admin.pharmacy.dashboard') : route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> {{ $createInvAdminLabel }}</a>
                                                 @endif
                                                 <form method="POST" action="{{ route('logout') }}">
                                                     @csrf
@@ -85,7 +98,7 @@
                 <div class="app-sidebar">
                     <div class="side-header">
                         <a class="header-brand1" href="{{ url('/') }}">
-                            <img src="{{ asset('images/logo.png') }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
+                            <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
                         </a>
                     </div>
                     <div class="main-sidemenu">
@@ -107,10 +120,28 @@
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Wallet</span></a>
                             </li>
-                            @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller')
+                            @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
+                            @php
+                                $createInvSideRole = auth()->user()->role?->name;
+                                $createInvSideAdminLabel = match($createInvSideRole) {
+                                    'reseller' => 'Reseller',
+                                    'accountant' => 'Accountant Panel',
+                                    'dispatch' => 'Dispatch Panel',
+                                    'headquarters' => 'Admin Dashboard',
+                                    'branch' => 'Branch Admin',
+                                    'service_center' => 'Service Center Admin',
+                                    'annex' => 'Annex Admin',
+                                    default => 'Admin',
+                                };
+                            @endphp
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">{{ auth()->user()->role?->name === 'reseller' ? 'Reseller' : 'Admin' }}</span></a>
+                                <a class="side-menu__item" href="{{ in_array($createInvSideRole, ['headquarters', 'branch', 'service_center', 'annex']) ? route('admin.pharmacy.dashboard') : route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">{{ $createInvSideAdminLabel }}</span></a>
                             </li>
+                            @if(auth()->user()->isSuperAdmin())
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('admin.expenditures.index') }}"><i class="side-menu__icon fe fe-credit-card"></i><span class="side-menu__label">Expenditures</span></a>
+                            </li>
+                            @endif
                             @endif
                             <li class="sub-category"><h3>Account</h3></li>
                             <li class="slide">
@@ -235,18 +266,32 @@
                                                         <th style="width:80px">Unit</th>
                                                         <th style="width:120px" class="text-end">Unit Price</th>
                                                         <th style="width:120px">Quantity</th>
+                                                        <th style="width:100px" class="text-end">PV</th>
+                                                        <th style="width:100px" class="text-end">BV</th>
                                                         <th style="width:120px" class="text-end">Line Total</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     @foreach($products as $product)
-                                                        @php $unitPrice = $product->getPriceForUser($user); @endphp
-                                                        <tr class="product-row" data-unit-price="{{ $unitPrice }}" data-search="{{ strtolower($product->name . ' ' . ($product->pack_size ?? '') . ' ' . ($product->item_code ?? '')) }}">
+                                                        @php
+                                                            $unitPrice = $product->getPriceForUser($user);
+                                                            $pv = (float) ($product->pv ?? 0);
+                                                            $bv = (float) ($product->bv ?? 0);
+                                                        @endphp
+                                                        <tr class="product-row" data-unit-price="{{ $unitPrice }}" data-pv="{{ $pv }}" data-bv="{{ $bv }}" data-search="{{ strtolower($product->name . ' ' . ($product->pack_size ?? '') . ' ' . ($product->item_code ?? '')) }}">
                                                             <td>{{ $product->display_name }}</td>
                                                             <td>{{ $product->pack_size ?? 'pcs' }}</td>
                                                             <td class="text-end">₦{{ number_format($unitPrice, 2) }}</td>
                                                             <td>
-                                                                <input type="number" name="product_quantities[{{ $product->id }}]" class="form-control form-control-sm product-qty" value="{{ old('product_quantities.'.$product->id, 0) }}" min="0" step="1" data-unit-price="{{ $unitPrice }}">
+                                                                <input type="number" name="product_quantities[{{ $product->id }}]" class="form-control form-control-sm product-qty" value="{{ old('product_quantities.'.$product->id, $prefillQuantities[$product->id] ?? 0) }}" min="0" step="1" data-unit-price="{{ $unitPrice }}">
+                                                            </td>
+                                                            <td class="text-end">
+                                                                <small class="text-muted d-block">Unit: {{ number_format($pv, 1) }}</small>
+                                                                <span class="product-line-pv">0.0</span>
+                                                            </td>
+                                                            <td class="text-end">
+                                                                <small class="text-muted d-block">Unit: {{ number_format($bv, 1) }}</small>
+                                                                <span class="product-line-bv">0.0</span>
                                                             </td>
                                                             <td class="text-end"><span class="product-line-total">0.00</span></td>
                                                         </tr>
@@ -255,18 +300,26 @@
                                                 <tfoot>
                                                     <tr>
                                                         <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
+                                                        <td class="text-end"><strong id="product-subtotal-pv">0</strong></td>
+                                                        <td class="text-end"><strong id="product-subtotal-bv">0</strong></td>
                                                         <td class="text-end"><strong id="product-subtotal">0.00</strong></td>
                                                     </tr>
                                                     <tr>
                                                         <td colspan="4" class="text-end"><label class="mb-0">Tax:</label></td>
+                                                        <td></td>
+                                                        <td></td>
                                                         <td><input type="number" name="tax" class="form-control form-control-sm" step="0.01" min="0" value="{{ old('tax', 0) }}" id="tax-input" style="width:100px; margin-left: auto;"></td>
                                                     </tr>
                                                     <tr>
                                                         <td colspan="4" class="text-end"><label class="mb-0">Discount:</label></td>
+                                                        <td></td>
+                                                        <td></td>
                                                         <td><input type="number" name="discount" class="form-control form-control-sm" step="0.01" min="0" value="{{ old('discount', 0) }}" id="discount-input" style="width:100px; margin-left: auto;"></td>
                                                     </tr>
                                                     <tr>
                                                         <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                                                        <td class="text-end"><strong id="product-total-pv">0</strong></td>
+                                                        <td class="text-end"><strong id="product-total-bv">0</strong></td>
                                                         <td class="text-end"><strong id="product-total">0.00</strong></td>
                                                     </tr>
                                                 </tfoot>
@@ -370,41 +423,71 @@
 
     <script>
     (function() {
+        function formatPrice(num) {
+            return parseFloat(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        function formatPvBv(num) {
+            return parseFloat(num).toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
         // Toggle between products and manual items
         var useProductsToggle = document.getElementById('use-products-toggle');
         var productsSection = document.getElementById('products-section');
         var manualItemsSection = document.getElementById('manual-items-section');
         var useProductQuantitiesInput = document.querySelector('input[name="use_product_quantities"]');
 
+        function setManualItemsRequired(required) {
+            manualItemsSection.querySelectorAll('input[required], select[required]').forEach(function(el) {
+                if (required) el.setAttribute('required', 'required');
+                else el.removeAttribute('required');
+            });
+        }
+
         useProductsToggle.addEventListener('change', function() {
             if (this.checked) {
                 productsSection.style.display = 'block';
                 manualItemsSection.style.display = 'none';
                 useProductQuantitiesInput.value = '1';
+                setManualItemsRequired(false);
             } else {
                 productsSection.style.display = 'none';
                 manualItemsSection.style.display = 'block';
                 useProductQuantitiesInput.value = '0';
+                setManualItemsRequired(true);
             }
         });
+
+        setManualItemsRequired(false);
 
         // Products section calculations
         var productTable = document.getElementById('product-quantities-table');
         if (productTable) {
             function updateProductTotals() {
-                var subtotal = 0;
+                var subtotal = 0, subtotalPv = 0, subtotalBv = 0;
                 productTable.querySelectorAll('.product-row').forEach(function(row) {
                     var qty = parseFloat(row.querySelector('.product-qty').value) || 0;
                     var price = parseFloat(row.querySelector('.product-qty').getAttribute('data-unit-price')) || 0;
+                    var pv = parseFloat(row.getAttribute('data-pv')) || 0;
+                    var bv = parseFloat(row.getAttribute('data-bv')) || 0;
                     var lineTotal = qty * price;
-                    row.querySelector('.product-line-total').textContent = lineTotal.toFixed(2);
+                    var linePv = qty * pv;
+                    var lineBv = qty * bv;
+                    row.querySelector('.product-line-total').textContent = formatPrice(lineTotal);
+                    row.querySelector('.product-line-pv').textContent = formatPvBv(linePv);
+                    row.querySelector('.product-line-bv').textContent = formatPvBv(lineBv);
                     subtotal += lineTotal;
+                    subtotalPv += linePv;
+                    subtotalBv += lineBv;
                 });
                 var tax = parseFloat(document.getElementById('tax-input').value) || 0;
                 var discount = parseFloat(document.getElementById('discount-input').value) || 0;
                 var total = subtotal + tax - discount;
-                document.getElementById('product-subtotal').textContent = subtotal.toFixed(2);
-                document.getElementById('product-total').textContent = total.toFixed(2);
+                document.getElementById('product-subtotal').textContent = formatPrice(subtotal);
+                document.getElementById('product-subtotal-pv').textContent = formatPvBv(subtotalPv);
+                document.getElementById('product-subtotal-bv').textContent = formatPvBv(subtotalBv);
+                document.getElementById('product-total').textContent = formatPrice(total);
+                document.getElementById('product-total-pv').textContent = formatPvBv(subtotalPv);
+                document.getElementById('product-total-bv').textContent = formatPvBv(subtotalBv);
             }
             productTable.querySelectorAll('.product-qty').forEach(function(input) {
                 input.addEventListener('input', updateProductTotals);
@@ -449,14 +532,14 @@
                     var qty = parseFloat(row.querySelector('.item-qty').value) || 0;
                     var price = parseFloat(row.querySelector('.item-price').value) || 0;
                     var lineTotal = qty * price;
-                    row.querySelector('.line-total').value = lineTotal.toFixed(2);
+                    row.querySelector('.line-total').value = formatPrice(lineTotal);
                     subtotal += lineTotal;
                 });
                 var tax = parseFloat(document.getElementById('tax-input-manual').value) || 0;
                 var discount = parseFloat(document.getElementById('discount-input-manual').value) || 0;
                 var total = subtotal + tax - discount;
-                document.getElementById('subtotal-display').value = subtotal.toFixed(2);
-                document.getElementById('total-display').value = total.toFixed(2);
+                document.getElementById('subtotal-display').value = formatPrice(subtotal);
+                document.getElementById('total-display').value = formatPrice(total);
             }
 
             document.getElementById('add-row').addEventListener('click', function() {
