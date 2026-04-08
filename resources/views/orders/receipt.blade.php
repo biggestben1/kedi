@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
     <title>Order Receipt – {{ $order->invoice_number ?? 'ORD-' . $order->id }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
+    @include('partials.pwa-head')
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
@@ -189,5 +190,6 @@
 
     <script src="{{ asset('sash/assets/js/jquery.min.js') }}"></script>
     <script src="{{ asset('sash/assets/plugins/bootstrap/js/bootstrap.min.js') }}"></script>
+    @include('partials.pwa-scripts')
 </body>
 </html>

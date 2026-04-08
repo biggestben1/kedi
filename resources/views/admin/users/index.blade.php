@@ -93,9 +93,14 @@
                         <a class="btn btn-outline-secondary" href="{{ route('admin.users.index', array_filter(request()->only('role', 'view_admin'))) }}">Clear search</a>
                     @endif
                 </form>
-                <a href="{{ route('admin.users.create') }}" class="btn btn-primary ms-auto">
-                    <i class="fe fe-user-plus me-2"></i>@if(auth()->user()->role?->name === 'reseller')Create Customer@else Create User @endif
-                </a>
+                @if(auth()->user()->isSuperAdmin() || auth()->user()->isHeadquarters())
+                    @if(auth()->user()->isSuperAdmin())
+                        <a href="{{ route('admin.users.trashed') }}" class="btn btn-outline-danger"><i class="fe fe-trash-2 me-2"></i>Trash</a>
+                    @endif
+                    <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
+                        <i class="fe fe-user-plus me-2"></i>@if(auth()->user()->role?->name === 'reseller')Create Customer@else Create User @endif
+                    </a>
+                @endif
             </div>
         </div>
         <div class="card-body p-0">
@@ -126,6 +131,9 @@
                                     @endif
                                     @if(isset($createdByUser) && $createdByUser)
                                         <a href="{{ route('admin.invoices.create', ['user_id' => $user->id]) }}" class="btn btn-sm btn-outline-success">Create Invoice</a>
+                                    @endif
+                                    @if(auth()->user()->isSuperAdmin())
+                                        <a href="{{ route('admin.users.transfer', $user) }}" class="btn btn-sm btn-outline-warning">Transfer</a>
                                     @endif
                                     <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                                     <form action="{{ route('admin.users.destroy', $user) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this user?');">

@@ -558,8 +558,13 @@
 
     {{-- G. KD Registration Credit Overview --}}
     <div class="row mb-4">
-        <div class="col-12">
-            <h5 class="mb-3">KD Registration Credit Overview</h5>
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <h5 class="mb-3 mb-0">KD Registration Credit Overview</h5>
+            @if(auth()->user()->isSuperAdmin() || in_array(auth()->user()->role?->name, ['headquarters','branch','service_center','annex','accountant'], true))
+                <a href="{{ route('admin.kd.registration.index') }}" class="btn btn-sm btn-primary">
+                    <i class="fe fe-credit-card me-1"></i>Manage KD Registration Credit
+                </a>
+            @endif
         </div>
         <div class="col-xl-2 col-lg-4 col-md-6 col-sm-6">
             <div class="card overflow-hidden border-success">

@@ -8,12 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use SoftDeletes, HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -80,6 +81,11 @@ class User extends Authenticatable
         return $this->hasMany(Order::class);
     }
 
+    public function blogPosts(): HasMany
+    {
+        return $this->hasMany(BlogPost::class);
+    }
+
     public function dpbvCollections(): HasMany
     {
         return $this->hasMany(DpbvCollection::class);
@@ -138,5 +144,55 @@ class User extends Authenticatable
     public function isAnnex(): bool
     {
         return $this->hasRole(Role::ANNEX);
+    }
+
+    public function isCashier(): bool
+    {
+        return $this->hasRole(Role::CASHIER);
+    }
+
+    public function isDistributor(): bool
+    {
+        return $this->hasRole(Role::DISTRIBUTOR);
+    }
+
+    /** Cashier / Distributor: sell on behalf of parent HQ/Branch/SC/Annex (same behaviour for now). */
+    public function isCashierOrDistributor(): bool
+    {
+        return $this->isCashier() || $this->isDistributor();
+    }
+
+    /**
+     * Wallet used for checkout, draft placement, and balance display.
+     * Cashier → parent HQ/Branch/SC/Annex wallet. Distributor → own wallet.
+     */
+    public function walletOwnerForShopping(): User
+    {
+        $this->loadMissing(['role', 'createdBy.role']);
+        if ($this->isCashier() && $this->createdBy && $this->createdBy->role) {
+            $ownerRole = $this->createdBy->role->name;
+            if (in_array($ownerRole, ['headquarters', 'branch', 'service_center', 'annex'], true)) {
+                return $this->createdBy;
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * User used to resolve HQ bank accounts for wallet top-up (proof transfer).
+     * Cashier and Distributor both follow the parent chain when attached to HQ/Branch/SC/Annex.
+     */
+    public function bankContextUser(): User
+    {
+        $this->loadMissing(['role', 'createdBy.role']);
+        if ($this->isCashierOrDistributor() && $this->createdBy && $this->createdBy->role) {
+            $ownerRole = $this->createdBy->role->name;
+            if (in_array($ownerRole, ['headquarters', 'branch', 'service_center', 'annex'], true)) {
+                return $this->createdBy;
+            }
+        }
+
+        return $this;
     }
 }

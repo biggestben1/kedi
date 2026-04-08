@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Contact Us – {{ config('app.name') }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
+    @include('partials.pwa-head')
     <link id="style" href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -105,5 +106,6 @@
     <script src="{{ asset('sash/assets/plugins/p-scroll/perfect-scrollbar.js') }}"></script>
     <script src="{{ asset('sash/assets/js/themeColors.js') }}"></script>
     <script src="{{ asset('sash/assets/js/custom.js') }}"></script>
+    @include('partials.pwa-scripts')
 </body>
 </html>

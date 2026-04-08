@@ -38,7 +38,10 @@ class OrderController extends Controller
         $walletBalance = 0;
         if ($statusFilter === 'draft') {
             $draftTotal = $request->user()->orders()->where('status', Order::STATUS_DRAFT)->sum('subtotal');
-            $walletBalance = (float) ($request->user()->wallet_balance ?? 0);
+            $u = $request->user();
+            $u->load(['role', 'createdBy.role']);
+            $walletOwner = $u->walletOwnerForShopping();
+            $walletBalance = (float) ($walletOwner->wallet_balance ?? 0);
         }
 
         return view('orders.index', [
@@ -57,9 +60,9 @@ class OrderController extends Controller
         if (in_array($role, ['branch', 'headquarters', 'service_center', 'annex', 'dispatch', 'accountant'], true) && $order->status !== Order::STATUS_DRAFT) {
             return redirect()->route('admin');
         }
-        //if ($order->user_id !== $request->user()->id) {
+        // if ($order->user_id !== $request->user()->id) {
         //    abort(404);
-       // }
+        // }
 
         $order->load('items');
         $cartCount = array_sum($request->session()->get('cart', []));
@@ -109,7 +112,7 @@ class OrderController extends Controller
         $order->load('user', 'items');
 
         $pdf = Pdf::loadView('orders.receipt-pdf', ['order' => $order]);
-        $filename = 'receipt-' . ($order->invoice_number ?? 'ORD-' . $order->id) . '.pdf';
+        $filename = 'receipt-'.($order->invoice_number ?? 'ORD-'.$order->id).'.pdf';
 
         return $pdf->download($filename);
     }
@@ -144,7 +147,7 @@ class OrderController extends Controller
         }
 
         $pdf = Pdf::loadView('orders.receipt-pdf-multi', ['orders' => $orders]);
-        $filename = 'receipts-' . now()->format('Y-m-d-His') . '.pdf';
+        $filename = 'receipts-'.now()->format('Y-m-d-His').'.pdf';
 
         return $pdf->download($filename);
     }
@@ -181,7 +184,7 @@ class OrderController extends Controller
             return redirect()->route('orders.index')->with('error', 'No valid orders selected. Draft orders cannot be included.');
         }
 
-        $filename = 'orders-' . now()->format('Y-m-d-His') . '.csv';
+        $filename = 'orders-'.now()->format('Y-m-d-His').'.csv';
 
         $headers = [
             'Order #',
@@ -209,10 +212,10 @@ class OrderController extends Controller
 
         return response()->streamDownload(function () use ($orders, $headers) {
             $out = fopen('php://output', 'w');
-            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM for Excel
+            fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM for Excel
             fputcsv($out, $headers);
             foreach ($orders as $order) {
-                $orderNum = $order->invoice_number ?? 'ORD-' . $order->id;
+                $orderNum = $order->invoice_number ?? 'ORD-'.$order->id;
                 $payment = $order->payment_method === 'wallet' ? 'Wallet' : 'Pay on Delivery';
                 $kdNo = $order->kd_id ?? '—';
                 $custName = $order->customer_name ?? '—';
@@ -275,7 +278,7 @@ class OrderController extends Controller
             fclose($out);
         }, $filename, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -299,7 +302,7 @@ class OrderController extends Controller
             'items' => $items,
             'total' => $total,
         ]);
-        $filename = 'items-for-supply-' . now()->format('Y-m-d-His') . '.pdf';
+        $filename = 'items-for-supply-'.now()->format('Y-m-d-His').'.pdf';
 
         return $pdf->download($filename);
     }

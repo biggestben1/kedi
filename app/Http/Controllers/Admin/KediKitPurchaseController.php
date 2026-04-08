@@ -16,18 +16,18 @@ class KediKitPurchaseController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $roleName = $user->role->name ?? '';
+        [$buyer] = $this->resolveBuyerAndWalletOwner($user);
 
         // Get purchases where current user is the buyer
         $purchases = KediKitPurchase::with(['kit', 'buyer', 'seller', 'backOrders'])
-            ->where('buyer_user_id', $user->id)
+            ->where('buyer_user_id', $buyer->id)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate(20);
 
         // Get back orders for this user
         $backOrders = KediKitBackOrder::with(['kit', 'purchase'])
-            ->where('buyer_user_id', $user->id)
+            ->where('buyer_user_id', $buyer->id)
             ->where('status', KediKitBackOrder::STATUS_PENDING)
             ->orderByDesc('created_at')
             ->get();
@@ -67,12 +67,12 @@ class KediKitPurchaseController extends Controller
     public function create(Request $request)
     {
         $user = $request->user();
-        $roleName = $user->role->name ?? '';
+        [$buyer, $walletOwner] = $this->resolveBuyerAndWalletOwner($user);
 
         // Determine seller based on buyer's role
-        $seller = $this->getSellerForBuyer($user);
+        $seller = $this->getSellerForBuyer($buyer);
 
-        if (!$seller) {
+        if (! $seller) {
             return redirect()->route('admin.kedi-kits.purchase.index')
                 ->with('error', 'No seller available for your role. Only Headquarters, Branch, Service Center, and Annex can purchase kits.');
         }
@@ -83,7 +83,7 @@ class KediKitPurchaseController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $walletBalance = (float) ($user->wallet_balance ?? 0);
+        $walletBalance = (float) ($walletOwner->wallet_balance ?? 0);
 
         return view('admin.kedi-kits.purchase.create', compact('availableKits', 'seller', 'walletBalance'));
     }
@@ -91,9 +91,10 @@ class KediKitPurchaseController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        $seller = $this->getSellerForBuyer($user);
+        [$buyer, $walletOwner] = $this->resolveBuyerAndWalletOwner($user);
+        $seller = $this->getSellerForBuyer($buyer);
 
-        if (!$seller) {
+        if (! $seller) {
             return back()->with('error', 'No seller available for your role.');
         }
 
@@ -112,25 +113,25 @@ class KediKitPurchaseController extends Controller
         $unitPrice = $kit->price;
         $requestedQuantity = $validated['quantity'];
         $availableQuantity = $kit->quantity ?? 0;
-        
+
         // Calculate fulfilled and back order quantities
         $fulfilledQuantity = min($requestedQuantity, $availableQuantity);
         $backOrderQuantity = max(0, $requestedQuantity - $availableQuantity);
-        
+
         $totalPrice = $unitPrice * $requestedQuantity;
 
-        // Check wallet balance
-        if (!$user->canPayWithWallet($totalPrice)) {
+        // Check wallet balance (for cashier, use parent HQ/Branch/SC/Annex wallet)
+        if (! $walletOwner->canPayWithWallet($totalPrice)) {
             return back()->withInput()
-                ->with('error', 'Insufficient wallet balance. Your balance is ₦' . number_format($user->wallet_balance ?? 0, 2) . ' but you need ₦' . number_format($totalPrice, 2) . '.');
+                ->with('error', 'Insufficient wallet balance. Your balance is ₦'.number_format($walletOwner->wallet_balance ?? 0, 2).' but you need ₦'.number_format($totalPrice, 2).'.');
         }
 
         DB::beginTransaction();
         try {
-            // Create purchase record
+            // Create purchase record – buyer is the effective HQ/Branch/SC/Annex account
             $purchase = KediKitPurchase::create([
                 'kedi_kit_id' => $kit->id,
-                'buyer_user_id' => $user->id,
+                'buyer_user_id' => $buyer->id,
                 'seller_user_id' => $seller->id,
                 'quantity' => $requestedQuantity,
                 'unit_price' => $unitPrice,
@@ -139,17 +140,17 @@ class KediKitPurchaseController extends Controller
                 'notes' => $validated['notes'] ?? null,
             ]);
 
-            // Deduct from wallet
-            $user->decrement('wallet_balance', $totalPrice);
-            $balanceAfter = (float) $user->fresh()->wallet_balance;
+            // Deduct from wallet (for cashier, from parent wallet)
+            $walletOwner->decrement('wallet_balance', $totalPrice);
+            $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
 
             // Create wallet transaction
             WalletTransaction::create([
-                'user_id' => $user->id,
+                'user_id' => $walletOwner->id,
                 'type' => WalletTransaction::TYPE_DEBIT,
                 'amount' => $totalPrice,
                 'balance_after' => $balanceAfter,
-                'reference' => 'KEDI Kit Purchase #' . $purchase->id,
+                'reference' => 'KEDI Kit Purchase #'.$purchase->id,
                 'status' => WalletTransaction::STATUS_ACCEPTED,
             ]);
 
@@ -160,11 +161,11 @@ class KediKitPurchaseController extends Controller
                     ->whereNull('purchased_by_user_id')
                     ->limit($fulfilledQuantity)
                     ->get();
-                
+
                 foreach ($unassignedItems as $item) {
-                    $item->update(['purchased_by_user_id' => $user->id]);
+                    $item->update(['purchased_by_user_id' => $buyer->id]);
                 }
-                
+
                 // Update kit quantity (deduct fulfilled quantity)
                 $kit->decrement('quantity', $fulfilledQuantity);
             }
@@ -178,7 +179,7 @@ class KediKitPurchaseController extends Controller
                     'quantity_pending' => $backOrderQuantity,
                     'quantity_fulfilled' => 0,
                     'status' => KediKitBackOrder::STATUS_PENDING,
-                    'notes' => 'Back order for ' . $backOrderQuantity . ' kit(s)',
+                    'notes' => 'Back order for '.$backOrderQuantity.' kit(s)',
                 ]);
             }
 
@@ -186,19 +187,20 @@ class KediKitPurchaseController extends Controller
 
             $message = 'Kit purchase submitted successfully. ';
             if ($fulfilledQuantity > 0) {
-                $message .= $fulfilledQuantity . ' kit(s) fulfilled. ';
+                $message .= $fulfilledQuantity.' kit(s) fulfilled. ';
             }
             if ($backOrderQuantity > 0) {
-                $message .= $backOrderQuantity . ' kit(s) placed in back order. ';
+                $message .= $backOrderQuantity.' kit(s) placed in back order. ';
             }
-            $message .= '₦' . number_format($totalPrice, 2) . ' deducted from your wallet.';
+            $message .= '₦'.number_format($totalPrice, 2).' deducted from your wallet.';
 
             return redirect()->route('admin.kedi-kits.purchase.show', $purchase)
                 ->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
+
             return back()->withInput()
-                ->with('error', 'Failed to create purchase request: ' . $e->getMessage());
+                ->with('error', 'Failed to create purchase request: '.$e->getMessage());
         }
     }
 
@@ -209,18 +211,18 @@ class KediKitPurchaseController extends Controller
             'kit',
             'buyer',
             'seller',
-            'backOrders'
+            'backOrders',
         ])->findOrFail($purchase->id);
-        
+
         // Explicitly reload kit items with registration relationship (fresh query)
         $kit = $purchase->kit;
         $kit->load(['items' => function ($query) {
             $query->with('purchasedBy', 'registration');
         }]);
-        
+
         // Clean up back orders: delete invalid ones and update status
         $assignedToBuyer = $kit->items()->where('purchased_by_user_id', $purchase->buyer_user_id)->count();
-        
+
         // If all KD numbers are assigned (purchase fully fulfilled), delete any back orders
         if ($assignedToBuyer >= $purchase->quantity) {
             // Delete back orders since purchase is fully fulfilled
@@ -244,17 +246,17 @@ class KediKitPurchaseController extends Controller
                     $totalPending += $backOrder->quantity_pending;
                 }
             }
-            
+
             // If purchase is approved and all back orders are fulfilled, mark purchase as completed IF fully registered
             if ($purchase->status === KediKitPurchase::STATUS_APPROVED && $totalPending == 0 && $purchase->backOrders->count() > 0 && $purchase->isFullyRegistered()) {
                 $purchase->update(['status' => KediKitPurchase::STATUS_COMPLETED]);
             }
         }
-        
+
         // Reload back orders and purchase after potential updates
         $purchase->load('backOrders');
         $purchase->refresh();
-        
+
         return view('admin.kedi-kits.purchase.show', compact('purchase'));
     }
 
@@ -267,7 +269,7 @@ class KediKitPurchaseController extends Controller
 
         // Can only approve pending purchases
         if ($purchase->status !== KediKitPurchase::STATUS_PENDING) {
-            return back()->with('error', 'This purchase cannot be approved. Current status: ' . $purchase->status);
+            return back()->with('error', 'This purchase cannot be approved. Current status: '.$purchase->status);
         }
 
         $kit = $purchase->kit;
@@ -292,7 +294,7 @@ class KediKitPurchaseController extends Controller
                 ->whereNull('purchased_by_user_id')
                 ->limit($requestedQuantity)
                 ->get();
-            
+
             foreach ($unassignedItems as $item) {
                 $item->update(['purchased_by_user_id' => $purchase->buyer_user_id]);
             }
@@ -311,7 +313,7 @@ class KediKitPurchaseController extends Controller
                     'quantity_pending' => $backOrderQuantity,
                     'quantity_fulfilled' => 0,
                     'status' => KediKitBackOrder::STATUS_PENDING,
-                    'notes' => 'Back order for ' . $backOrderQuantity . ' kit(s)',
+                    'notes' => 'Back order for '.$backOrderQuantity.' kit(s)',
                 ]);
             }
 
@@ -326,16 +328,17 @@ class KediKitPurchaseController extends Controller
 
             $message = 'Purchase approved successfully. ';
             if ($fulfilledQuantity > 0) {
-                $message .= $fulfilledQuantity . ' kit(s) fulfilled. ';
+                $message .= $fulfilledQuantity.' kit(s) fulfilled. ';
             }
             if ($backOrderQuantity > 0) {
-                $message .= $backOrderQuantity . ' kit(s) placed in back order.';
+                $message .= $backOrderQuantity.' kit(s) placed in back order.';
             }
 
             return back()->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to approve purchase: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to approve purchase: '.$e->getMessage());
         }
     }
 
@@ -363,7 +366,7 @@ class KediKitPurchaseController extends Controller
                 'type' => WalletTransaction::TYPE_CREDIT,
                 'amount' => $purchase->total_price,
                 'balance_after' => $balanceAfter,
-                'reference' => 'Refund for KEDI Kit Purchase #' . $purchase->id,
+                'reference' => 'Refund for KEDI Kit Purchase #'.$purchase->id,
                 'status' => WalletTransaction::STATUS_ACCEPTED,
             ]);
 
@@ -376,14 +379,15 @@ class KediKitPurchaseController extends Controller
             return back()->with('success', 'Purchase rejected. Amount refunded to buyer\'s wallet.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to reject purchase: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to reject purchase: '.$e->getMessage());
         }
     }
 
     public function unassignKdNumbers(Request $request, KediKitPurchase $purchase)
     {
         $user = $request->user();
-        
+
         // Only buyer or seller can unassign
         if ($purchase->buyer_user_id !== $user->id && $purchase->seller_user_id !== $user->id) {
             return back()->with('error', 'You are not authorized to unassign KD numbers from this purchase.');
@@ -392,14 +396,14 @@ class KediKitPurchaseController extends Controller
         DB::beginTransaction();
         try {
             $kit = $purchase->kit;
-            
+
             // Get all KD numbers assigned to this purchase's buyer from this kit
             $assignedItems = $kit->items()
                 ->where('purchased_by_user_id', $purchase->buyer_user_id)
                 ->get();
 
             $unassignCount = 0;
-            
+
             // Unassign (set purchased_by_user_id to null) and mark as pending
             foreach ($assignedItems as $item) {
                 $item->update(['purchased_by_user_id' => null]);
@@ -419,17 +423,18 @@ class KediKitPurchaseController extends Controller
 
             DB::commit();
 
-            return back()->with('success', $unassignCount . ' KD number(s) have been unassigned and made pending. Purchase status reset to pending.');
+            return back()->with('success', $unassignCount.' KD number(s) have been unassigned and made pending. Purchase status reset to pending.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to unassign KD numbers: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to unassign KD numbers: '.$e->getMessage());
         }
     }
 
     public function fulfillBackOrder(Request $request, KediKitBackOrder $backOrder)
     {
         $user = $request->user();
-        
+
         // Only seller can fulfill back orders
         if ($backOrder->purchase->seller_user_id !== $user->id) {
             return back()->with('error', 'You are not authorized to fulfill this back order.');
@@ -440,7 +445,7 @@ class KediKitPurchaseController extends Controller
         }
 
         $request->validate([
-            'fulfill_quantity' => ['required', 'integer', 'min:1', 'max:' . $backOrder->quantity_pending],
+            'fulfill_quantity' => ['required', 'integer', 'min:1', 'max:'.$backOrder->quantity_pending],
         ]);
 
         $fulfillQuantity = $request->input('fulfill_quantity');
@@ -448,20 +453,20 @@ class KediKitPurchaseController extends Controller
         $availableQuantity = $kit->quantity ?? 0;
 
         if ($fulfillQuantity > $availableQuantity) {
-            return back()->with('error', 'Insufficient stock. Available: ' . $availableQuantity . ', Requested: ' . $fulfillQuantity);
+            return back()->with('error', 'Insufficient stock. Available: '.$availableQuantity.', Requested: '.$fulfillQuantity);
         }
 
         DB::beginTransaction();
         try {
             // Deduct from kit quantity and assign KD numbers to buyer
             $kit->decrement('quantity', $fulfillQuantity);
-            
+
             // Assign KD numbers to buyer (get unassigned KD numbers)
             $unassignedItems = $kit->items()
                 ->whereNull('purchased_by_user_id')
                 ->limit($fulfillQuantity)
                 ->get();
-            
+
             foreach ($unassignedItems as $item) {
                 $item->update(['purchased_by_user_id' => $backOrder->buyer_user_id]);
             }
@@ -485,17 +490,18 @@ class KediKitPurchaseController extends Controller
 
             DB::commit();
 
-            return back()->with('success', $fulfillQuantity . ' kit(s) fulfilled. ' . ($newPending > 0 ? $newPending . ' still pending.' : 'Back order completed.'));
+            return back()->with('success', $fulfillQuantity.' kit(s) fulfilled. '.($newPending > 0 ? $newPending.' still pending.' : 'Back order completed.'));
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to fulfill back order: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to fulfill back order: '.$e->getMessage());
         }
     }
 
     public function syncRegistrations(Request $request, KediKitPurchase $purchase)
     {
         $user = $request->user();
-        
+
         // Only buyer can sync
         if ($purchase->buyer_user_id !== $user->id) {
             return back()->with('error', 'You are not authorized to sync registrations for this purchase.');
@@ -513,47 +519,47 @@ class KediKitPurchaseController extends Controller
                 ->get();
 
             $linkedCount = 0;
-            
+
             foreach ($registrations as $reg) {
                 // Find an unassigned kit item from this kit
                 $item = \App\Models\KediKitItem::where('kedi_kit_id', $kit->id)
                     ->whereNull('purchased_by_user_id')
                     ->first();
-                
+
                 if ($item) {
-                   $item->update([
-                       'kd_no' => $reg->kd_no,
-                       'purchased_by_user_id' => $buyerId,
-                       'kedi_kit_purchase_id' => $purchase->id
-                   ]);
-                   $linkedCount++;
-                   
-                   // Deduct from purchase quantity
-                   $purchase->decrement('quantity', 1);
-                   
-                   // Deduct from kit quantity if needed
-                   if ($kit->quantity > 0) {
-                       $kit->decrement('quantity', 1);
-                   }
+                    $item->update([
+                        'kd_no' => $reg->kd_no,
+                        'purchased_by_user_id' => $buyerId,
+                        'kedi_kit_purchase_id' => $purchase->id,
+                    ]);
+                    $linkedCount++;
+
+                    // Deduct from purchase quantity
+                    $purchase->decrement('quantity', 1);
+
+                    // Deduct from kit quantity if needed
+                    if ($kit->quantity > 0) {
+                        $kit->decrement('quantity', 1);
+                    }
                 } else {
                     // Create a new kit item if none available to assign
                     KediKitItem::create([
                         'kedi_kit_id' => $kit->id,
                         'kedi_kit_purchase_id' => $purchase->id,
                         'kd_no' => $reg->kd_no,
-                        'purchased_by_user_id' => $buyerId
+                        'purchased_by_user_id' => $buyerId,
                     ]);
                     $linkedCount++;
-                    
+
                     // Deduct from purchase quantity
                     $purchase->decrement('quantity', 1);
-                    
+
                     // Deduct from kit quantity if needed
                     if ($kit->quantity > 0) {
                         $kit->decrement('quantity', 1);
                     }
                 }
-                
+
                 // Stop if we've satisfied the purchase quantity
                 $assignedCount = $kit->items()->where('purchased_by_user_id', $buyerId)->count();
                 if ($assignedCount >= $purchase->quantity) {
@@ -568,10 +574,11 @@ class KediKitPurchaseController extends Controller
 
             DB::commit();
 
-            return back()->with('success', $linkedCount . ' registration(s) have been synced and linked to your purchase.');
+            return back()->with('success', $linkedCount.' registration(s) have been synced and linked to your purchase.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Failed to sync registrations: ' . $e->getMessage());
+
+            return back()->with('error', 'Failed to sync registrations: '.$e->getMessage());
         }
     }
 
@@ -618,12 +625,47 @@ class KediKitPurchaseController extends Controller
                 if ($seller) {
                     return $seller;
                 }
+
                 return User::whereHas('role', function ($q) {
                     $q->where('name', 'super_admin');
                 })->first();
 
+            case 'cashier':
+            case 'distributor':
+                // Cashier / Distributor buys on behalf of the account that created them (HQ/Branch/SC/Annex/Reseller)
+                if ($buyer->created_by_user_id) {
+                    $parent = User::with('role')->find($buyer->created_by_user_id);
+                    if ($parent) {
+                        return $this->getSellerForBuyer($parent);
+                    }
+                }
+
+                return null;
+
             default:
                 return null;
         }
+    }
+
+    /**
+     * Cashier: buyer + wallet = parent (HQ/Branch/SC/Annex).
+     * Distributor: buyer + wallet = self (top up own wallet; stock/seller still from parent chain).
+     */
+    private function resolveBuyerAndWalletOwner(User $user): array
+    {
+        $buyer = $user;
+        $walletOwner = $user;
+
+        $user->loadMissing(['role', 'createdBy.role']);
+        $roleName = $user->role->name ?? '';
+        if ($roleName === 'cashier' && $user->createdBy && $user->createdBy->role) {
+            $parentRole = $user->createdBy->role->name;
+            if (in_array($parentRole, ['headquarters', 'branch', 'service_center', 'annex'], true)) {
+                $buyer = $user->createdBy;
+                $walletOwner = $user->createdBy;
+            }
+        }
+
+        return [$buyer, $walletOwner];
     }
 }

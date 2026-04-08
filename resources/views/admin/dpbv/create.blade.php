@@ -30,7 +30,11 @@
                 </div>
 
                 <div class="alert alert-info">
-                    <strong>Format:</strong> The first row should contain headers: <strong>NO</strong>, <strong>CODE</strong> (KD NO), <strong>NAME</strong>, <strong>DATE</strong>, <strong>SC</strong>, <strong>DPBV</strong>. CODE values are matched against <code>kd_customers.kd_no</code> to link records to user accounts. Users with matching KD numbers will see their DPBV on "My DPBV".
+                    <strong>Format:</strong> The first row should contain headers: <strong>NO</strong>, <strong>CODE</strong> (KD NO), <strong>NAME</strong>, <strong>DATE</strong>, <strong>SC</strong>, <strong>DPBV</strong>.
+                    <br>
+                    <strong>SC behavior:</strong> If <strong>SC</strong> is provided, it is treated as <code>service_center_code</code> and DPBV is assigned strictly to that Service Center account (only that service center will see it).
+                    <br>
+                    If <strong>SC</strong> is empty, system falls back to matching by <strong>CODE</strong> (KD NO) using <code>kd_customers.kd_no</code> and orders.
                 </div>
 
                 <div class="d-flex gap-2">

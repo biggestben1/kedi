@@ -5,17 +5,38 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\DpbvCollection;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
+    private function effectiveDpbvQuery(User $user)
+    {
+        $query = DpbvCollection::query()->where('user_id', $user->id);
+
+        $serviceCenterCode = trim((string) ($user->service_center_code ?? ''));
+        if (($user->role?->name ?? null) === 'service_center' && $serviceCenterCode !== '') {
+            $scVariants = array_values(array_unique([
+                $serviceCenterCode,
+                strtoupper($serviceCenterCode),
+                strtolower($serviceCenterCode),
+            ]));
+
+            $query->orWhere(function ($q) use ($scVariants) {
+                $q->whereNull('user_id')->whereIn('sc', $scVariants);
+            });
+        }
+
+        return $query;
+    }
+
     public function index(Request $request)
     {
         $query = Product::with('category')->where('is_active', true);
 
         $search = $request->input('q', '');
         if (trim($search) !== '') {
-            $term = '%' . trim($search) . '%';
+            $term = '%'.trim($search).'%';
             $query->where(function ($q) use ($term) {
                 $q->where('item_code', 'like', $term)
                     ->orWhere('name', 'like', $term)
@@ -69,14 +90,14 @@ class HomeController extends Controller
             $kdId = trim((string) $request->session()->get('kd_id', ''));
             $customerName = trim((string) $request->session()->get('customer_name', ''));
             $showKdModal = $kdId === '' || $customerName === '';
-            
+
             // Calculate DPBV balance
-            $totalDpbv = (float) DpbvCollection::where('user_id', $user->id)->sum('dpbv');
+            $totalDpbv = (float) $this->effectiveDpbvQuery($user)->sum('dpbv');
             $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
             // Check if all products in cart allow DPBV
             $allProductsAllowDpbv = true;
             foreach ($cartItems as $item) {
-                if (!($item->product->can_use_dpbv ?? true)) {
+                if (! ($item->product->can_use_dpbv ?? true)) {
                     $allProductsAllowDpbv = false;
                     break;
                 }

@@ -10,15 +10,30 @@ class Role extends Model
     protected $fillable = ['name', 'display_name', 'description'];
 
     public const SUPER_ADMIN = 'super_admin';
+
     public const WHOLESALE_STAFF = 'wholesale_staff';
+
     public const RESELLER = 'reseller';
+
     public const CUSTOMER = 'customer';
+
     public const ACCOUNTANT = 'accountant';
+
     public const DISPATCH = 'dispatch';
+
     public const HEADQUARTERS = 'headquarters';
+
     public const ANNEX = 'annex';
+
     public const SERVICE_CENTER = 'service_center';
+
     public const BRANCH = 'branch';
+
+    public const CASHIER = 'cashier';
+
+    public const DISTRIBUTOR = 'distributor';
+
+    public const HR = 'hr';
 
     public function users(): HasMany
     {
@@ -73,5 +88,20 @@ class Role extends Model
     public function isBranch(): bool
     {
         return $this->name === self::BRANCH;
+    }
+
+    public function isCashier(): bool
+    {
+        return $this->name === self::CASHIER;
+    }
+
+    public function isDistributor(): bool
+    {
+        return $this->name === self::DISTRIBUTOR;
+    }
+
+    public function isHr(): bool
+    {
+        return $this->name === self::HR;
     }
 }

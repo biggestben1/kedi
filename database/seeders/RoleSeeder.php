@@ -60,6 +60,21 @@ class RoleSeeder extends Seeder
                 'display_name' => 'Branch',
                 'description' => 'Branch with own stock, creates Annex users, creates invoices from branch stock.',
             ],
+            [
+                'name' => Role::CASHIER,
+                'display_name' => 'Cashier',
+                'description' => 'Sells on behalf of HQ/Branch/Service Center/Annex (parent wallet & stock).',
+            ],
+            [
+                'name' => Role::DISTRIBUTOR,
+                'display_name' => 'Distributor',
+                'description' => 'Same as Cashier for now – sells on behalf of HQ/Branch/Service Center/Annex.',
+            ],
+            [
+                'name' => Role::HR,
+                'display_name' => 'HR',
+                'description' => 'Human Resources management, user oversight, and administrative support.',
+            ],
         ];
 
         foreach ($roles as $role) {

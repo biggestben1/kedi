@@ -51,10 +51,17 @@
                         <i class="fe fe-filter me-1"></i>Filters
                     </button>
                 </div>
-                @if(!in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']))
-                <a href="{{ route('admin.products.create') }}" class="btn btn-primary ms-auto">
-                    <i class="fe fe-plus me-2"></i>Create Product
-                </a>
+                @if(auth()->user()->isAdmin() || auth()->user()->isSuperAdmin())
+                    <div class="ms-auto d-flex gap-2">
+                        @if(auth()->user()->isSuperAdmin())
+                            <a href="{{ route('admin.products.trashed') }}" class="btn btn-outline-danger"><i class="fe fe-trash-2 me-2"></i>Trash</a>
+                        @endif
+                        @if(!in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']))
+                            <a href="{{ route('admin.products.create') }}" class="btn btn-primary">
+                                <i class="fe fe-plus me-2"></i>Create Product
+                            </a>
+                        @endif
+                    </div>
                 @endif
             </div>
             <div class="collapse mt-3" id="products-filter-collapse">

@@ -8,7 +8,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Login – {{ config('app.name') }}</title>
 
-    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
+    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}?v=3" />
+    @include('partials.pwa-head')
     <link id="style" href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -78,7 +79,11 @@
                                                 <input class="form-check-input" type="checkbox" name="remember" id="remember">
                                                 <label class="form-check-label" for="remember">Remember me</label>
                                             </div>
-                                            <div class="text-end pt-4">
+                                            <div class="text-end pt-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                                <div>
+                                                    <a href="{{ route('admin.staff.create') }}" class="text-primary small">Staff Register</a> |
+                                                    <a href="{{ route('admin.sc-annex.create') }}" class="text-primary small">SC/Annex Register</a>
+                                                </div>
                                                 <p class="mb-0"><a href="{{ route('password.request') }}" class="text-primary ms-1">Forgot Password?</a></p>
                                             </div>
                                             <div class="container-login100-form-btn">
@@ -101,6 +106,7 @@
     <script src="{{ asset('sash/assets/plugins/p-scroll/perfect-scrollbar.js') }}"></script>
     <script src="{{ asset('sash/assets/js/themeColors.js') }}"></script>
     <script src="{{ asset('sash/assets/js/custom.js') }}"></script>
+    @include('partials.pwa-scripts')
 </body>
 
 </html>

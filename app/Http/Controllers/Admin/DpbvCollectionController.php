@@ -22,7 +22,7 @@ class DpbvCollectionController extends Controller
         $collections = DpbvCollection::with('user')
             ->orderByDesc('record_date')
             ->orderByDesc('id')
-            ->when($request->query('code'), fn ($q, $code) => $q->where('code', 'like', '%' . $code . '%'))
+            ->when($request->query('code'), fn ($q, $code) => $q->where('code', 'like', '%'.$code.'%'))
             ->paginate(50)
             ->withQueryString();
 
@@ -60,7 +60,7 @@ class DpbvCollectionController extends Controller
             $sheet = $spreadsheet->getActiveSheet();
             $rows = $sheet->toArray();
         } catch (\Throwable $e) {
-            return back()->withInput()->withErrors(['file' => 'Could not read the file. Ensure it is a valid Excel file (.xlsx, .xls) or CSV. Error: ' . $e->getMessage()]);
+            return back()->withInput()->withErrors(['file' => 'Could not read the file. Ensure it is a valid Excel file (.xlsx, .xls) or CSV. Error: '.$e->getMessage()]);
         }
 
         $created = 0;
@@ -104,6 +104,7 @@ class DpbvCollectionController extends Controller
 
                 if (! $code && ! $name) {
                     $skipped++;
+
                     continue;
                 }
 
@@ -146,11 +147,11 @@ class DpbvCollectionController extends Controller
         } catch (\Throwable $e) {
             DB::rollBack();
 
-            return back()->withInput()->withErrors(['file' => 'Error importing: ' . $e->getMessage()]);
+            return back()->withInput()->withErrors(['file' => 'Error importing: '.$e->getMessage()]);
         }
 
         return redirect()->route('admin.dpbv.index')
-            ->with('success', "Imported {$created} records. " . ($matched > 0 ? "Matched {$matched} to user accounts." : '') . ($skipped > 0 ? " Skipped {$skipped} empty rows." : ''));
+            ->with('success', "Imported {$created} records. ".($matched > 0 ? "Matched {$matched} to user accounts." : '').($skipped > 0 ? " Skipped {$skipped} empty rows." : ''));
     }
 
     /**
@@ -183,32 +184,39 @@ class DpbvCollectionController extends Controller
     }
 
     /**
-     * Resolve user_id for a CODE (KD NO): check kd_customers first, then orders.kd_id from shopping.
+     * Resolve user_id for DPBV ownership.
+     *
+     * Rule:
+     * - If SC (service center code) is present, assign strictly to that Service Center account.
+     *   In this case, we DO NOT fall back to KD NO matching.
+     * - If SC is empty, fall back to CODE (KD NO) matching via kd_customers, then orders.kd_id.
      */
     private function resolveUserIdForCode(string $code, string $sc, array $kdCustomers): ?int
     {
         $code = trim($code);
         $sc = trim($sc);
 
-        // 1. Match from service_center_code if SC is provided
+        // 1) Strict match from service_center_code if SC is provided
         if ($sc !== '') {
             $scUser = \App\Models\User::where('service_center_code', $sc)
                 ->orWhere('service_center_code', strtoupper($sc))
                 ->orWhere('service_center_code', strtolower($sc))
+                ->whereHas('role', function ($q) {
+                    $q->where('name', 'service_center');
+                })
                 ->first();
-            if ($scUser) {
-                return (int) $scUser->id;
-            }
+
+            return $scUser ? (int) $scUser->id : null;
         }
 
         if (! $code) {
             return null;
         }
 
-        // 2. Match from kd_customers (KD NO registry)
+        // 2) Match from kd_customers (KD NO registry)
         $userId = $kdCustomers[$code] ?? $kdCustomers[strtoupper($code)] ?? $kdCustomers[strtolower($code)] ?? null;
-        
-        // 3. If no match, check orders.kd_id (KD NO from shopping)
+
+        // 3) If no match, check orders.kd_id (KD NO from shopping)
         if (! $userId) {
             $orderUser = Order::whereNotNull('user_id')
                 ->where(function ($q) use ($code) {

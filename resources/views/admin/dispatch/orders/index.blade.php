@@ -28,7 +28,12 @@
 
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h3 class="card-title mb-0">Paid / Dispatch Orders</h3>
+            <div class="d-flex align-items-center gap-3">
+                <h3 class="card-title mb-0">Paid / Dispatch Orders</h3>
+                @if(auth()->user()->isSuperAdmin())
+                    <a href="{{ route('admin.orders.trashed') }}" class="btn btn-sm btn-outline-danger"><i class="fe fe-trash-2 me-1"></i>Trash</a>
+                @endif
+            </div>
             <form method="GET" action="{{ route('admin.dispatch.orders.index') }}" class="d-flex gap-2 flex-wrap">
                 <input type="search" name="search" class="form-control form-control-sm" placeholder="Order #, tracking, customer..." value="{{ $search }}" style="min-width: 180px;">
                 <select name="status" class="form-select form-select-sm" style="min-width: 140px;">
@@ -96,6 +101,13 @@
                             <td class="text-end">
                                 <a href="{{ route('admin.dispatch.orders.view', $order) }}" class="btn btn-sm btn-outline-secondary">View</a>
                                 <a href="{{ route('admin.dispatch.orders.show', $order) }}" class="btn btn-sm btn-primary">Process</a>
+                                @if(auth()->user()->isSuperAdmin())
+                                    <form action="{{ route('admin.dispatch.orders.destroy', $order) }}" method="POST" class="d-inline" onsubmit="return confirm('Move this order to trash?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Order"><i class="fe fe-trash"></i></button>
+                                    </form>
+                                @endif
                             </td>
                         </tr>
                         @endforeach

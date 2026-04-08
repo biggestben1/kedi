@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Wallet – {{ config('app.name') }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
+    @include('partials.pwa-head')
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -356,6 +357,7 @@
                 </div>
             </div>
         </div>
+        @include('partials.cloud-footer')
     </footer>
     <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
 
@@ -376,7 +378,12 @@
             if (!display || !hidden) return;
 
             function parseMoney(str) {
-                const cleaned = String(str || '').replace(/[^0-9.]/g, '');
+                // Allow commas while typing, but only keep digits + one dot.
+                let cleaned = String(str || '').replace(/,/g, '').replace(/[^0-9.]/g, '');
+                const firstDot = cleaned.indexOf('.');
+                if (firstDot !== -1) {
+                    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+                }
                 const num = Number(cleaned);
                 return Number.isFinite(num) ? num : 0;
             }
@@ -395,7 +402,15 @@
 
             display.addEventListener('input', function () {
                 // typing-friendly: allow numbers, comma, dot
-                display.value = display.value.replace(/[^0-9.,]/g, '');
+                const raw = String(display.value || '').replace(/[^0-9.,]/g, '');
+                display.value = raw;
+
+                const num = parseMoney(raw);
+                if (raw.trim() === '' || raw === '.' || raw === ',') {
+                    hidden.value = '';
+                    return;
+                }
+
                 syncHidden();
             });
 
@@ -410,5 +425,6 @@
             hidden.value = '';
         })();
     </script>
+    @include('partials.pwa-scripts')
 </body>
 </html>

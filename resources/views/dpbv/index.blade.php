@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>My DPBV – {{ config('app.name') }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
+    @include('partials.pwa-head')
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -175,12 +176,18 @@
                                 </ol>
                             </div>
                         </div>
+                        @if(session('success'))
+                            <div class="alert alert-success">{{ session('success') }}</div>
+                        @endif
+                        @if($errors->any())
+                            <div class="alert alert-danger">{{ $errors->first() }}</div>
+                        @endif
 
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <h3 class="card-title mb-0">DPBV Collection</h3>
                                 <div>
-                                    <span class="badge bg-primary fs-6">Total DPBV: {{ number_format($totalDpbv ?? 0, 2) }}</span>
+                                    <span class="badge bg-primary fs-6">Total DPBV: <span id="dpbv-total-badge">{{ number_format($totalDpbv ?? 0, 2) }}</span></span>
                                     <a href="{{ route('dpbv.spending') }}" class="btn btn-sm btn-outline-info ms-2"><i class="fe fe-shopping-cart me-1"></i> View Spending</a>
                                     <a href="{{ url('/') }}" class="btn btn-sm btn-outline-primary ms-2"><i class="fe fe-shopping-bag me-1"></i> Back to Shop</a>
                                 </div>
@@ -192,47 +199,75 @@
                                             <h5 class="alert-heading mb-2"><i class="fe fe-info me-2"></i>Shopping Credit</h5>
                                             <p class="mb-2">Your DPBV can be used for shopping:</p>
                                             <p class="mb-0">
-                                                <strong>Total DPBV:</strong> {{ number_format($totalDpbv ?? 0, 2) }}<br>
-                                                <strong>After 5% discount:</strong> {{ number_format(($totalDpbv ?? 0) * 0.95, 2) }}<br>
-                                                <strong class="text-success fs-5">Naira Equivalent: ₦{{ number_format($nairaEquivalent ?? 0, 2) }}</strong>
+                                                <strong>Total DPBV:</strong> <span id="dpbv-total-text">{{ number_format($totalDpbv ?? 0, 2) }}</span><br>
+                                                <strong>After 5% discount:</strong> <span id="dpbv-after-discount-text">{{ number_format(($totalDpbv ?? 0) * 0.95, 2) }}</span><br>
+                                                <strong class="text-success fs-5">Naira Equivalent: <span id="dpbv-naira-text">₦{{ number_format($nairaEquivalent ?? 0, 2) }}</span></strong>
                                             </p>
                                         </div>
                                     </div>
+                                    <div class="col-md-6 mt-3 mt-md-0">
+                                        <form id="dpbv-search-form" method="GET" action="{{ route('dpbv.index') }}" class="d-flex gap-2">
+                                            <input
+                                                id="dpbv-search-input"
+                                                type="text"
+                                                name="search"
+                                                value="{{ $search ?? '' }}"
+                                                class="form-control"
+                                                placeholder="Search by KD NO, name, SC, or date (YYYY-MM-DD)">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fe fe-search me-1"></i>Search
+                                            </button>
+                                            @if(!empty($search))
+                                                <a href="{{ route('dpbv.index') }}" id="dpbv-reset-link" class="btn btn-outline-secondary">Reset</a>
+                                            @endif
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="card-body p-0">
-                                @if($collections->isEmpty())
-                                    <p class="text-muted p-4 mb-0">You have no DPBV records yet. DPBV data is uploaded by Headquarters and matched to your account using your KD NO. If you have placed orders with your KD number, your DPBV will appear here once it has been uploaded.</p>
-                                @else
-                                    <div class="table-responsive">
-                                        <table class="table table-hover mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th>Code (KD NO)</th>
-                                                    <th>Name</th>
-                                                    <th>Date</th>
-                                                    <th>SC</th>
-                                                    <th class="text-end">DPBV</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($collections as $c)
-                                                <tr>
-                                                    <td><strong>{{ $c->code }}</strong></td>
-                                                    <td>{{ $c->name }}</td>
-                                                    <td>{{ $c->record_date->format('M d, Y') }}</td>
-                                                    <td>{{ $c->sc }}</td>
-                                                    <td class="text-end">{{ number_format($c->dpbv, 2) }}</td>
-                                                </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                @endif
+                            <div id="dpbv-results">
+                                @include('dpbv.partials.table', ['collections' => $collections, 'netByCode' => $netByCode ?? []])
                             </div>
-                            @if(!$collections->isEmpty() && $collections->hasPages())
-                                <div class="card-footer">{{ $collections->links() }}</div>
-                            @endif
+                        </div>
+
+                        <div class="modal fade" id="dpbvTransferModal" tabindex="-1" aria-labelledby="dpbvTransferModalLabel" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <form method="POST" action="{{ route('dpbv.transfer') }}">
+                                        @csrf
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="dpbvTransferModalLabel">Transfer DPBV</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <input type="hidden" name="source_id" id="transfer-source-id">
+                                            <div class="mb-3">
+                                                <label class="form-label">Code (KD NO)</label>
+                                                <input type="text" class="form-control" id="transfer-code-display" readonly>
+                                                <input type="hidden" name="code" id="transfer-code">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Name</label>
+                                                <input type="text" class="form-control" id="transfer-name-display" readonly>
+                                                <input type="hidden" name="name" id="transfer-name">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Recipient Email</label>
+                                                <input type="email" class="form-control" name="recipient_email" id="transfer-recipient-email" required>
+                                                <small id="transfer-recipient-feedback" class="d-block mt-1 text-muted"></small>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">DPBV Amount</label>
+                                                <input type="number" class="form-control" name="amount" id="transfer-amount" step="0.01" min="0.01" required readonly>
+                                                <small class="text-muted">Max for selected row: <span id="transfer-max-text">0.00</span></small>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-primary">Transfer</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -248,6 +283,7 @@
                 </div>
             </div>
         </div>
+        @include('partials.cloud-footer')
     </footer>
     <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
 
@@ -260,5 +296,197 @@
     <script src="{{ asset('sash/assets/js/sticky.js') }}"></script>
     <script src="{{ asset('sash/assets/js/custom.js') }}"></script>
     <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+    <script>
+        (function() {
+            var form = document.getElementById('dpbv-search-form');
+            var input = document.getElementById('dpbv-search-input');
+            var results = document.getElementById('dpbv-results');
+            var totalBadge = document.getElementById('dpbv-total-badge');
+            var totalText = document.getElementById('dpbv-total-text');
+            var afterDiscountText = document.getElementById('dpbv-after-discount-text');
+            var nairaText = document.getElementById('dpbv-naira-text');
+            var typingTimer;
+            var activeController = null;
+            var transferCode = document.getElementById('transfer-code');
+            var transferCodeDisplay = document.getElementById('transfer-code-display');
+            var transferName = document.getElementById('transfer-name');
+            var transferNameDisplay = document.getElementById('transfer-name-display');
+            var transferSourceId = document.getElementById('transfer-source-id');
+            var transferAmount = document.getElementById('transfer-amount');
+            var transferMaxText = document.getElementById('transfer-max-text');
+            var transferRecipientEmail = document.getElementById('transfer-recipient-email');
+            var transferRecipientFeedback = document.getElementById('transfer-recipient-feedback');
+            var transferModalElement = document.getElementById('dpbvTransferModal');
+            var transferModal = transferModalElement ? new bootstrap.Modal(transferModalElement) : null;
+            var recipientTimer;
+
+            if (!form || !input || !results) return;
+
+            function formatNumber(value) {
+                return Number(value || 0).toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+
+            function buildUrl(url) {
+                var endpoint = new URL(url || form.action, window.location.origin);
+                var q = (input.value || '').trim();
+                if (q) {
+                    endpoint.searchParams.set('search', q);
+                } else {
+                    endpoint.searchParams.delete('search');
+                }
+                return endpoint.toString();
+            }
+
+            function updateSummary(totalDpbv, nairaEquivalent) {
+                var total = Number(totalDpbv || 0);
+                var afterDiscount = total * 0.95;
+                if (totalBadge) totalBadge.textContent = formatNumber(total);
+                if (totalText) totalText.textContent = formatNumber(total);
+                if (afterDiscountText) afterDiscountText.textContent = formatNumber(afterDiscount);
+                if (nairaText) nairaText.textContent = '₦' + formatNumber(nairaEquivalent || 0);
+            }
+
+            function fetchResults(url) {
+                var endpoint = buildUrl(url);
+                if (activeController) {
+                    activeController.abort();
+                }
+                activeController = new AbortController();
+                fetch(endpoint, {
+                    signal: activeController.signal,
+                    headers: {
+                        'Accept': 'application/json, text/plain, */*',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(function(response) {
+                    if (!response.ok) throw new Error('Request failed');
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (!data || typeof data.html === 'undefined') return;
+                    results.innerHTML = data.html;
+                    updateSummary(data.totalDpbv, data.nairaEquivalent);
+                    history.replaceState({}, '', endpoint);
+                    applyLocalFilter((input.value || '').trim().toLowerCase());
+                })
+                .catch(function(error) {
+                    if (error && error.name === 'AbortError') return;
+                    // Fallback to normal navigation if AJAX fails.
+                    window.location.href = endpoint;
+                });
+            }
+
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                fetchResults(form.action);
+            });
+
+            function triggerLiveSearch() {
+                var currentSearch = (input.value || '').trim().toLowerCase();
+                applyLocalFilter(currentSearch);
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(function() {
+                    fetchResults(form.action);
+                }, 150);
+            }
+
+            function applyLocalFilter(term) {
+                var rows = results.querySelectorAll('tr[data-dpbv-row]');
+                if (!rows.length) return;
+                rows.forEach(function(row) {
+                    var haystack = (row.getAttribute('data-search') || '').toLowerCase();
+                    var show = !term || haystack.indexOf(term) !== -1;
+                    row.style.display = show ? '' : 'none';
+                });
+            }
+
+            input.addEventListener('input', triggerLiveSearch);
+            input.addEventListener('keyup', triggerLiveSearch);
+            input.addEventListener('search', triggerLiveSearch);
+            input.addEventListener('change', triggerLiveSearch);
+            input.addEventListener('paste', triggerLiveSearch);
+
+            results.addEventListener('click', function(e) {
+                var transferBtn = e.target.closest('.js-transfer-btn');
+                if (transferBtn && transferModal) {
+                    var sourceId = transferBtn.getAttribute('data-id') || '';
+                    var code = transferBtn.getAttribute('data-code') || '';
+                    var name = transferBtn.getAttribute('data-name') || '';
+                    var dpbv = transferBtn.getAttribute('data-dpbv') || '0.00';
+
+                    if (transferSourceId) transferSourceId.value = sourceId;
+                    if (transferCode) transferCode.value = code;
+                    if (transferCodeDisplay) transferCodeDisplay.value = code;
+                    if (transferName) transferName.value = name;
+                    if (transferNameDisplay) transferNameDisplay.value = name;
+                    if (transferAmount) {
+                        transferAmount.value = dpbv;
+                        transferAmount.max = dpbv;
+                    }
+                    if (transferRecipientEmail) transferRecipientEmail.value = '';
+                    if (transferRecipientFeedback) {
+                        transferRecipientFeedback.textContent = '';
+                        transferRecipientFeedback.className = 'd-block mt-1 text-muted';
+                    }
+                    if (transferMaxText) transferMaxText.textContent = dpbv;
+                    transferModal.show();
+                    return;
+                }
+
+                var link = e.target.closest('.pagination a');
+                if (!link) return;
+                e.preventDefault();
+                fetchResults(link.href);
+            });
+
+            function validateRecipientEmail() {
+                if (!transferRecipientEmail || !transferRecipientFeedback) return;
+                var email = (transferRecipientEmail.value || '').trim();
+                if (!email) {
+                    transferRecipientFeedback.textContent = '';
+                    transferRecipientFeedback.className = 'd-block mt-1 text-muted';
+                    return;
+                }
+
+                var endpoint = "{{ route('dpbv.check-recipient-email') }}" + '?email=' + encodeURIComponent(email);
+                fetch(endpoint, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(function(response) {
+                    if (!response.ok) throw new Error('Request failed');
+                    return response.json();
+                })
+                .then(function(data) {
+                    if (data && data.exists) {
+                        transferRecipientFeedback.textContent = 'Found: ' + (data.name || '') + ' (' + (data.email || email) + ')';
+                        transferRecipientFeedback.className = 'd-block mt-1 text-success';
+                    } else {
+                        transferRecipientFeedback.textContent = (data && data.message) ? data.message : 'Recipient email not found.';
+                        transferRecipientFeedback.className = 'd-block mt-1 text-danger';
+                    }
+                })
+                .catch(function() {
+                    transferRecipientFeedback.textContent = 'Unable to verify recipient now. Try again.';
+                    transferRecipientFeedback.className = 'd-block mt-1 text-warning';
+                });
+            }
+
+            if (transferRecipientEmail) {
+                transferRecipientEmail.addEventListener('input', function() {
+                    clearTimeout(recipientTimer);
+                    recipientTimer = setTimeout(validateRecipientEmail, 250);
+                });
+                transferRecipientEmail.addEventListener('blur', validateRecipientEmail);
+            }
+        })();
+    </script>
+    @include('partials.pwa-scripts')
 </body>
 </html>

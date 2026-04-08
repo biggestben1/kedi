@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Dashboard – {{ config('app.name') }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
+    @include('partials.pwa-head')
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -149,6 +150,12 @@
                                 <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ route('my-blog.index') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">My Blog</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('blog.index') }}"><i class="side-menu__icon fe fe-book-open"></i><span class="side-menu__label">Community blog</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Wallet</span></a>
                             </li>
                             <li class="slide">
@@ -246,6 +253,8 @@
                                         <a href="{{ route('admin.pharmacy.referred-orders') }}" class="btn btn-outline-success me-2"><i class="fe fe-users me-1"></i>Referral Orders</a>
                                         @endif
                                         <a href="{{ route('invoices.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-file-text me-1"></i>My Invoices</a>
+                                        <a href="{{ route('my-blog.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-edit me-1"></i>My Blog</a>
+                                        <a href="{{ route('blog.index') }}" class="btn btn-outline-secondary me-2"><i class="fe fe-book-open me-1"></i>Community blog</a>
                                         <a href="{{ route('wallet.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-dollar-sign me-2"></i>Wallet</a>
                                         @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
                                         @php
@@ -301,6 +310,7 @@
                 </div>
             </div>
         </div>
+        @include('partials.cloud-footer')
     </footer>
     <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
 
@@ -313,5 +323,6 @@
     <script src="{{ asset('sash/assets/js/sticky.js') }}"></script>
     <script src="{{ asset('sash/assets/js/custom.js') }}"></script>
     <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+    @include('partials.pwa-scripts')
 </body>
 </html>

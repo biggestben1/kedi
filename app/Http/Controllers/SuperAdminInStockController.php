@@ -45,7 +45,7 @@ class SuperAdminInStockController extends Controller
     {
         $nextId = (int) FactoryInvoice::max('id') + 1;
 
-        return 'FI-' . str_pad((string) $nextId, 6, '0', STR_PAD_LEFT);
+        return 'FI-'.str_pad((string) $nextId, 6, '0', STR_PAD_LEFT);
     }
 
     public function store(Request $request)
@@ -158,6 +158,7 @@ class SuperAdminInStockController extends Controller
                     if ($item) {
                         $item->update($attrs);
                         $keepIds[] = $item->id;
+
                         continue;
                     }
                 }
@@ -186,22 +187,38 @@ class SuperAdminInStockController extends Controller
     /** Add factory invoice quantities to product stock (main inventory). */
     public function addToStock(FactoryInvoice $inStock)
     {
+        // Only allow adding once to avoid double-counting
         if ($inStock->stock_added_at) {
             return redirect()->route('admin.in-stock.show', $inStock)
-                ->with('error', 'Stock has already been added from this invoice on ' . $inStock->stock_added_at->format('M d, Y H:i') . '.');
+                ->with('error', 'Stock has already been added from this invoice on '.$inStock->stock_added_at->format('M d, Y H:i').'.');
         }
+
+        $inStock->load('items.product');
 
         DB::transaction(function () use ($inStock) {
             foreach ($inStock->items as $item) {
-                if ($item->product_id && $item->quantity > 0) {
-                    $item->product->increment('stock', $item->quantity);
+                if ($item->quantity <= 0) {
+                    continue;
+                }
+
+                // Prefer the related product; fall back to item_code lookup
+                $product = $item->product;
+                if (! $product && $item->item_code) {
+                    $product = Product::where('item_code', $item->item_code)->first();
+                }
+
+                if ($product) {
+                    $product->increment('stock', (int) $item->quantity);
+                    // Mark as brought since it has been added to stock
+                    $item->update(['is_brought' => true, 'product_id' => $product->id]);
                 }
             }
+
             $inStock->update(['stock_added_at' => now()]);
         });
 
         return redirect()->route('admin.in-stock.show', $inStock)
-            ->with('success', 'Stock added to products successfully.');
+            ->with('success', 'Stock added from this factory invoice into product stock.');
     }
 
     /** Update which items were brought (received). */
@@ -213,9 +230,13 @@ class SuperAdminInStockController extends Controller
         }
         $broughtIds = array_map('intval', $broughtIds);
 
-        $inStock->items()->each(function (FactoryInvoiceItem $item) use ($broughtIds) {
-            $item->update(['is_brought' => in_array($item->id, $broughtIds, true)]);
-        });
+        $inStock->load('items.product');
+
+        // Update brought flags for this invoice's items
+        foreach ($inStock->items as $item) {
+            $nowBrought = in_array($item->id, $broughtIds, true);
+            $item->update(['is_brought' => $nowBrought]);
+        }
 
         return redirect()->route('admin.in-stock.show', $inStock)
             ->with('success', 'Brought status updated.');
@@ -231,6 +252,6 @@ class SuperAdminInStockController extends Controller
             'statusOptions' => FactoryInvoice::statusOptions(),
         ]);
 
-        return $pdf->download('factory-invoice-' . $inStock->invoice_number . '.pdf');
+        return $pdf->download('factory-invoice-'.$inStock->invoice_number.'.pdf');
     }
 }

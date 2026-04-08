@@ -6,8 +6,8 @@ use App\Models\AnnexStock;
 use App\Models\BranchStock;
 use App\Models\Category;
 use App\Models\HeadquartersStock;
-use App\Models\ServiceCenterStock;
 use App\Models\Product;
+use App\Models\ServiceCenterStock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -18,8 +18,9 @@ class SuperAdminProductController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $categoryId = $request->query('category_id');
-        
+
         $currentUser = $request->user();
+        $isSuperAdmin = $currentUser?->isSuperAdmin() ?? false;
         $isHeadquarters = $currentUser?->role?->name === 'headquarters';
         $headquartersUserId = $isHeadquarters ? $currentUser->id : null;
         $isServiceCenter = $currentUser?->role?->name === 'service_center';
@@ -29,7 +30,8 @@ class SuperAdminProductController extends Controller
         $serviceCenterUserId = $isServiceCenter ? (int) $currentUser->id : null;
         $annexUserId = $isAnnex ? (int) $currentUser->id : null;
 
-        $showStockAsZero = ! $headquartersUserId && ! $branchUserId && ! $serviceCenterUserId && ! $annexUserId;
+        // For Super Admin, always show product stock as stored on the product
+        $showStockAsZero = ! $isSuperAdmin && ! $headquartersUserId && ! $branchUserId && ! $serviceCenterUserId && ! $annexUserId;
 
         $products = Product::query()
             ->with('category')
@@ -49,17 +51,23 @@ class SuperAdminProductController extends Controller
             ->withQueryString();
 
         if ($request->wantsJson()) {
-            $items = collect($products->items())->map(function (Product $p) use ($headquartersUserId, $branchUserId, $serviceCenterUserId, $annexUserId, $showStockAsZero) {
-                $stock = $showStockAsZero ? 0 : $p->stock;
-                if (! $showStockAsZero && $headquartersUserId) {
-                    $stock = HeadquartersStock::getQuantity($headquartersUserId, $p->id);
-                } elseif (! $showStockAsZero && $branchUserId) {
-                    $stock = BranchStock::getQuantity($branchUserId, $p->id);
-                } elseif (! $showStockAsZero && $serviceCenterUserId) {
-                    $stock = ServiceCenterStock::getQuantity($serviceCenterUserId, $p->id);
-                } elseif (! $showStockAsZero && $annexUserId) {
-                    $stock = AnnexStock::getQuantity($annexUserId, $p->id);
+            $items = collect($products->items())->map(function (Product $p) use ($isSuperAdmin, $headquartersUserId, $branchUserId, $serviceCenterUserId, $annexUserId, $showStockAsZero) {
+                // Super Admin: always see main product stock
+                if ($isSuperAdmin) {
+                    $stock = $p->stock;
+                } else {
+                    $stock = $showStockAsZero ? 0 : $p->stock;
+                    if (! $showStockAsZero && $headquartersUserId) {
+                        $stock = HeadquartersStock::getQuantity($headquartersUserId, $p->id);
+                    } elseif (! $showStockAsZero && $branchUserId) {
+                        $stock = BranchStock::getQuantity($branchUserId, $p->id);
+                    } elseif (! $showStockAsZero && $serviceCenterUserId) {
+                        $stock = ServiceCenterStock::getQuantity($serviceCenterUserId, $p->id);
+                    } elseif (! $showStockAsZero && $annexUserId) {
+                        $stock = AnnexStock::getQuantity($annexUserId, $p->id);
+                    }
                 }
+
                 return [
                     'id' => $p->id,
                     'item_code' => $p->item_code,
@@ -78,6 +86,7 @@ class SuperAdminProductController extends Controller
                     'destroy_url' => route('admin.products.destroy', $p),
                 ];
             });
+
             return response()->json([
                 'products' => $items,
                 'total' => $products->total(),
@@ -91,13 +100,15 @@ class SuperAdminProductController extends Controller
         $lowStockProducts = Product::whereRaw('min_stock > 0 AND stock <= min_stock')->orderBy('stock')->get();
 
         // Load headquarters stock for HQ, Service Center, and Annex (their parent HQ)
-        if ($headquartersUserId) {
+        // For Super Admin, keep product->stock as-is in reports
+        if ($headquartersUserId && ! $isSuperAdmin) {
             $headquartersStockMap = HeadquartersStock::where('headquarters_user_id', $headquartersUserId)
                 ->pluck('quantity', 'product_id')
                 ->toArray();
 
             $stockProducts = $stockProducts->map(function ($product) use ($headquartersStockMap) {
                 $product->stock = $headquartersStockMap[$product->id] ?? 0;
+
                 return $product;
             });
         }
@@ -106,10 +117,12 @@ class SuperAdminProductController extends Controller
         if ($showStockAsZero) {
             $stockProducts = $stockProducts->map(function ($product) {
                 $product->stock = 0;
+
                 return $product;
             });
             $lowStockProducts = $lowStockProducts->map(function ($product) {
                 $product->stock = 0;
+
                 return $product;
             });
         }
@@ -123,6 +136,7 @@ class SuperAdminProductController extends Controller
 
             $stockProducts = $stockProducts->map(function ($product) use ($branchStockMap) {
                 $product->stock = $branchStockMap[$product->id] ?? 0;
+
                 return $product;
             });
         }
@@ -134,6 +148,7 @@ class SuperAdminProductController extends Controller
 
             $stockProducts = $stockProducts->map(function ($product) use ($scStockMap) {
                 $product->stock = $scStockMap[$product->id] ?? 0;
+
                 return $product;
             });
         }
@@ -145,6 +160,7 @@ class SuperAdminProductController extends Controller
 
             $stockProducts = $stockProducts->map(function ($product) use ($annexStockMap) {
                 $product->stock = $annexStockMap[$product->id] ?? 0;
+
                 return $product;
             });
         }
@@ -170,17 +186,17 @@ class SuperAdminProductController extends Controller
             if ($branchUserId) {
                 $row = BranchStock::where('branch_user_id', $branchUserId)->where('quantity', '>', 0)->first();
                 if ($row && $row->product) {
-                    $sampleWithStock = $row->product->display_name . ': ' . $row->quantity;
+                    $sampleWithStock = $row->product->display_name.': '.$row->quantity;
                 }
             } elseif ($serviceCenterUserId) {
                 $row = ServiceCenterStock::where('service_center_user_id', $serviceCenterUserId)->where('quantity', '>', 0)->first();
                 if ($row && $row->product) {
-                    $sampleWithStock = $row->product->display_name . ': ' . $row->quantity;
+                    $sampleWithStock = $row->product->display_name.': '.$row->quantity;
                 }
             } elseif ($annexUserId) {
                 $row = AnnexStock::where('annex_user_id', $annexUserId)->where('quantity', '>', 0)->first();
                 if ($row && $row->product) {
-                    $sampleWithStock = $row->product->display_name . ': ' . $row->quantity;
+                    $sampleWithStock = $row->product->display_name.': '.$row->quantity;
                 }
             }
             $stockDebug = [
@@ -220,6 +236,7 @@ class SuperAdminProductController extends Controller
     public function create()
     {
         $categories = Category::orderBy('sort_order')->orderBy('name')->get();
+
         return view('admin.products.create', ['categories' => $categories]);
     }
 
@@ -273,6 +290,7 @@ class SuperAdminProductController extends Controller
     public function edit(Product $product)
     {
         $categories = Category::orderBy('sort_order')->orderBy('name')->get();
+
         return view('admin.products.edit', ['product' => $product, 'categories' => $categories]);
     }
 
@@ -329,10 +347,47 @@ class SuperAdminProductController extends Controller
 
     public function destroy(Product $product)
     {
+        $product->delete();
+
+        return redirect()->route('admin.products.index')->with('success', 'Product moved to trash.');
+    }
+
+    public function trashed()
+    {
+        if (! auth()->user()->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $products = Product::onlyTrashed()->with('category')->paginate(50);
+        return view('admin.products.trashed', compact('products'));
+    }
+
+    public function restore($id)
+    {
+        if (! auth()->user()->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $product = Product::withTrashed()->findOrFail($id);
+        $product->restore();
+
+        return redirect()->route('admin.products.trashed')->with('success', "Product {$product->name} has been restored.");
+    }
+
+    public function forceDelete($id)
+    {
+        if (! auth()->user()->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $product = Product::withTrashed()->findOrFail($id);
+
         if ($product->image && Storage::disk('public')->exists($product->image)) {
             Storage::disk('public')->delete($product->image);
         }
-        $product->delete();
-        return redirect()->route('admin.products.index')->with('success', 'Product deleted successfully.');
+
+        $product->forceDelete();
+
+        return redirect()->route('admin.products.trashed')->with('success', "Product {$product->name} has been permanently deleted.");
     }
 }

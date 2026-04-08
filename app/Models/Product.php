@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
+    use SoftDeletes;
     /** Role names that see member price; everyone else sees retail price (cost_price). */
     public const MEMBER_ROLES = ['super_admin', 'wholesale_staff', 'reseller', 'customer', 'branch', 'headquarters'];
 

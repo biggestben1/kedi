@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#5b2c83">
+  <title>Offline — KEDI</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: linear-gradient(160deg, #f8f5fc 0%, #fff 50%, #eef2ff 100%);
+      color: #1a1a1a;
+    }
+    .card {
+      max-width: 420px;
+      text-align: center;
+      background: #fff;
+      border-radius: 16px;
+      padding: 2rem 1.75rem;
+      box-shadow: 0 12px 40px rgba(91, 44, 131, 0.12);
+      border: 1px solid rgba(91, 44, 131, 0.08);
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 0.5rem; color: #5b2c83; }
+    p { margin: 0 0 1.25rem; line-height: 1.55; color: #444; font-size: 0.95rem; }
+    .btn {
+      display: inline-block;
+      background: #5b2c83;
+      color: #fff !important;
+      text-decoration: none;
+      padding: 0.65rem 1.35rem;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: none;
+      cursor: pointer;
+    }
+    .btn:hover { filter: brightness(1.06); }
+    .btn-outline {
+      background: transparent;
+      color: #5b2c83 !important;
+      border: 2px solid #5b2c83;
+      margin-left: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>You’re offline</h1>
+    <p>Check your internet connection, then try again. Saved pages may still open when you’re back online.</p>
+    <div>
+      <a class="btn" href="/">Go to home</a>
+      <button type="button" class="btn btn-outline" onclick="location.reload()">Retry</button>
+    </div>
+  </div>
+</body>
+</html>

@@ -28,6 +28,7 @@ class RestrictHeadquartersAdmin
             || str_starts_with($routeName, 'admin.pharmacy.dashboard')
             || str_starts_with($routeName, 'admin.pharmacy.reports')
             || str_starts_with($routeName, 'admin.invoices')
+            || str_starts_with($routeName, 'admin.in-stock')
             || str_starts_with($routeName, 'admin.products')
             || str_starts_with($routeName, 'admin.categories')
             || str_starts_with($routeName, 'admin.dispatch.orders')

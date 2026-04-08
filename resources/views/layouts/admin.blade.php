@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin') – {{ config('app.name') }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}?v=3" />
+    @include('partials.pwa-head')
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -102,6 +103,7 @@
                                                 </div>
                                                 <div class="dropdown-divider m-0"></div>
                                                 <a class="dropdown-item" href="{{ route('home') }}"><i class="dropdown-icon fe fe-shopping-bag"></i> Back to Shop</a>
+                                                <a class="dropdown-item" href="{{ url('/') }}#about"><i class="dropdown-icon fe fe-info"></i> About Us</a>
                                                 <a class="dropdown-item" href="{{ route('dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('password.change') }}"><i class="dropdown-icon fe fe-lock"></i> Change Password</a>
                                                 @if(auth()->user()->role?->name === 'reseller')
@@ -175,6 +177,9 @@
                                 <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin') && !request()->routeIs('admin.*') ? 'active' : '' }}" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="slide">
@@ -185,7 +190,6 @@
                                 <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Users</span><i class="angle fe fe-chevron-right"></i></a>
                                 <ul class="slide-menu {{ request()->routeIs('admin.users*') ? 'open' : '' }}" style="{{ request()->routeIs('admin.users*') ? 'display: block;' : '' }}">
                                     <li><a href="{{ route('admin.users.index', ['role' => 'customer']) }}" class="slide-item {{ request()->routeIs('admin.users.index') ? 'active' : '' }}">My Customers</a></li>
-                                    <li><a href="{{ route('admin.users.create') }}" class="slide-item {{ request()->routeIs('admin.users.create') ? 'active' : '' }}">Create Customer</a></li>
                                 </ul>
                             </li>
                             <li class="slide">
@@ -217,6 +221,9 @@
                                 <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="slide">
@@ -238,11 +245,35 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}" href="{{ route('admin.kd.registration.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">KD Registration</span></a>
                             </li>
+                            @elseif(in_array(auth()->user()->role?->name, ['cashier', 'distributor'], true))
+                            {{-- Cashier: parent wallet & stock. Distributor: own wallet; same KD/kits/stock from parent. --}}
+                            <li class="sub-category"><h3>{{ auth()->user()->role?->name === 'distributor' ? 'Distributor' : 'Cashier' }}</h3></li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('wallet.*') ? 'active' : '' }}" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-credit-card"></i><span class="side-menu__label">Wallet</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}" href="{{ route('admin.kd.registration.create') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">Register KD NO</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.kedi-kits.purchase*') && !request()->routeIs('admin.kedi-kits.purchase.seller*') ? 'active' : '' }}" href="{{ route('admin.kedi-kits.purchase.index') }}"><i class="side-menu__icon fe fe-shopping-cart"></i><span class="side-menu__label">Purchase Kits</span></a>
+                            </li>
                             @elseif(auth()->user()->role?->name === 'headquarters')
                             {{-- Headquarters menu: All invoices, Products CRUD, Categories CRUD --}}
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
@@ -324,6 +355,9 @@
                                 <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="slide">
@@ -353,8 +387,6 @@
                                     <li><a href="{{ route('admin.users.index', ['role' => 'service_center']) }}" class="slide-item {{ request()->query('role') === 'service_center' ? 'active' : '' }}">Service Center</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'accountant']) }}" class="slide-item {{ request()->query('role') === 'accountant' ? 'active' : '' }}">Accountant</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'dispatch']) }}" class="slide-item {{ request()->query('role') === 'dispatch' ? 'active' : '' }}">Dispatch</a></li>
-                                    <li><a href="{{ route('admin.users.create', ['role' => 'annex']) }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') === 'annex' ? 'active' : '' }}">Create Annex</a></li>
-                                    <li><a href="{{ route('admin.users.create') }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') !== 'annex' ? 'active' : '' }}">Create User</a></li>
                                 </ul>
                             </li>
                             <li class="slide {{ (request()->routeIs('admin.categories*') || request()->routeIs('admin.products*')) ? 'is-expanded' : '' }}">
@@ -400,6 +432,9 @@
                                 <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="sub-category"><h3>Service Center</h3></li>
@@ -428,8 +463,6 @@
                                     <li><a href="{{ route('admin.users.index', ['role' => 'annex']) }}" class="slide-item {{ request()->query('role') === 'annex' ? 'active' : '' }}">Annex</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'dispatch']) }}" class="slide-item {{ request()->query('role') === 'dispatch' ? 'active' : '' }}">Dispatch</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'accountant']) }}" class="slide-item {{ request()->query('role') === 'accountant' ? 'active' : '' }}">Accountant</a></li>
-                                    <li><a href="{{ route('admin.users.create', ['role' => 'annex']) }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') === 'annex' ? 'active' : '' }}">Create Annex</a></li>
-                                    <li><a href="{{ route('admin.users.create') }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') !== 'annex' ? 'active' : '' }}">Create User</a></li>
                                 </ul>
                             </li>
                             <li class="slide">
@@ -465,6 +498,9 @@
                                 <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="sub-category"><h3>Annex</h3></li>
@@ -492,8 +528,6 @@
                                     <li><a href="{{ route('admin.users.index') }}" class="slide-item {{ request()->routeIs('admin.users.index') && empty(request('role')) ? 'active' : '' }}">My Users</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'accountant']) }}" class="slide-item {{ request()->query('role') === 'accountant' ? 'active' : '' }}">Accountant</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'dispatch']) }}" class="slide-item {{ request()->query('role') === 'dispatch' ? 'active' : '' }}">Dispatch</a></li>
-                                    <li><a href="{{ route('admin.users.create', ['role' => 'accountant']) }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') === 'accountant' ? 'active' : '' }}">Create Accountant</a></li>
-                                    <li><a href="{{ route('admin.users.create', ['role' => 'dispatch']) }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') === 'dispatch' ? 'active' : '' }}">Create Dispatch</a></li>
                                 </ul>
                             </li>
                             
@@ -516,6 +550,9 @@
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
@@ -605,6 +642,18 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kedi-kits*') ? 'active' : '' }}" href="{{ route('admin.kedi-kits.index') }}"><i class="side-menu__icon fe fe-box"></i><span class="side-menu__label">KEDI Kits</span></a>
                             </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.dispatch.orders.index') && request()->query('status') !== 'completed' ? 'active' : '' }}" href="{{ route('admin.dispatch.orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">All Orders</span></a>
+                            </li>
+                            <li class="slide">
+                                <form method="POST" action="{{ route('admin.system.clear-orders-wallet') }}" onsubmit="return confirm('This will delete ALL orders and wallet transactions and reset every user\\'s wallet balance to ₦0.00. Are you sure?');">
+                                    @csrf
+                                    <button type="submit" class="side-menu__item border-0 bg-transparent w-100 text-start text-danger">
+                                        <i class="side-menu__icon fe fe-alert-triangle"></i>
+                                        <span class="side-menu__label">Clear Orders &amp; Wallet</span>
+                                    </button>
+                                </form>
+                            </li>
                             @endif
                             @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff')
                             <li class="slide">
@@ -623,8 +672,17 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.bonus*') ? 'active' : '' }}" href="{{ route('admin.bonus.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Bonus Disbursed</span></a>
                             </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.about.edit') ? 'active' : '' }}" href="{{ route('admin.about.edit') }}"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us CMS</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.services.*') ? 'active' : '' }}" href="{{ route('admin.services.index') }}"><i class="side-menu__icon fe fe-grid"></i><span class="side-menu__label">Services CMS</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.landing-sliders*') ? 'active' : '' }}" href="{{ route('admin.landing-sliders.index') }}"><i class="side-menu__icon fe fe-image"></i><span class="side-menu__label">Front Page Banner</span></a>
+                            </li>
                             @endif
-                            @if(auth()->user()->role?->name === 'accountant')
+                            @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'accountant')
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kd*') ? 'active' : '' }}" href="{{ route('admin.kd.index') }}"><i class="side-menu__icon fe fe-hash"></i><span class="side-menu__label">Borrow</span></a>
                             </li>
@@ -712,6 +770,7 @@
                 </div>
             </div>
         </div>
+        @include('partials.cloud-footer')
     </footer>
     <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
 
@@ -725,5 +784,6 @@
     <script src="{{ asset('sash/assets/js/custom.js') }}"></script>
     <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
     @stack('scripts')
+    @include('partials.pwa-scripts')
 </body>
 </html>

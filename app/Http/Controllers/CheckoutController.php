@@ -5,10 +5,9 @@ namespace App\Http\Controllers;
 use App\Mail\OrderConfirmationMail;
 use App\Models\AnnexStock;
 use App\Models\BranchStock;
-use App\Models\ServiceCenterStock;
-use App\Models\HeadquartersStock;
-use App\Models\Guest;
 use App\Models\DpbvCollection;
+use App\Models\Guest;
+use App\Models\HeadquartersStock;
 use App\Models\KdCustomer;
 use App\Models\KdRegistration;
 use App\Models\KdRegistrationCredit;
@@ -16,6 +15,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Role;
+use App\Models\ServiceCenterStock;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
@@ -24,6 +24,26 @@ use Illuminate\Support\Facades\Mail;
 
 class CheckoutController extends Controller
 {
+    private function effectiveDpbvQuery(User $user)
+    {
+        $query = DpbvCollection::query()->where('user_id', $user->id);
+
+        $serviceCenterCode = trim((string) ($user->service_center_code ?? ''));
+        if (($user->role?->name ?? null) === 'service_center' && $serviceCenterCode !== '') {
+            $scVariants = array_values(array_unique([
+                $serviceCenterCode,
+                strtoupper($serviceCenterCode),
+                strtolower($serviceCenterCode),
+            ]));
+
+            $query->orWhere(function ($q) use ($scVariants) {
+                $q->whereNull('user_id')->whereIn('sc', $scVariants);
+            });
+        }
+
+        return $query;
+    }
+
     private function getCartData(Request $request): array
     {
         $cart = $request->session()->get('cart', []);
@@ -66,6 +86,7 @@ class CheckoutController extends Controller
 
         $cartTotal = max(0, $cartSubtotal - $discountAmount);
         $cartCount = array_sum($cart);
+
         return compact('cartItems', 'cartSubtotal', 'cartBv', 'cartPv', 'cartCount', 'coupon', 'discountAmount', 'cartTotal');
     }
 
@@ -77,24 +98,31 @@ class CheckoutController extends Controller
         }
 
         $user = $request->user();
+        $user?->load(['role', 'createdBy.role']);
         $kdId = trim((string) $request->session()->get('kd_id', ''));
         $customerName = trim((string) $request->session()->get('customer_name', ''));
         // Guests can checkout without KD NO/Customer Name; orders stored with null, can be updated later
-        $walletBalance = $user ? (float) ($user->wallet_balance ?? 0) : 0;
-        $canPayWithWallet = $user->canPayWithWallet($data['cartTotal']);
-        
+        // Cashier → parent wallet; Distributor → own wallet
+        $walletOwner = $user ? $user->walletOwnerForShopping() : null;
+
+        $walletBalance = $walletOwner ? (float) ($walletOwner->wallet_balance ?? 0) : 0;
+        $canPayWithWallet = $walletBalance >= $data['cartTotal'];
+
         // Calculate DPBV balance and naira equivalent
-        $totalDpbv = $user ? (float) DpbvCollection::where('user_id', $user->id)->sum('dpbv') : 0;
+        $totalDpbv = $user ? (float) $this->effectiveDpbvQuery($user)->sum('dpbv') : 0;
         $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
-        // Check if all products in cart allow DPBV
-        $allProductsAllowDpbv = true;
+        // Use rounded comparison to avoid float precision blocking DPBV option.
+        $dpbvProductsAllowed = true;
         foreach ($data['cartItems'] as $item) {
-            if (!($item->product->can_use_dpbv ?? true)) {
-                $allProductsAllowDpbv = false;
+            if (! ($item->product->can_use_dpbv ?? true)) {
+                $dpbvProductsAllowed = false;
                 break;
             }
         }
-        $canPayWithDpbv = $dpbvNairaEquivalent >= $data['cartTotal'] && $allProductsAllowDpbv;
+
+        // Enable the DPBV radio based on balance ONLY.
+        // The real product eligibility check is enforced again during `placeOrder`.
+        $canPayWithDpbv = round($dpbvNairaEquivalent, 2) >= round((float) $data['cartTotal'], 2);
 
         // Check KD Registration credit balance if KD NO is provided
         $kdCreditBalance = 0;
@@ -113,6 +141,7 @@ class CheckoutController extends Controller
             'totalDpbv' => $totalDpbv,
             'dpbvNairaEquivalent' => $dpbvNairaEquivalent,
             'canPayWithDpbv' => $canPayWithDpbv,
+            'dpbvProductsAllowed' => $dpbvProductsAllowed,
             'kdId' => $kdId,
             'customerName' => $customerName,
             'kdCreditBalance' => $kdCreditBalance,
@@ -129,7 +158,7 @@ class CheckoutController extends Controller
         $kdNo = trim($request->input('kd_no'));
         $kdRegistration = KdRegistration::where('kd_no', $kdNo)->first();
 
-        if (!$kdRegistration) {
+        if (! $kdRegistration) {
             return response()->json([
                 'has_credit' => false,
                 'balance' => 0,
@@ -138,12 +167,12 @@ class CheckoutController extends Controller
         }
 
         $balance = $kdRegistration->credits()->sum(DB::raw("CASE WHEN type = 'credit' THEN amount ELSE -amount END"));
-        
+
         // Get cart subtotal to check if balance is sufficient
         $cart = $request->session()->get('cart', []);
         $cartSubtotal = 0;
         $user = $request->user();
-        
+
         foreach ($cart as $itemCode => $qty) {
             $product = Product::where('item_code', $itemCode)->where('is_active', true)->first();
             if ($product && $qty > 0) {
@@ -182,50 +211,78 @@ class CheckoutController extends Controller
         $rules['shipping_state'] = 'nullable|string|max:100';
         $rules['shipping_postal_code'] = 'nullable|string|max:20';
         $rules['sc_referral_code'] = 'nullable|string|max:100';
+        $rules['sc_collection_code'] = 'nullable|string|max:100';
 
         $request->validate($rules);
 
         $user = $request->user();
+        $user?->load(['role', 'createdBy.role']);
         $paymentMethod = $request->input('payment_method');
         $kdId = trim((string) $request->input('kd_id', ''));
         $customerName = trim((string) $request->input('customer_name', ''));
 
-        if ($paymentMethod === 'wallet' && ! $user->canPayWithWallet($data['cartTotal'])) {
-            return back()->with('error', 'Insufficient wallet balance.');
+        // Cashier → parent wallet; Distributor → own wallet
+        $walletOwner = $user->walletOwnerForShopping();
+
+        // Distributor: resolve Service Center Code for Collection.
+        // Stock source for distributor orders must come from this service center.
+        // Wallet transfer (debit distributor, credit service center) remains wallet-only.
+        $serviceCenterForDistributor = null;
+        if ($user->role?->name === 'distributor') {
+            $scCode = trim((string) $request->input('sc_collection_code', ''));
+            if ($scCode === '') {
+                return back()->withErrors(['sc_collection_code' => 'Service Center code for collection is required for distributor orders.'])->withInput();
+            }
+
+            $serviceCenterForDistributor = User::where('service_center_code', $scCode)
+                ->whereHas('role', function ($q) {
+                    $q->where('name', Role::SERVICE_CENTER);
+                })
+                ->first();
+
+            if (! $serviceCenterForDistributor) {
+                return back()->withErrors(['sc_collection_code' => 'Invalid Service Center code.'])->withInput();
+            }
+        }
+
+        if ($paymentMethod === 'wallet') {
+            $walletBalance = $walletOwner ? (float) ($walletOwner->wallet_balance ?? 0) : 0;
+            if ($walletBalance < $data['cartTotal']) {
+                return back()->with('error', 'Insufficient wallet balance.');
+            }
         }
 
         // Check KD Registration credit balance if paying with credit
         if ($paymentMethod === 'kd_credit') {
-            if (!$kdId) {
+            if (! $kdId) {
                 return back()->with('error', 'KD NO is required to pay with credit.');
             }
             $kdRegistration = KdRegistration::where('kd_no', $kdId)->first();
-            if (!$kdRegistration) {
+            if (! $kdRegistration) {
                 return back()->with('error', 'KD Registration not found.');
             }
             $kdCreditBalance = $kdRegistration->credits()->sum(DB::raw("CASE WHEN type = 'credit' THEN amount ELSE -amount END"));
             if ($kdCreditBalance < $data['cartTotal']) {
-                return back()->with('error', 'Insufficient KD credit balance. You have ₦' . number_format($kdCreditBalance, 2) . ' available.');
+                return back()->with('error', 'Insufficient KD credit balance. You have ₦'.number_format($kdCreditBalance, 2).' available.');
             }
         }
 
-        // Check DPBV balance if paying with DPBV
+        // DPBV checks (balance + product eligibility) when paying with DPBV
         if ($paymentMethod === 'dpbv') {
-            $totalDpbv = (float) DpbvCollection::where('user_id', $user->id)->sum('dpbv');
+            $totalDpbv = (float) $this->effectiveDpbvQuery($user)->sum('dpbv');
             $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
-            if ($dpbvNairaEquivalent < $data['cartTotal']) {
-                return back()->with('error', 'Insufficient DPBV balance. You have ₦' . number_format($dpbvNairaEquivalent, 2) . ' available.');
+            if (round($dpbvNairaEquivalent, 2) < round((float) $data['cartTotal'], 2)) {
+                return back()->with('error', 'Insufficient DPBV balance. You have ₦'.number_format($dpbvNairaEquivalent, 2).' available.');
             }
-            
-            // Check if all products allow DPBV
+
             $productsNotAllowed = [];
             foreach ($data['cartItems'] as $item) {
-                if (!($item->product->can_use_dpbv ?? true)) {
+                if (! ($item->product->can_use_dpbv ?? true)) {
                     $productsNotAllowed[] = $item->product->name;
                 }
             }
-            if (!empty($productsNotAllowed)) {
-                return back()->with('error', 'The following products cannot be purchased with DPBV: ' . implode(', ', $productsNotAllowed) . '. Please remove them from your cart or use a different payment method.');
+            if (! empty($productsNotAllowed)) {
+                return back()->with('error', 'The following products cannot be purchased with DPBV: '.implode(', ', $productsNotAllowed).'. Please remove them from your cart or use a different payment method.');
             }
         }
 
@@ -235,26 +292,41 @@ class CheckoutController extends Controller
             $request->session()->put('customer_name', $customerName);
         }
 
+        // Determine which user's stock to use (HQ, Branch, Service Center, or Annex)
+        $stockOwner = $user;
+        $roleName = $user->role?->name ?? '';
+
+        // If cashier, they sell on behalf of the account that created them (HQ/Branch/SC/Annex)
+        if (in_array($roleName, ['cashier', 'distributor'], true) && $user->createdBy && $user->createdBy->role) {
+            $ownerRole = $user->createdBy->role->name;
+            if (in_array($ownerRole, ['headquarters', 'branch', 'service_center', 'annex'], true)) {
+                $stockOwner = $user->createdBy;
+                $roleName = $ownerRole;
+            }
+        }
+
+        // Distributor override: use the entered Service Center as stock source.
+        if ($serviceCenterForDistributor) {
+            $stockOwner = $serviceCenterForDistributor;
+            $roleName = Role::SERVICE_CENTER;
+        }
+
         $stockUserId = null; // user whose stock we use (Branch, SC, or Annex)
-        $isHeadquarters = $user->role?->name === 'headquarters';
-        if ($user->role?->name === 'branch') {
-            $stockUserId = (int) $user->id;
-        } elseif ($user->role?->name === 'service_center') {
-            $stockUserId = (int) $user->id;
-        } elseif ($user->role?->name === 'annex') {
-            $stockUserId = (int) $user->id;
+        $isHeadquarters = $roleName === 'headquarters';
+        if (in_array($roleName, ['branch', 'service_center', 'annex'], true)) {
+            $stockUserId = (int) $stockOwner->id;
         }
         $branchUserId = $stockUserId; // keep for order.branch_user_id (used when deducting)
 
-        // Check stock availability before placing order
+        // Check stock availability before placing order (using stock owner's account)
         foreach ($data['cartItems'] as $item) {
             if ($isHeadquarters) {
-                $avail = HeadquartersStock::getQuantity($user->id, $item->product->id);
+                $avail = HeadquartersStock::getQuantity($stockOwner->id, $item->product->id);
                 if ($avail < $item->quantity) {
                     return back()->with('error', "Insufficient Headquarters stock for {$item->product->name}. Available: {$avail}.");
                 }
             } elseif ($stockUserId) {
-                $avail = $this->getStockForUser($stockUserId, $user->role?->name, $item->product->id);
+                $avail = $this->getStockForUser($stockUserId, $roleName, $item->product->id);
                 if ($avail < $item->quantity) {
                     return back()->with('error', "Insufficient stock for {$item->product->name}. Available: {$avail}.");
                 }
@@ -281,7 +353,7 @@ class CheckoutController extends Controller
             );
         }
         $order = null;
-        DB::transaction(function () use ($user, $data, $paymentMethod, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, &$order) {
+        DB::transaction(function () use ($user, $walletOwner, $data, $paymentMethod, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, $serviceCenterForDistributor, &$order) {
             if (! $orderKdId || ! $orderCustomerName) {
                 Guest::firstOrCreate(
                     ['session_id' => $request->session()->getId(), 'user_id' => $user->id],
@@ -323,24 +395,52 @@ class CheckoutController extends Controller
                     'bv' => $item->product->bv,
                     'pv' => $item->product->pv,
                 ]);
-                
-                // For Headquarters users with paid orders, deduct stock immediately
+
+                // For Headquarters stock owner with paid orders, deduct stock immediately
                 if ($isHeadquarters && ($paymentMethod === Order::PAYMENT_WALLET || $paymentMethod === Order::PAYMENT_DPBV)) {
-                    HeadquartersStock::decrementStock($user->id, $item->product->id, $item->quantity);
+                    HeadquartersStock::decrementStock($stockOwner->id, $item->product->id, $item->quantity);
                 }
                 // For other users, stock will be deducted when order is marked as completed
             }
 
             if ($paymentMethod === Order::PAYMENT_WALLET) {
-                $user->decrement('wallet_balance', $data['cartSubtotal']);
-                $balanceAfter = (float) $user->fresh()->wallet_balance;
-                WalletTransaction::create([
-                    'user_id' => $user->id,
-                    'type' => WalletTransaction::TYPE_DEBIT,
-                    'amount' => $data['cartTotal'],
-                    'balance_after' => $balanceAfter,
-                    'reference' => 'Order #' . $order->id,
-                ]);
+                $debitAmount = (float) $data['cartTotal'];
+
+                // Distributor special case:
+                // - Debit distributor wallet
+                // - Credit the matched Service Center wallet
+                if ($user->role?->name === 'distributor' && $serviceCenterForDistributor) {
+                    $walletOwner->decrement('wallet_balance', $debitAmount);
+                    $walletBalanceAfter = (float) $walletOwner->fresh()->wallet_balance;
+                    WalletTransaction::create([
+                        'user_id' => $walletOwner->id,
+                        'type' => WalletTransaction::TYPE_DEBIT,
+                        'amount' => $debitAmount,
+                        'balance_after' => $walletBalanceAfter,
+                        'reference' => 'Order #'.$order->id,
+                    ]);
+
+                    $serviceCenterForDistributor->increment('wallet_balance', $debitAmount);
+                    $scBalanceAfter = (float) $serviceCenterForDistributor->fresh()->wallet_balance;
+                    WalletTransaction::create([
+                        'user_id' => $serviceCenterForDistributor->id,
+                        'type' => WalletTransaction::TYPE_CREDIT,
+                        'amount' => $debitAmount,
+                        'balance_after' => $scBalanceAfter,
+                        'reference' => 'Order #'.$order->id,
+                    ]);
+                } else {
+                    // Debit wallet from the wallet owner (parent for cashiers, self otherwise)
+                    $walletOwner->decrement('wallet_balance', $data['cartSubtotal']);
+                    $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
+                    WalletTransaction::create([
+                        'user_id' => $walletOwner->id,
+                        'type' => WalletTransaction::TYPE_DEBIT,
+                        'amount' => $data['cartTotal'],
+                        'balance_after' => $balanceAfter,
+                        'reference' => 'Order #'.$order->id,
+                    ]);
+                }
             }
 
             // Mark coupon as used
@@ -354,13 +454,13 @@ class CheckoutController extends Controller
                 if ($kdRegistration) {
                     $currentBalance = $kdRegistration->credits()->sum(DB::raw("CASE WHEN type = 'credit' THEN amount ELSE -amount END"));
                     $newBalance = $currentBalance - $data['cartTotal'];
-                    
+
                     KdRegistrationCredit::create([
                         'kd_registration_id' => $kdRegistration->id,
                         'type' => KdRegistrationCredit::TYPE_DEBIT,
                         'amount' => $data['cartTotal'],
                         'balance_after' => $newBalance,
-                        'reference' => 'Order #' . $order->invoice_number,
+                        'reference' => 'Order #'.$order->invoice_number,
                         'notes' => 'Payment for order',
                         'created_by_user_id' => $user->id,
                     ]);
@@ -369,13 +469,13 @@ class CheckoutController extends Controller
 
             // Deduct DPBV if paying with DPBV
             if ($paymentMethod === Order::PAYMENT_DPBV) {
-                $totalDpbv = (float) DpbvCollection::where('user_id', $user->id)->sum('dpbv');
+                $totalDpbv = (float) $this->effectiveDpbvQuery($user)->sum('dpbv');
                 $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
                 $amountToDeduct = $data['cartTotal'];
-                
+
                 // Calculate how much DPBV to deduct (reverse calculation: naira / 990 / 0.95)
                 $dpbvToDeduct = $amountToDeduct / 990 / 0.95;
-                
+
                 // Create a negative DPBV collection record to track usage
                 DpbvCollection::create([
                     'no' => null,
@@ -396,7 +496,7 @@ class CheckoutController extends Controller
         try {
             Mail::to($user->email)->send(new OrderConfirmationMail($order));
         } catch (\Throwable $e) {
-            \Log::warning('Order confirmation email failed: ' . $e->getMessage());
+            \Log::warning('Order confirmation email failed: '.$e->getMessage());
         }
 
         return redirect()->route('dashboard')->with('success', 'Order placed successfully. Thank you!');
@@ -415,13 +515,23 @@ class CheckoutController extends Controller
         $orderKdId = $kdId !== '' ? $kdId : null;
         $orderCustomerName = $customerName !== '' ? $customerName : null;
 
+        // Determine stock owner for drafts (HQ/Branch/SC/Annex or their cashier)
         $roleName = $user->role?->name ?? '';
+        $stockOwner = $user;
+        if (in_array($roleName, ['cashier', 'distributor'], true) && $user->createdBy && $user->createdBy->role) {
+            $ownerRole = $user->createdBy->role->name;
+            if (in_array($ownerRole, ['headquarters', 'branch', 'service_center', 'annex'], true)) {
+                $stockOwner = $user->createdBy;
+                $roleName = $ownerRole;
+            }
+        }
+
         $isHeadquarters = ($roleName === 'headquarters');
-        $stockUserId = in_array($roleName, ['branch', 'service_center', 'annex']) ? (int) $user->id : null;
+        $stockUserId = in_array($roleName, ['branch', 'service_center', 'annex']) ? (int) $stockOwner->id : null;
 
         foreach ($data['cartItems'] as $item) {
             if ($isHeadquarters) {
-                $avail = HeadquartersStock::getQuantity($user->id, $item->product->id);
+                $avail = HeadquartersStock::getQuantity($stockOwner->id, $item->product->id);
                 if ($avail < $item->quantity) {
                     return back()->with('error', "Insufficient Headquarters stock for {$item->product->name}. Available: {$avail}.");
                 }
@@ -432,7 +542,7 @@ class CheckoutController extends Controller
                 }
             }
         }
-        $branchUserId = ($isHeadquarters || $stockUserId) ? (int) $user->id : null;
+        $branchUserId = ($isHeadquarters || $stockUserId) ? (int) $stockOwner->id : null;
 
         $deliveryType = $request->input('delivery_type', 'ship');
         $shippingAddress = $deliveryType === 'walk_in' ? 'Walk-in (Pick up)' : $request->input('shipping_address', '');
@@ -484,34 +594,35 @@ class CheckoutController extends Controller
         return redirect()->route('home')->with('success', 'Order saved as draft. You can complete it later from My Orders. Cart cleared – start shopping again.');
     }
 
-   public function restoreDraft(Request $request, Order $order)
-{
-    if (!$request->user() || $order->user_id != $request->user()->id) {
-        abort(404);
+    public function restoreDraft(Request $request, Order $order)
+    {
+        if (! $request->user() || $order->user_id != $request->user()->id) {
+            abort(404);
+        }
+
+        if ($order->status !== Order::STATUS_DRAFT) {
+            return redirect()->route('orders.index')
+                ->with('error', 'This order is not a draft.');
+        }
+
+        $order->load('items');
+
+        $cart = session()->get('cart', []);
+
+        foreach ($order->items as $item) {
+            $cart[$item->item_code] = ($cart[$item->item_code] ?? 0) + $item->quantity;
+        }
+
+        session()->put('cart', $cart);
+        session()->put('kd_id', $order->kd_id ?? '');
+        session()->put('customer_name', $order->customer_name ?? '');
+
+        $order->delete();
+
+        return redirect()->route('checkout.show')
+            ->with('success', 'Draft restored to cart.');
     }
 
-    if ($order->status !== Order::STATUS_DRAFT) {
-        return redirect()->route('orders.index')
-            ->with('error', 'This order is not a draft.');
-    }
-
-    $order->load('items');
-
-    $cart = session()->get('cart', []);
-
-    foreach ($order->items as $item) {
-        $cart[$item->item_code] = ($cart[$item->item_code] ?? 0) + $item->quantity;
-    }
-
-    session()->put('cart', $cart);
-    session()->put('kd_id', $order->kd_id ?? '');
-    session()->put('customer_name', $order->customer_name ?? '');
-
-    $order->delete();
-
-    return redirect()->route('checkout.show')
-        ->with('success', 'Draft restored to cart.');
-}
     public function placeDraftFromWallet(Request $request, Order $order)
     {
         if ((int) $order->user_id !== (int) $request->user()->id) {
@@ -524,8 +635,19 @@ class CheckoutController extends Controller
         $user = $request->user();
         $subtotal = (float) $order->subtotal;
 
-        $stockUserId = in_array($user->role?->name ?? '', ['branch', 'service_center', 'annex']) ? (int) $user->id : null;
-        $isHeadquarters = $user->role?->name === 'headquarters';
+        // Determine stock owner when placing a single draft from wallet
+        $roleName = $user->role?->name ?? '';
+        $stockOwner = $user;
+        if (in_array($roleName, ['cashier', 'distributor'], true) && $user->createdBy && $user->createdBy->role) {
+            $ownerRole = $user->createdBy->role->name;
+            if (in_array($ownerRole, ['headquarters', 'branch', 'service_center', 'annex'], true)) {
+                $stockOwner = $user->createdBy;
+                $roleName = $ownerRole;
+            }
+        }
+
+        $stockUserId = in_array($roleName, ['branch', 'service_center', 'annex']) ? (int) $stockOwner->id : null;
+        $isHeadquarters = $roleName === 'headquarters';
         $branchUserId = $stockUserId;
 
         // Check stock availability before placing draft order
@@ -552,37 +674,37 @@ class CheckoutController extends Controller
             }
         }
 
-        if (! $user->canPayWithWallet($subtotal)) {
-            return redirect()->route('orders.index', ['status' => 'draft'])->with('error', 'Insufficient wallet balance. Need ₦' . number_format($subtotal, 0) . ' – you have ₦' . number_format($user->wallet_balance ?? 0, 0) . '.');
+        if (! $walletOwner->canPayWithWallet($subtotal)) {
+            return redirect()->route('orders.index', ['status' => 'draft'])->with('error', 'Insufficient wallet balance. Need ₦'.number_format($subtotal, 0).' – you have ₦'.number_format($walletOwner->wallet_balance ?? 0, 0).'.');
         }
 
-        DB::transaction(function () use ($user, $order, $subtotal, $branchUserId, $isHeadquarters) {
+        DB::transaction(function () use ($walletOwner, $order, $subtotal, $branchUserId, $isHeadquarters, $stockOwner) {
             $order->update([
                 'payment_method' => Order::PAYMENT_WALLET,
                 'status' => Order::STATUS_PAID,
                 'branch_user_id' => $branchUserId,
             ]);
 
-            // For Headquarters users, deduct stock immediately when order is paid
+            // For Headquarters stock owner, deduct stock immediately when order is paid
             if ($isHeadquarters) {
                 $order->load('items');
                 foreach ($order->items as $item) {
                     $product = \App\Models\Product::where('item_code', $item->item_code)->first();
                     if ($product) {
-                        HeadquartersStock::decrementStock($user->id, $product->id, $item->quantity);
+                        HeadquartersStock::decrementStock($stockOwner->id, $product->id, $item->quantity);
                     }
                 }
             }
             // For other users, stock will be deducted when order is marked as completed
 
-            $user->decrement('wallet_balance', $subtotal);
-            $balanceAfter = (float) $user->fresh()->wallet_balance;
+            $walletOwner->decrement('wallet_balance', $subtotal);
+            $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
             WalletTransaction::create([
-                'user_id' => $user->id,
+                'user_id' => $walletOwner->id,
                 'type' => WalletTransaction::TYPE_DEBIT,
                 'amount' => $subtotal,
                 'balance_after' => $balanceAfter,
-                'reference' => 'Order #' . $order->id,
+                'reference' => 'Order #'.$order->id,
             ]);
         });
 
@@ -592,10 +714,10 @@ class CheckoutController extends Controller
         try {
             Mail::to($user->email)->send(new OrderConfirmationMail($order));
         } catch (\Throwable $e) {
-            \Log::warning('Order confirmation email failed: ' . $e->getMessage());
+            \Log::warning('Order confirmation email failed: '.$e->getMessage());
         }
 
-        return redirect()->route('orders.receipt', $order)->with('success', 'Order placed successfully. ₦' . number_format($subtotal, 0) . ' deducted from wallet.');
+        return redirect()->route('orders.receipt', $order)->with('success', 'Order placed successfully. ₦'.number_format($subtotal, 0).' deducted from wallet.');
     }
 
     public function placeAllDraftsFromWallet(Request $request)
@@ -609,12 +731,23 @@ class CheckoutController extends Controller
 
         $totalAmount = $drafts->sum('subtotal');
         if (! $user->canPayWithWallet($totalAmount)) {
-            return redirect()->route('orders.index', ['status' => 'draft'])->with('error', 'Insufficient wallet balance. Need ₦' . number_format($totalAmount, 0) . ' – you have ₦' . number_format($user->wallet_balance ?? 0, 0) . '.');
+            return redirect()->route('orders.index', ['status' => 'draft'])->with('error', 'Insufficient wallet balance. Need ₦'.number_format($totalAmount, 0).' – you have ₦'.number_format($user->wallet_balance ?? 0, 0).'.');
+        }
+
+        // Determine stock owner when placing all drafts from wallet
+        $roleName = $user->role?->name ?? '';
+        $stockOwner = $user;
+        if (in_array($roleName, ['cashier', 'distributor'], true) && $user->createdBy && $user->createdBy->role) {
+            $ownerRole = $user->createdBy->role->name;
+            if (in_array($ownerRole, ['headquarters', 'branch', 'service_center', 'annex'], true)) {
+                $stockOwner = $user->createdBy;
+                $roleName = $ownerRole;
+            }
         }
 
         // Check stock availability for all drafts before placing
-        $stockUserId = in_array($user->role?->name ?? '', ['branch', 'service_center', 'annex']) ? (int) $user->id : null;
-        $isHeadquarters = $user->role?->name === 'headquarters';
+        $stockUserId = in_array($roleName, ['branch', 'service_center', 'annex']) ? (int) $stockOwner->id : null;
+        $isHeadquarters = $roleName === 'headquarters';
         $branchUserId = $stockUserId;
 
         foreach ($drafts as $order) {
@@ -622,12 +755,12 @@ class CheckoutController extends Controller
                 $product = \App\Models\Product::where('item_code', $item->item_code)->first();
                 if ($product) {
                     if ($isHeadquarters) {
-                        $avail = HeadquartersStock::getQuantity($user->id, $product->id);
+                        $avail = HeadquartersStock::getQuantity($stockOwner->id, $product->id);
                         if ($avail < $item->quantity) {
                             return redirect()->route('orders.index', ['status' => 'draft'])->with('error', "Insufficient Headquarters stock for {$item->product_name} in order #{$order->invoice_number}. Available: {$avail}.");
                         }
                     } elseif ($stockUserId) {
-                        $avail = $this->getStockForUser($stockUserId, $user->role?->name, $product->id);
+                        $avail = $this->getStockForUser($stockUserId, $roleName, $product->id);
                         if ($avail < $item->quantity) {
                             return redirect()->route('orders.index', ['status' => 'draft'])->with('error', "Insufficient stock for {$item->product_name} in order #{$order->invoice_number}. Available: {$avail}.");
                         }
@@ -640,7 +773,7 @@ class CheckoutController extends Controller
             }
         }
 
-        DB::transaction(function () use ($user, $drafts, $branchUserId, $isHeadquarters) {
+        DB::transaction(function () use ($user, $walletOwner, $drafts, $branchUserId, $isHeadquarters, $stockOwner) {
             foreach ($drafts as $order) {
                 $subtotal = (float) $order->subtotal;
                 $order->update([
@@ -648,34 +781,34 @@ class CheckoutController extends Controller
                     'status' => Order::STATUS_PAID,
                     'branch_user_id' => $branchUserId,
                 ]);
-                
-                // For Headquarters users, deduct stock immediately when order is paid
+
+                // For Headquarters stock owner, deduct stock immediately when order is paid
                 if ($isHeadquarters) {
                     $order->load('items');
                     foreach ($order->items as $item) {
                         $product = \App\Models\Product::where('item_code', $item->item_code)->first();
                         if ($product) {
-                            HeadquartersStock::decrementStock($user->id, $product->id, $item->quantity);
+                            HeadquartersStock::decrementStock($stockOwner->id, $product->id, $item->quantity);
                         }
                     }
                 }
                 // For other users, stock will be deducted when order is marked as completed
-                
-                $user->decrement('wallet_balance', $subtotal);
-                $balanceAfter = (float) $user->fresh()->wallet_balance;
+
+                $walletOwner->decrement('wallet_balance', $subtotal);
+                $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
                 WalletTransaction::create([
-                    'user_id' => $user->id,
+                    'user_id' => $walletOwner->id,
                     'type' => WalletTransaction::TYPE_DEBIT,
                     'amount' => $subtotal,
                     'balance_after' => $balanceAfter,
-                    'reference' => 'Order #' . $order->id,
+                    'reference' => 'Order #'.$order->id,
                 ]);
 
                 $order->load(['user', 'items']);
                 try {
                     Mail::to($user->email)->send(new OrderConfirmationMail($order));
                 } catch (\Throwable $e) {
-                    \Log::warning('Order confirmation email failed: ' . $e->getMessage());
+                    \Log::warning('Order confirmation email failed: '.$e->getMessage());
                 }
             }
         });
@@ -688,7 +821,7 @@ class CheckoutController extends Controller
         $request->session()->put('placed_order_ids', $placedOrderIds);
 
         return redirect()->route('orders.receipt', $firstOrder)
-            ->with('success', 'All ' . $drafts->count() . ' draft(s) placed successfully. ₦' . number_format($totalAmount, 0) . ' deducted from wallet.');
+            ->with('success', 'All '.$drafts->count().' draft(s) placed successfully. ₦'.number_format($totalAmount, 0).' deducted from wallet.');
     }
 
     /** Get stock quantity for Branch/Service Center/Annex user. */
@@ -703,6 +836,7 @@ class CheckoutController extends Controller
         if ($role === 'annex') {
             return AnnexStock::getQuantity($userId, $productId);
         }
+
         return BranchStock::getQuantity($userId, $productId);
     }
 
@@ -717,37 +851,37 @@ class CheckoutController extends Controller
         }
 
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return redirect()->route('login')->with('error', 'Please login to buy with DPBV.');
         }
 
         // Check DPBV balance
-        $totalDpbv = (float) DpbvCollection::where('user_id', $user->id)->sum('dpbv');
+        $totalDpbv = (float) $this->effectiveDpbvQuery($user)->sum('dpbv');
         $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
-        if ($dpbvNairaEquivalent < $data['cartSubtotal']) {
-            return redirect()->route('home')->with('error', 'Insufficient DPBV balance. You have ₦' . number_format($dpbvNairaEquivalent, 2) . ' available.');
+        if (round($dpbvNairaEquivalent, 2) < round((float) $data['cartSubtotal'], 2)) {
+            return redirect()->route('home')->with('error', 'Insufficient DPBV balance. You have ₦'.number_format($dpbvNairaEquivalent, 2).' available.');
         }
-        
+
         // Check if all products allow DPBV
         $productsNotAllowed = [];
         foreach ($data['cartItems'] as $item) {
-            if (!($item->product->can_use_dpbv ?? true)) {
+            if (! ($item->product->can_use_dpbv ?? true)) {
                 $productsNotAllowed[] = $item->product->name;
             }
         }
-        if (!empty($productsNotAllowed)) {
-            return redirect()->route('home')->with('error', 'The following products cannot be purchased with DPBV: ' . implode(', ', $productsNotAllowed) . '. Please remove them from your cart.');
+        if (! empty($productsNotAllowed)) {
+            return redirect()->route('home')->with('error', 'The following products cannot be purchased with DPBV: '.implode(', ', $productsNotAllowed).'. Please remove them from your cart.');
         }
 
         // Auto-generate KD NO and name
-        $baseKd = 'KD-' . $user->id . '-';
-        $existing = KdCustomer::where('kd_no', 'like', $baseKd . '%')->max('kd_no');
+        $baseKd = 'KD-'.$user->id.'-';
+        $existing = KdCustomer::where('kd_no', 'like', $baseKd.'%')->max('kd_no');
         $seq = 1;
         if ($existing) {
             $parts = explode('-', $existing);
             $seq = (int) (end($parts) ?: 0) + 1;
         }
-        $kdNo = $baseKd . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+        $kdNo = $baseKd.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
         $customerName = trim($user->name ?? $user->email ?? 'Customer');
 
         $kd = KdCustomer::updateOrCreate(
@@ -819,7 +953,7 @@ class CheckoutController extends Controller
                     'bv' => $item->product->bv,
                     'pv' => $item->product->pv,
                 ]);
-                
+
                 // Deduct stock for Headquarters users
                 if ($isHeadquarters) {
                     HeadquartersStock::decrementStock($user->id, $item->product->id, $item->quantity);
@@ -829,7 +963,7 @@ class CheckoutController extends Controller
             // Deduct DPBV
             $amountToDeduct = $data['cartSubtotal'];
             $dpbvToDeduct = $amountToDeduct / 990 / 0.95;
-            
+
             DpbvCollection::create([
                 'no' => null,
                 'code' => $kdNo,
@@ -849,10 +983,10 @@ class CheckoutController extends Controller
         try {
             Mail::to($user->email)->send(new OrderConfirmationMail($order));
         } catch (\Throwable $e) {
-            \Log::warning('Order confirmation email failed: ' . $e->getMessage());
+            \Log::warning('Order confirmation email failed: '.$e->getMessage());
         }
 
-        return redirect()->route('dashboard')->with('success', 'Order placed successfully with DPBV! KD NO: ' . $kdNo);
+        return redirect()->route('dashboard')->with('success', 'Order placed successfully with DPBV! KD NO: '.$kdNo);
     }
 
     public function validateScCode(Request $request)

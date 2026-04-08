@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>KEDI Shop – {{ config('app.name') }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}?v=3" />
+    @include('partials.pwa-head')
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -146,12 +147,6 @@
                                                 <div class="dropdown-divider m-0" id="cartDropdownDivider" style="{{ count($cartItems) > 0 ? '' : 'display:none;' }}"></div>
                                                 <div class="dropdown-footer" id="cartDropdownFooter" style="{{ count($cartItems) > 0 ? '' : 'display:none;' }}">
                                                     @auth
-                                                    @if($canBuyWithDpbv ?? false)
-                                                        <form action="{{ route('checkout.dpbv') }}" method="POST" class="mb-2" onsubmit="return confirm('Buy with DPBV? This will auto-generate KD NO and deduct from your DPBV balance.');">
-                                                            @csrf
-                                                            <button type="submit" class="btn btn-success btn-pill btn-sm py-2 w-100"><i class="fe fe-award me-1"></i> Buy with DPBV</button>
-                                                        </form>
-                                                    @endif
                                                     <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-pill btn-sm py-2 js-checkout-link"><i class="fe fe-credit-card me-1"></i> Checkout</a>
                                                     @else
                                                     <a href="{{ route('login') }}" class="btn btn-primary btn-pill btn-sm py-2">Login to Checkout</a>
@@ -231,6 +226,12 @@
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ url('/') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
                             </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('blog.index') }}"><i class="side-menu__icon fe fe-book-open"></i><span class="side-menu__label">Community blog</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                            </li>
                             @auth
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('dashboard') }}"><i class="side-menu__icon fe fe-grid"></i><span class="side-menu__label">Dashboard</span></a>
@@ -250,6 +251,9 @@
                                 <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ route('my-blog.index') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">My Blog</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Wallet</span></a>
                             </li>
                             <li class="slide">
@@ -261,6 +265,11 @@
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('bonus.index') }}"><i class="side-menu__icon fe fe-trending-up"></i><span class="side-menu__label">My Bonus</span></a>
                             </li>
+                            @if(in_array(auth()->user()->role?->name, ['cashier', 'distributor'], true))
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('admin.kedi-kits.purchase.index') }}"><i class="side-menu__icon fe fe-shopping-cart"></i><span class="side-menu__label">Purchase Kits</span></a>
+                            </li>
+                            @endif
                             @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
                             @php
                                 $sideRole = auth()->user()->role?->name;
@@ -368,22 +377,6 @@
                                 <strong><i class="fe fe-award me-1"></i> DPBV Balance:</strong>
                                 {{ number_format($totalDpbv ?? 0, 2) }} DPBV = ₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }}
                             </div>
-                            @if($canBuyWithDpbv ?? false)
-                                <form action="{{ route('checkout.dpbv') }}" method="POST" class="d-inline" onsubmit="return confirm('Buy with DPBV? This will auto-generate KD NO and deduct from your DPBV balance (₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }} available).');">
-                                    @csrf
-                                    <button type="submit" class="btn btn-success btn-sm"><i class="fe fe-award me-1"></i> Buy with DPBV</button>
-                                </form>
-                            @elseif(! $dpbvHasItems)
-                                <span class="text-muted small">Add items to cart to buy with DPBV.</span>
-                            @elseif(! $dpbvAllItemsAllowed)
-                                <span class="text-muted small">Some items in your cart cannot be purchased with DPBV.</span>
-                            @elseif($dpbvBalanceNaira <= 0)
-                                <span class="text-muted small">No DPBV balance available.</span>
-                            @elseif($dpbvBalanceNaira < $dpbvCartTotal)
-                                <span class="text-muted small">Cart total exceeds your DPBV balance.</span>
-                            @else
-                                <span class="text-muted small">DPBV is not available for this cart.</span>
-                            @endif
                         </div>
                         @endauth
                         
@@ -436,12 +429,6 @@
                                                 <p class="mb-1"><strong>Subtotal:</strong> <span id="cartSummarySubtotal">₦{{ number_format($cartSubtotal, 0) }}</span></p>
                                                 <p class="mb-2 small text-muted">BV: <span id="cartSummaryBv">{{ number_format($cartBv, 1) }}</span> &nbsp; PV: <span id="cartSummaryPv">{{ number_format($cartPv, 1) }}</span></p>
                                                 @auth
-                                                @if($canBuyWithDpbv ?? false)
-                                                    <form action="{{ route('checkout.dpbv') }}" method="POST" class="mb-2" onsubmit="return confirm('Buy with DPBV? This will auto-generate KD NO and deduct from your DPBV balance (₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }} available).');">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-success btn-sm w-100"><i class="fe fe-award me-1"></i> Buy with DPBV</button>
-                                                    </form>
-                                                @endif
                                                 <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-sm w-100 mb-2 js-checkout-link"><i class="fe fe-credit-card me-1"></i> Checkout</a>
                                                 @else
                                                 <a href="{{ route('login') }}" class="btn btn-primary btn-sm w-100 mb-2">Login to Checkout</a>
@@ -608,12 +595,6 @@
                 <p><strong>Subtotal:</strong> <span id="cartOffcanvasSubtotal">₦{{ number_format($cartSubtotal, 0) }}</span></p>
                 <p class="small text-muted">BV: <span id="cartOffcanvasBv">{{ number_format($cartBv, 1) }}</span> &nbsp; PV: <span id="cartOffcanvasPv">{{ number_format($cartPv, 1) }}</span></p>
                 @auth
-                @if($canBuyWithDpbv ?? false)
-                    <form action="{{ route('checkout.dpbv') }}" method="POST" class="mb-2" onsubmit="return confirm('Buy with DPBV? This will auto-generate KD NO and deduct from your DPBV balance.');">
-                        @csrf
-                        <button type="submit" class="btn btn-success btn-sm w-100"><i class="fe fe-award me-1"></i> Buy with DPBV</button>
-                    </form>
-                @endif
                 <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-sm w-100 mb-2 js-checkout-link">Checkout</a>
                 @else
                 <a href="{{ route('login') }}" class="btn btn-primary btn-sm w-100 mb-2">Login to Checkout</a>
@@ -635,6 +616,7 @@
                 </div>
             </div>
         </div>
+        @include('partials.cloud-footer')
     </footer>
     <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
 
@@ -669,41 +651,7 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">I'll browse only</button>
                         <button type="submit" class="btn btn-primary" id="kdInfoSubmit"><i class="fe fe-check me-1"></i>Continue Shopping</button>
-                        @auth
-                        @php
-                            $dpbvBalanceNairaModal = (float) ($dpbvNairaEquivalent ?? 0);
-                            $dpbvCartTotalModal = (float) ($cartSubtotal ?? 0);
-                            $dpbvHasItemsModal = (int) ($cartCount ?? 0) > 0;
-                            $dpbvAllItemsAllowedModal = true;
-                            foreach (($cartItems ?? []) as $it) {
-                                if (!($it->product->can_use_dpbv ?? true)) {
-                                    $dpbvAllItemsAllowedModal = false;
-                                    break;
-                                }
-                            }
-                            $dpbvDisabledReason = null;
-                            if (!($canBuyWithDpbv ?? false)) {
-                                if (! $dpbvHasItemsModal) {
-                                    $dpbvDisabledReason = 'Add items to cart to buy with DPBV.';
-                                } elseif (! $dpbvAllItemsAllowedModal) {
-                                    $dpbvDisabledReason = 'Some items in your cart cannot be purchased with DPBV.';
-                                } elseif ($dpbvBalanceNairaModal <= 0) {
-                                    $dpbvDisabledReason = 'No DPBV balance available.';
-                                } elseif ($dpbvBalanceNairaModal < $dpbvCartTotalModal) {
-                                    $dpbvDisabledReason = 'Cart total exceeds your DPBV balance.';
-                                } else {
-                                    $dpbvDisabledReason = 'DPBV is not available for this cart.';
-                                }
-                            }
-                        @endphp
-                        <button
-                            type="button"
-                            class="btn btn-success"
-                            id="dpbvAutoGenBtn"
-                            {{ ($canBuyWithDpbv ?? false) ? '' : 'disabled' }}
-                            title="{{ $dpbvDisabledReason ?? '' }}"
-                        ><i class="fe fe-award me-1"></i>Buy with DPBV</button>
-                        @endauth
+                        {{-- DPBV buy action removed --}}
                     </div>
                 </form>
             </div>
@@ -1032,95 +980,7 @@
             });
         }
 
-        // DPBV Auto-generate and Buy button
-        const dpbvAutoGenBtn = document.getElementById('dpbvAutoGenBtn');
-        if (dpbvAutoGenBtn) {
-            dpbvAutoGenBtn.addEventListener('click', async function() {
-                const btn = this;
-                btn.disabled = true;
-                btn.innerHTML = '<i class=\"fe fe-loader me-1\"></i>Processing...';
-                try {
-                    // Step 1: Auto-generate KD NO and name
-                    const res = await fetch('{{ route("kd-info.auto-generate") }}', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
-                        body: '_token=' + encodeURIComponent(CSRF),
-                    });
-                    const data = await res.json().catch(function() { return {}; });
-                    
-                    if (!res.ok || data.error) {
-                        alert(data.error || 'Failed to generate KD NO.');
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class=\"fe fe-award me-1\"></i>Buy with DPBV';
-                        return;
-                    }
-
-                    // Step 2: Display generated KD NO and name in the fields
-                    const kdInput = document.getElementById('kd_id');
-                    const nameInput = document.getElementById('customer_name');
-                    if (kdInput) kdInput.value = data.kd_id || '';
-                    if (nameInput) nameInput.value = data.customer_name || '';
-
-                    // Step 3: Save to database via store endpoint
-                    const saveRes = await fetch('{{ route("kd-info.store") }}', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: { 
-                            'Accept': 'application/json', 
-                            'Content-Type': 'application/x-www-form-urlencoded', 
-                            'X-CSRF-TOKEN': CSRF, 
-                            'X-Requested-With': 'XMLHttpRequest' 
-                        },
-                        body: 'kd_id=' + encodeURIComponent(data.kd_id || '') + '&customer_name=' + encodeURIComponent(data.customer_name || '')
-                    });
-                    const saveData = await saveRes.json().catch(function() { return { success: true }; });
-
-                    // Step 4: Close modal and redirect to DPBV checkout
-                    const modalEl = document.getElementById('kdInfoModal');
-                    const modal = bootstrap.Modal.getInstance(modalEl);
-                    if (modal) modal.hide();
-
-                    // Show success message
-                    const m = document.querySelector('.main-content');
-                    if (m) {
-                        const alert = document.createElement('div');
-                        alert.className = 'alert alert-success alert-dismissible fade show';
-                        alert.innerHTML = 'KD NO (' + (data.kd_id || '') + ') and name (' + (data.customer_name || '') + ') generated and saved! ' + 
-                            '<button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\"></button>';
-                        m.insertBefore(alert, m.firstChild);
-                        setTimeout(() => alert.remove(), 5000);
-                    }
-
-                    // Redirect to DPBV checkout if cart has items
-                    const cartCount = parseInt(document.getElementById('headerCartCount')?.textContent || '0');
-                    if (cartCount > 0) {
-                        // Submit DPBV checkout form
-                        setTimeout(function() {
-                            const dpbvForm = document.createElement('form');
-                            dpbvForm.method = 'POST';
-                            dpbvForm.action = '{{ route("checkout.dpbv") }}';
-                            const csrfInput = document.createElement('input');
-                            csrfInput.type = 'hidden';
-                            csrfInput.name = '_token';
-                            csrfInput.value = CSRF;
-                            dpbvForm.appendChild(csrfInput);
-                            document.body.appendChild(dpbvForm);
-                            dpbvForm.submit();
-                        }, 500);
-                    } else {
-                        // Reload page to show updated KD info
-                        setTimeout(function() {
-                            location.reload();
-                        }, 1000);
-                    }
-                } catch (err) {
-                    alert(err?.error || err?.message || 'Failed to process DPBV order.');
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class=\"fe fe-award me-1\"></i>Buy with DPBV';
-                }
-            });
-        }
+        {{-- DPBV auto-generate and buy removed --}}
 
         // AJAX add-to-cart
         document.querySelectorAll('.add-to-cart-form').forEach(function(form) {
@@ -1222,5 +1082,6 @@
             filterProducts();
         })();
     </script>
+    @include('partials.pwa-scripts')
 </body>
 </html>

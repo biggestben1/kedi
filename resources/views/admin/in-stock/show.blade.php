@@ -74,7 +74,12 @@
                     <table class="table table-bordered">
                         <thead>
                             <tr>
-                                <th class="text-center" style="width:80px">Brought</th>
+                                <th class="text-center" style="width:80px">
+                                    <div class="form-check mb-0">
+                                        <input type="checkbox" class="form-check-input" id="brought-check-all">
+                                        <label class="form-check-label small" for="brought-check-all">All</label>
+                                    </div>
+                                </th>
                                 <th>Product</th>
                                 <th class="text-end">Quantity</th>
                                 <th>Status</th>
@@ -109,4 +114,19 @@
             <a href="{{ route('admin.in-stock.index') }}" class="btn btn-outline-secondary">← Back to In Stock</a>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const master = document.getElementById('brought-check-all');
+            if (!master) return;
+            master.addEventListener('change', function () {
+                const checks = document.querySelectorAll('#brought-form input[type="checkbox"][name=\"brought[]\"]');
+                checks.forEach(cb => {
+                    cb.checked = master.checked;
+                });
+            });
+        });
+    </script>
+    @endpush
 @endsection

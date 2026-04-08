@@ -6,13 +6,14 @@ use App\Models\AnnexStock;
 use App\Models\BackOrder;
 use App\Models\BranchStock;
 use App\Models\HeadquartersStock;
-use App\Models\ServiceCenterStock;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ServiceCenterStock;
 use App\Models\User;
+use App\Models\WalletTransaction;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -148,7 +149,7 @@ class SuperAdminInvoiceController extends Controller
         $selectedUser = null;
         $products = collect();
         $branchStockByProduct = [];
-        
+
         if ($branchOnly) {
             $branchStock = BranchStock::where('branch_user_id', $request->user()->id)
                 ->where('quantity', '>', 0)
@@ -176,7 +177,7 @@ class SuperAdminInvoiceController extends Controller
         } else {
             $products = Product::where('is_active', true)->orderBy('name')->get();
         }
-        
+
         if ($request->filled('user_id')) {
             $selectedUser = User::find($request->query('user_id'));
             $allowed = ! $resellerOnly && ! $branchOnly && ! $serviceCenterOnly
@@ -187,7 +188,7 @@ class SuperAdminInvoiceController extends Controller
                 $selectedUser = null;
             }
         }
-        
+
         return view('admin.invoices.create', [
             'users' => $users,
             'selectedUser' => $selectedUser,
@@ -204,7 +205,7 @@ class SuperAdminInvoiceController extends Controller
         $hasProductQuantities = $request->has('product_quantities') && is_array($request->input('product_quantities'));
         $productQuantities = $hasProductQuantities ? array_filter($request->input('product_quantities', []), fn ($q) => (float) $q > 0) : [];
 
-        if ($hasProductQuantities && !empty($productQuantities)) {
+        if ($hasProductQuantities && ! empty($productQuantities)) {
             $data = $request->validate([
                 'user_id' => ['nullable', 'integer', 'exists:users,id'],
                 'customer_name' => ['nullable', 'string', 'max:255'],
@@ -220,14 +221,14 @@ class SuperAdminInvoiceController extends Controller
                 'product_quantities' => ['required', 'array'],
                 'product_quantities.*' => ['numeric', 'min:0'],
             ]);
-            
-            $user = !empty($data['user_id']) ? User::findOrFail($data['user_id']) : null;
+
+            $user = ! empty($data['user_id']) ? User::findOrFail($data['user_id']) : null;
             $productIds = array_keys($productQuantities);
             $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
             $items = [];
             foreach ($productQuantities as $productId => $qty) {
                 $product = $products->get($productId);
-                if (!$product) {
+                if (! $product) {
                     continue;
                 }
                 $qty = (float) $qty;
@@ -294,21 +295,23 @@ class SuperAdminInvoiceController extends Controller
         }
 
         // Check branch stock if branch user and using products
-        if ($branchOnly && $hasProductQuantities && !empty($productQuantities)) {
+        if ($branchOnly && $hasProductQuantities && ! empty($productQuantities)) {
             foreach ($productQuantities as $productId => $qty) {
                 $avail = BranchStock::getQuantity($request->user()->id, (int) $productId);
                 if ($avail < (float) $qty) {
                     $name = Product::find($productId)?->name ?? "Product #{$productId}";
+
                     return redirect()->back()->withInput()->withErrors(['product_quantities' => "Insufficient branch stock for {$name}. Available: {$avail}."]);
                 }
             }
         }
         // Check service center stock if service center and using products (no deduct at create; stock moves on approve)
-        if ($serviceCenterOnly && $hasProductQuantities && !empty($productQuantities)) {
+        if ($serviceCenterOnly && $hasProductQuantities && ! empty($productQuantities)) {
             foreach ($productQuantities as $productId => $qty) {
                 $avail = ServiceCenterStock::getQuantity($request->user()->id, (int) $productId);
                 if ($avail < (float) $qty) {
                     $name = Product::find($productId)?->name ?? "Product #{$productId}";
+
                     return redirect()->back()->withInput()->withErrors(['product_quantities' => "Insufficient service center stock for {$name}. Available: {$avail}."]);
                 }
             }
@@ -677,7 +680,7 @@ class SuperAdminInvoiceController extends Controller
             $keepIds = [];
             foreach ($data['items'] as $index => $item) {
                 $lineTotal = (float) $item['quantity'] * (float) $item['unit_price'];
-                if (!empty($item['id'])) {
+                if (! empty($item['id'])) {
                     $invoiceItem = InvoiceItem::where('invoice_id', $invoice->id)->find($item['id']);
                     if ($invoiceItem) {
                         $invoiceItem->update([
@@ -690,6 +693,7 @@ class SuperAdminInvoiceController extends Controller
                             'sort_order' => $index,
                         ]);
                         $keepIds[] = $invoiceItem->id;
+
                         continue;
                     }
                 }
@@ -723,6 +727,7 @@ class SuperAdminInvoiceController extends Controller
         }
         $invoice->items()->delete();
         $invoice->delete();
+
         return redirect()->route('admin.invoices.index')->with('success', 'Invoice deleted successfully.');
     }
 
@@ -843,7 +848,7 @@ class SuperAdminInvoiceController extends Controller
                     continue;
                 }
                 $invItem = $row['item'];
-                $itemCode = 'INV-' . $invoice->id . '-' . ($index + 1);
+                $itemCode = 'INV-'.$invoice->id.'-'.($index + 1);
                 OrderItem::create([
                     'order_id' => $order->id,
                     'item_code' => $itemCode,
@@ -877,8 +882,9 @@ class SuperAdminInvoiceController extends Controller
         $backOrderCount = count($backOrdersToCreate);
         $msg = 'Invoice moved to dispatch. You can now process it.';
         if ($backOrderCount > 0) {
-            $msg .= ' ' . $backOrderCount . ' back order(s) saved against the customer for when you receive more stock.';
+            $msg .= ' '.$backOrderCount.' back order(s) saved against the customer for when you receive more stock.';
         }
+
         return redirect()
             ->route('admin.dispatch.orders.show', $order)
             ->with('success', $msg);
@@ -915,7 +921,8 @@ class SuperAdminInvoiceController extends Controller
             'outOfStockItemIds' => $outOfStockItemIds,
             'inStockItemIds' => $inStockItemIds,
         ]);
-        return $pdf->download('invoice-' . $invoice->invoice_number . '.pdf');
+
+        return $pdf->download('invoice-'.$invoice->invoice_number.'.pdf');
     }
 
     public function approve(Request $request, Invoice $invoice)
@@ -962,6 +969,23 @@ class SuperAdminInvoiceController extends Controller
 
         if (! $canApprove) {
             abort(403, 'You cannot approve this invoice.');
+        }
+
+        // Determine wallet transfer: debit sender (invoice user), credit approver
+        $sender = $invoiceUser;
+        $receiver = $user;
+        $amount = (float) ($invoice->total ?? 0);
+        if ($amount <= 0) {
+            return back()->with('error', 'Invoice total is zero. Cannot perform wallet transfer.');
+        }
+        if ($sender && $sender->id === $receiver->id) {
+            return back()->with('error', 'Sender and approver are the same account. Wallet transfer not allowed.');
+        }
+        if (! $sender) {
+            return back()->with('error', 'Invoice sender account not found.');
+        }
+        if (($sender->wallet_balance ?? 0) < $amount) {
+            return back()->with('error', 'Sender does not have enough wallet balance to approve this invoice.');
         }
 
         $products = Product::where('is_active', true)->get();
@@ -1027,143 +1051,169 @@ class SuperAdminInvoiceController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($invoice, $stockSource, $stockUpdates, $backOrdersToCreate, $headquartersUserId, $approvalType) {
-            if ($approvalType === 'super_admin_hq' || $approvalType === 'hq_own') {
-                foreach ($stockUpdates as $update) {
-                    $product = $update['product'];
-                    $qty = (int) $update['quantity'];
-                    if ($qty <= 0) {
-                        continue;
+            DB::transaction(function () use ($invoice, $stockSource, $stockUpdates, $backOrdersToCreate, $headquartersUserId, $approvalType, $sender, $receiver, $amount) {
+                if ($approvalType === 'super_admin_hq' || $approvalType === 'hq_own') {
+                    foreach ($stockUpdates as $update) {
+                        $product = $update['product'];
+                        $qty = (int) $update['quantity'];
+                        if ($qty <= 0) {
+                            continue;
+                        }
+                        $product->decrement('stock', $qty);
+                        HeadquartersStock::incrementStock($headquartersUserId, $product->id, $qty);
                     }
-                    $product->decrement('stock', $qty);
-                    HeadquartersStock::incrementStock($headquartersUserId, $product->id, $qty);
+                } else {
+                    foreach ($stockUpdates as $update) {
+                        $product = $update['product'];
+                        $qty = (int) $update['quantity'];
+                        if ($qty <= 0) {
+                            continue;
+                        }
+                        if ($stockSource[0] === 'hq') {
+                            $ok = HeadquartersStock::decrementStock($stockSource[1], $product->id, $qty);
+                            if (! $ok) {
+                                throw new \RuntimeException("Insufficient HQ stock for {$product->display_name}.");
+                            }
+                        } elseif ($stockSource[0] === 'service_center') {
+                            $ok = ServiceCenterStock::decrementStock($stockSource[1], $product->id, $qty);
+                            if (! $ok) {
+                                throw new \RuntimeException("Insufficient Service Center stock for {$product->display_name}.");
+                            }
+                        } else {
+                            $ok = BranchStock::decrementStock($stockSource[1], $product->id, $qty);
+                            if (! $ok) {
+                                throw new \RuntimeException("Insufficient branch stock for {$product->display_name}.");
+                            }
+                        }
+                    }
                 }
-            } else {
-                foreach ($stockUpdates as $update) {
-                    $product = $update['product'];
-                    $qty = (int) $update['quantity'];
-                    if ($qty <= 0) {
-                        continue;
-                    }
-                    if ($stockSource[0] === 'hq') {
-                        $ok = HeadquartersStock::decrementStock($stockSource[1], $product->id, $qty);
-                        if (! $ok) {
-                            throw new \RuntimeException("Insufficient HQ stock for {$product->display_name}.");
-                        }
-                    } elseif ($stockSource[0] === 'service_center') {
-                        $ok = ServiceCenterStock::decrementStock($stockSource[1], $product->id, $qty);
-                        if (! $ok) {
-                            throw new \RuntimeException("Insufficient Service Center stock for {$product->display_name}.");
-                        }
-                    } else {
-                        $ok = BranchStock::decrementStock($stockSource[1], $product->id, $qty);
-                        if (! $ok) {
-                            throw new \RuntimeException("Insufficient branch stock for {$product->display_name}.");
-                        }
-                    }
-                }
-            }
 
-            $createOrder = in_array($approvalType, ['hq_child', 'branch_child', 'service_center_child'], true);
-            if ($createOrder) {
-                $orderSubtotal = 0;
-                foreach ($stockUpdates as $u) {
-                    $orderSubtotal += $u['quantity'] * (float) $u['item']->unit_price;
-                }
-                // Order's branch_user_id = stock holder (customer) for Branch/SC approvals so delivery deduction uses correct table
-                $orderBranchUserId = in_array($approvalType, ['branch_child', 'service_center_child'], true)
-                    ? (int) $invoice->user_id
-                    : ($invoice->branch_user_id ?? $invoice->user_id);
-                $order = Order::create([
-                    'invoice_number' => $invoice->invoice_number,
-                    'invoice_id' => $invoice->id,
-                    'user_id' => $invoice->user_id,
-                    'branch_user_id' => $orderBranchUserId,
-                    'subtotal' => $orderSubtotal,
-                    'total_bv' => 0,
-                    'total_pv' => 0,
-                    'payment_method' => 'invoice',
-                    'status' => Order::STATUS_PAID,
-                    'shipping_address' => $invoice->customer_address,
-                    'shipping_phone' => $invoice->customer_phone,
-                    'customer_name' => $invoice->customer_name,
-                    'kd_id' => null,
-                ]);
-                foreach ($stockUpdates as $index => $row) {
-                    $givingNow = $row['quantity'];
-                    if ($givingNow <= 0) {
-                        continue;
+                $createOrder = in_array($approvalType, ['hq_child', 'branch_child', 'service_center_child'], true);
+                if ($createOrder) {
+                    $orderSubtotal = 0;
+                    foreach ($stockUpdates as $u) {
+                        $orderSubtotal += $u['quantity'] * (float) $u['item']->unit_price;
                     }
-                    $invItem = $row['item'];
-                    $itemCode = 'INV-' . $invoice->id . '-' . ($index + 1);
-                    OrderItem::create([
-                        'order_id' => $order->id,
-                        'item_code' => $itemCode,
-                        'product_name' => $invItem->item_name,
-                        'quantity' => (int) round($givingNow, 2),
-                        'unit_price' => $invItem->unit_price,
-                        'line_total' => $givingNow * (float) $invItem->unit_price,
-                        'bv' => 0,
-                        'pv' => 0,
+                    // Order's branch_user_id = stock holder (customer) for Branch/SC approvals so delivery deduction uses correct table
+                    $orderBranchUserId = in_array($approvalType, ['branch_child', 'service_center_child'], true)
+                        ? (int) $invoice->user_id
+                        : ($invoice->branch_user_id ?? $invoice->user_id);
+                    $order = Order::create([
+                        'invoice_number' => $invoice->invoice_number,
+                        'invoice_id' => $invoice->id,
+                        'user_id' => $invoice->user_id,
+                        'branch_user_id' => $orderBranchUserId,
+                        'subtotal' => $orderSubtotal,
+                        'total_bv' => 0,
+                        'total_pv' => 0,
+                        'payment_method' => 'invoice',
+                        'status' => Order::STATUS_PAID,
+                        'shipping_address' => $invoice->customer_address,
+                        'shipping_phone' => $invoice->customer_phone,
+                        'customer_name' => $invoice->customer_name,
+                        'kd_id' => null,
+                    ]);
+                    foreach ($stockUpdates as $index => $row) {
+                        $givingNow = $row['quantity'];
+                        if ($givingNow <= 0) {
+                            continue;
+                        }
+                        $invItem = $row['item'];
+                        $itemCode = 'INV-'.$invoice->id.'-'.($index + 1);
+                        OrderItem::create([
+                            'order_id' => $order->id,
+                            'item_code' => $itemCode,
+                            'product_name' => $invItem->item_name,
+                            'quantity' => (int) round($givingNow, 2),
+                            'unit_price' => $invItem->unit_price,
+                            'line_total' => $givingNow * (float) $invItem->unit_price,
+                            'bv' => 0,
+                            'pv' => 0,
+                        ]);
+                    }
+                    // HQ approving Branch: deduct from HQ, add to Branch
+                    if ($approvalType === 'hq_child' && $invoice->user?->role?->name === 'branch') {
+                        $branchUserId = (int) ($invoice->branch_user_id ?? $invoice->user_id);
+                        foreach ($stockUpdates as $u) {
+                            $qty = (int) $u['quantity'];
+                            if ($qty > 0) {
+                                BranchStock::incrementStock($branchUserId, $u['product']->id, $qty);
+                            }
+                        }
+                    }
+                    // Branch approving Service Center: deduct from Branch, add to Service Center
+                    if ($approvalType === 'branch_child' && $invoice->user?->role?->name === 'service_center') {
+                        $scUserId = (int) $invoice->user_id;
+                        foreach ($stockUpdates as $u) {
+                            $qty = (int) $u['quantity'];
+                            if ($qty > 0) {
+                                ServiceCenterStock::incrementStock($scUserId, $u['product']->id, $qty);
+                            }
+                        }
+                    }
+                    // Branch approving Annex: deduct from Branch, add to Annex
+                    if ($approvalType === 'branch_child' && $invoice->user?->role?->name === 'annex') {
+                        $annexUserId = (int) $invoice->user_id;
+                        foreach ($stockUpdates as $u) {
+                            $qty = (int) $u['quantity'];
+                            if ($qty > 0) {
+                                AnnexStock::incrementStock($annexUserId, $u['product']->id, $qty);
+                            }
+                        }
+                    }
+                    // Service Center approving Annex: deduct from SC, add to Annex
+                    if ($approvalType === 'service_center_child' && $invoice->user?->role?->name === 'annex') {
+                        $annexUserId = (int) $invoice->user_id;
+                        foreach ($stockUpdates as $u) {
+                            $qty = (int) $u['quantity'];
+                            if ($qty > 0) {
+                                AnnexStock::incrementStock($annexUserId, $u['product']->id, $qty);
+                            }
+                        }
+                    }
+                }
+
+                foreach ($backOrdersToCreate as $bo) {
+                    BackOrder::create([
+                        'invoice_id' => $invoice->id,
+                        'invoice_item_id' => $bo['invoice_item_id'],
+                        'user_id' => $invoice->user_id,
+                        'product_id' => $bo['product_id'],
+                        'item_name' => $bo['item_name'],
+                        'unit' => $bo['unit'],
+                        'unit_price' => $bo['unit_price'],
+                        'quantity_pending' => $bo['quantity_pending'],
+                        'quantity_fulfilled' => 0,
+                        'status' => BackOrder::STATUS_PENDING,
                     ]);
                 }
-                // HQ approving Branch: deduct from HQ, add to Branch
-                if ($approvalType === 'hq_child' && $invoice->user?->role?->name === 'branch') {
-                    $branchUserId = (int) ($invoice->branch_user_id ?? $invoice->user_id);
-                    foreach ($stockUpdates as $u) {
-                        $qty = (int) $u['quantity'];
-                        if ($qty > 0) {
-                            BranchStock::incrementStock($branchUserId, $u['product']->id, $qty);
-                        }
-                    }
-                }
-                // Branch approving Service Center: deduct from Branch, add to Service Center
-                if ($approvalType === 'branch_child' && $invoice->user?->role?->name === 'service_center') {
-                    $scUserId = (int) $invoice->user_id;
-                    foreach ($stockUpdates as $u) {
-                        $qty = (int) $u['quantity'];
-                        if ($qty > 0) {
-                            ServiceCenterStock::incrementStock($scUserId, $u['product']->id, $qty);
-                        }
-                    }
-                }
-                // Branch approving Annex: deduct from Branch, add to Annex
-                if ($approvalType === 'branch_child' && $invoice->user?->role?->name === 'annex') {
-                    $annexUserId = (int) $invoice->user_id;
-                    foreach ($stockUpdates as $u) {
-                        $qty = (int) $u['quantity'];
-                        if ($qty > 0) {
-                            AnnexStock::incrementStock($annexUserId, $u['product']->id, $qty);
-                        }
-                    }
-                }
-                // Service Center approving Annex: deduct from SC, add to Annex
-                if ($approvalType === 'service_center_child' && $invoice->user?->role?->name === 'annex') {
-                    $annexUserId = (int) $invoice->user_id;
-                    foreach ($stockUpdates as $u) {
-                        $qty = (int) $u['quantity'];
-                        if ($qty > 0) {
-                            AnnexStock::incrementStock($annexUserId, $u['product']->id, $qty);
-                        }
-                    }
-                }
-            }
 
-            foreach ($backOrdersToCreate as $bo) {
-                BackOrder::create([
-                    'invoice_id' => $invoice->id,
-                    'invoice_item_id' => $bo['invoice_item_id'],
-                    'user_id' => $invoice->user_id,
-                    'product_id' => $bo['product_id'],
-                    'item_name' => $bo['item_name'],
-                    'unit' => $bo['unit'],
-                    'unit_price' => $bo['unit_price'],
-                    'quantity_pending' => $bo['quantity_pending'],
-                    'quantity_fulfilled' => 0,
-                    'status' => BackOrder::STATUS_PENDING,
+                // Wallet transfer: debit sender, credit approver
+                $sender->refresh();
+                if (($sender->wallet_balance ?? 0) < $amount) {
+                    throw new \RuntimeException('Sender does not have enough wallet balance to approve this invoice.');
+                }
+                $sender->decrement('wallet_balance', $amount);
+                $senderBalanceAfter = (float) $sender->fresh()->wallet_balance;
+                WalletTransaction::create([
+                    'user_id' => $sender->id,
+                    'type' => WalletTransaction::TYPE_DEBIT,
+                    'amount' => $amount,
+                    'balance_after' => $senderBalanceAfter,
+                    'reference' => 'Invoice #'.$invoice->invoice_number.' approval (sent)',
                 ]);
-            }
-            $invoice->update(['is_approved' => true, 'approved_at' => now()]);
+
+                $receiver->increment('wallet_balance', $amount);
+                $receiverBalanceAfter = (float) $receiver->fresh()->wallet_balance;
+                WalletTransaction::create([
+                    'user_id' => $receiver->id,
+                    'type' => WalletTransaction::TYPE_CREDIT,
+                    'amount' => $amount,
+                    'balance_after' => $receiverBalanceAfter,
+                    'reference' => 'Invoice #'.$invoice->invoice_number.' approval (received)',
+                ]);
+
+                $invoice->update(['is_approved' => true, 'approved_at' => now()]);
             });
         } catch (\Throwable $e) {
             return back()->with('error', $e->getMessage() ?: 'Approval failed. Please try again.');
@@ -1177,15 +1227,17 @@ class SuperAdminInvoiceController extends Controller
             $msg .= ' Stock has been deducted and an order has been created for the customer.';
         }
         if ($backOrderCount > 0) {
-            $msg .= ' ' . $backOrderCount . ' back order(s) saved for when you receive more stock.';
+            $msg .= ' '.$backOrderCount.' back order(s) saved for when you receive more stock.';
         }
+
         return back()->with('success', $msg);
     }
 
     protected function generateInvoiceNumber(): string
     {
         $nextId = (int) Invoice::max('id') + 1;
-        return 'INV-' . str_pad((string) $nextId, 6, '0', STR_PAD_LEFT);
+
+        return 'INV-'.str_pad((string) $nextId, 6, '0', STR_PAD_LEFT);
     }
 
     /** Get the HQ user id whose stock is used when fulfilling an invoice for this customer (Annex or Service Center). */
@@ -1203,10 +1255,12 @@ class SuperAdminInvoiceController extends Controller
         }
         if ($parent->role?->name === 'service_center' && $parent->created_by_user_id) {
             $branch = User::with('role')->find($parent->created_by_user_id);
+
             return ($branch && $branch->role?->name === 'branch' && $branch->created_by_user_id)
                 ? (int) $branch->created_by_user_id
                 : 0;
         }
+
         return 0;
     }
 
@@ -1259,6 +1313,7 @@ class SuperAdminInvoiceController extends Controller
 
         // Fuzzy contains-based match
         $prod = $products->first(fn ($p) => str_contains(strtolower($p->display_name ?? ''), $lower) || str_contains(strtolower($p->name ?? ''), $lower));
+
         return $prod ?: null;
     }
 }

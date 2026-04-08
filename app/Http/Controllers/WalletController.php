@@ -2,35 +2,43 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\WalletTopupApproverRequestMail;
 use App\Models\Bank;
+use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class WalletController extends Controller
 {
     public function index(Request $request)
     {
         $user = $request->user();
-        
-        // Only show transactions for the logged-in user
-        $transactions = WalletTransaction::where('user_id', $user->id)
+        $user->load(['role', 'createdBy.role']);
+
+        // Cashier → parent wallet. Distributor → own wallet (top-up & shop on own balance).
+        $walletOwner = $user->walletOwnerForShopping();
+
+        // Show transactions for the wallet owner
+        $transactions = WalletTransaction::where('user_id', $walletOwner->id)
             ->orderByDesc('created_at')
             ->limit(50)
             ->get();
 
-        // Filter banks: HQ sees their own; Branch/Service Center see their HQ's banks; Annex/Dispatch/Accountant under SC see SC's HQ banks
+        // Bank list: follow parent HQ chain for cashier & distributor (where to pay in proof)
         $banksQuery = Bank::where('is_active', true);
         $hqId = null;
-        if ($user->role?->name === 'headquarters') {
-            $hqId = (int) $user->id;
-        } elseif ($user->role?->name === 'branch') {
-            $hqId = (int) $user->created_by_user_id;
-        } elseif ($user->role?->name === 'service_center' && $user->created_by_user_id) {
-            $branch = \App\Models\User::find($user->created_by_user_id);
+        $forBanks = $user->bankContextUser();
+        if ($forBanks->role?->name === 'headquarters') {
+            $hqId = (int) $forBanks->id;
+        } elseif ($forBanks->role?->name === 'branch') {
+            $hqId = (int) $forBanks->created_by_user_id;
+        } elseif ($forBanks->role?->name === 'service_center' && $forBanks->created_by_user_id) {
+            $branch = \App\Models\User::find($forBanks->created_by_user_id);
             $hqId = ($branch && $branch->created_by_user_id) ? (int) $branch->created_by_user_id : null;
-        } elseif (in_array($user->role?->name, ['annex', 'dispatch', 'accountant'], true) && $user->created_by_user_id) {
-            $creator = \App\Models\User::with('role')->find($user->created_by_user_id);
+        } elseif (in_array($forBanks->role?->name, ['annex', 'dispatch', 'accountant'], true) && $forBanks->created_by_user_id) {
+            $creator = \App\Models\User::with('role')->find($forBanks->created_by_user_id);
             if ($creator && $creator->role?->name === 'service_center' && $creator->created_by_user_id) {
                 $branch = \App\Models\User::find($creator->created_by_user_id);
                 $hqId = ($branch && $branch->created_by_user_id) ? (int) $branch->created_by_user_id : null;
@@ -47,7 +55,7 @@ class WalletController extends Controller
         $cartCount = array_sum($cart);
 
         return view('wallet.index', [
-            'walletBalance' => (float) ($user->wallet_balance ?? 0),
+            'walletBalance' => (float) ($walletOwner->wallet_balance ?? 0),
             'transactions' => $transactions,
             'banks' => $banks,
             'cartCount' => $cartCount,
@@ -62,13 +70,16 @@ class WalletController extends Controller
         ]);
 
         $user = $request->user();
+        $user->loadMissing(['role', 'createdBy.role']);
+        $walletOwner = $user->walletOwnerForShopping();
         $amount = (float) $request->input('amount');
 
         $path = $request->file('proof')->store('wallet_proofs', 'public');
 
-        DB::transaction(function () use ($user, $amount, $path) {
-            WalletTransaction::create([
-                'user_id' => $user->id,
+        $tx = null;
+        DB::transaction(function () use ($walletOwner, $amount, $path, &$tx) {
+            $tx = WalletTransaction::create([
+                'user_id' => $walletOwner->id,
                 'type' => WalletTransaction::TYPE_CREDIT,
                 'amount' => $amount,
                 'balance_after' => null,
@@ -79,7 +90,42 @@ class WalletController extends Controller
             ]);
         });
 
+        // Notify approvers about the new pending request (Super Admins).
+        try {
+            $approvers = User::with('role')
+                ->whereHas('role', function ($q) {
+                    $q->where('name', 'super_admin');
+                })
+                ->get();
+
+            $roleName = $walletOwner->role?->name ?? '';
+            $sourceUnit = match ($roleName) {
+                'headquarters' => 'HQ',
+                'branch' => 'Branch',
+                'service_center' => 'Service Center',
+                'annex' => 'Annex',
+                default => ucfirst(str_replace('_', ' ', $roleName)),
+            };
+
+            $paymentMethod = 'Bank Transfer';
+            $date = $tx && $tx->created_at ? $tx->created_at->toDateString() : now()->toDateString();
+
+            foreach ($approvers as $approver) {
+                Mail::to($approver->email)->send(new WalletTopupApproverRequestMail(
+                    $approver,
+                    $walletOwner,
+                    (float) $tx->amount,
+                    $date,
+                    (int) $tx->id,
+                    $sourceUnit,
+                    $paymentMethod
+                ));
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Wallet top-up approver email failed: '.$e->getMessage());
+        }
+
         return redirect()->route('wallet.index')
-            ->with('success', 'Top-up proof submitted: ₦' . number_format($amount, 2) . '. Your wallet will be credited after admin approval.');
+            ->with('success', 'Top-up proof submitted: ₦'.number_format($amount, 2).'. Your wallet will be credited after admin approval.');
     }
 }

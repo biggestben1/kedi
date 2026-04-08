@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Checkout – {{ config('app.name') }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
+    @include('partials.pwa-head')
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
@@ -199,10 +200,18 @@
                                                 </div>
                                                 <div class="col-md-12">
                                                     <label class="form-label">Service Center Referral Code</label>
-                                                    <input type="text" name="sc_referral_code" id="checkout_sc_referral_code" class="form-control @error('sc_referral_code') is-invalid @enderror" value="{{ old('sc_referral_code') }}" placeholder="Enter Service Center Referral Code (optional)">
+                                                    <input type="text" name="sc_referral_code" id="checkout_sc_referral_code" class="form-control @error('sc_referral_code') is-invalid @enderror" value="{{ old('sc_referral_code') }}" placeholder="Enter Service Center code">
                                                     <div id="sc_referral_feedback" class="mt-1 small"></div>
                                                     @error('sc_referral_code')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                                 </div>
+                                                @if(auth()->user()->role?->name === 'distributor')
+                                                <div class="col-md-12">
+                                                    <label class="form-label">Service Center Code for Collection <span class="text-danger">*</span></label>
+                                                    <input type="text" name="sc_collection_code" id="checkout_sc_collection_code" class="form-control @error('sc_collection_code') is-invalid @enderror" value="{{ old('sc_collection_code') }}" placeholder="Enter Service Center code for collection">
+                                                    <div id="sc_collection_feedback" class="mt-1 small"></div>
+                                                    @error('sc_collection_code')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                </div>
+                                                @endif
                                             </div>
                                         </div>
                                     </div>
@@ -373,20 +382,22 @@
                                                 </div>
                                                 @endif
                                                 <div class="form-check">
-                                                    <input class="form-check-input" type="radio" name="payment_method" id="pay_dpbv" value="dpbv" form="checkout-form" {{ ($canPayWithDpbv ?? false) ? '' : 'disabled' }}>
-                                                    <label class="form-check-label" for="pay_dpbv">
-                                                        Pay with DPBV (₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }} available)
-                                                        @if(!($canPayWithDpbv ?? false))
-                                                            <span class="text-muted">(insufficient balance)</span>
-                                                        @endif
-                                                    </label>
-                                                </div>
-                                                <div class="form-check">
                                                     <input class="form-check-input" type="radio" name="payment_method" id="pay_wallet" value="wallet" form="checkout-form" {{ $canPayWithWallet ? '' : 'disabled' }}>
                                                     <label class="form-check-label" for="pay_wallet">
                                                         Pay with Wallet
                                                         @if(!$canPayWithWallet)
                                                             <span class="text-muted">(insufficient balance – <a href="{{ route('wallet.index') }}">top up</a>)</span>
+                                                        @endif
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="payment_method" id="pay_dpbv" value="dpbv" form="checkout-form" {{ ($canPayWithDpbv ?? false) ? '' : 'disabled' }}>
+                                                    <label class="form-check-label" for="pay_dpbv">
+                                                        Pay with DPBV (₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }} available)
+                                                        @if(!($canPayWithDpbv ?? false))
+                                                            <span class="text-muted">(insufficient balance)</span>
+                                                        @elseif(!($dpbvProductsAllowed ?? true))
+                                                            <span class="text-muted">(some items not eligible for DPBV)</span>
                                                         @endif
                                                     </label>
                                                 </div>
@@ -415,6 +426,7 @@
                 </div>
             </div>
         </div>
+        @include('partials.cloud-footer')
     </footer>
     <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
 
@@ -525,7 +537,8 @@
                 
                 if (!creditOption) {
                     // Credit option doesn't exist, create it
-                    var paymentMethods = document.querySelector('.mb-3 label[for="pay_dpbv"]')?.closest('.mb-3');
+                    // DPBV option removed; insert KD Credit inside the same payment-method container as Wallet.
+                    var paymentMethods = document.getElementById('pay_wallet')?.closest('.mb-3') || document.querySelector('.mb-3');
                     if (paymentMethods) {
                         var creditHtml = '<div class="form-check" id="pay_kd_credit_option">' +
                             '<input class="form-check-input" type="radio" name="payment_method" id="pay_kd_credit" value="kd_credit" form="checkout-form"' + (canPay ? '' : ' disabled') + '>' +
@@ -571,24 +584,23 @@
                 }
             }
             
-            // SC Referral Code Validation
-            var scInput = document.getElementById('checkout_sc_referral_code');
-            var scFeedback = document.getElementById('sc_referral_feedback');
-            var scTimeout = null;
+            // Service Center code validation helper (for referral + distributor collection code)
+            function wireScCodeValidation(inputId, feedbackId) {
+                var scInput = document.getElementById(inputId);
+                var scFeedback = document.getElementById(feedbackId);
+                var scTimeout = null;
+                if (!scInput || !scFeedback) return null;
 
-            if (scInput) {
                 scInput.addEventListener('input', function() {
                     var code = scInput.value.trim();
                     scFeedback.innerHTML = '';
                     scInput.classList.remove('is-valid', 'is-invalid');
 
                     if (scTimeout) clearTimeout(scTimeout);
-
                     if (code.length === 0) return;
 
                     scTimeout = setTimeout(function() {
                         scFeedback.innerHTML = '<span class="text-muted"><i class="fe fe-refresh-cw fe-spin me-1"></i>Checking...</span>';
-                        
                         fetch('{{ route("checkout.validate-sc-code") }}', {
                             method: 'POST',
                             headers: {
@@ -607,12 +619,34 @@
                                 scFeedback.innerHTML = '<span class="text-danger"><i class="fe fe-x-circle me-1"></i>' + data.message + '</span>';
                             }
                         })
-                        .catch(error => {
+                        .catch(function() {
                             scFeedback.innerHTML = '<span class="text-warning">Error checking code.</span>';
                         });
                     }, 500);
                 });
+
+                return scInput;
             }
+
+            var scReferralInput = wireScCodeValidation('checkout_sc_referral_code', 'sc_referral_feedback');
+            var scCollectionInput = wireScCodeValidation('checkout_sc_collection_code', 'sc_collection_feedback');
+
+            function toggleDistributorScRequired() {
+                if (!scCollectionInput) return;
+                var payWallet = document.getElementById('pay_wallet');
+                var isWallet = payWallet ? !!payWallet.checked : false;
+                scCollectionInput.required = isWallet;
+            }
+
+            var payWallet = document.getElementById('pay_wallet');
+            var payDpbv = document.getElementById('pay_dpbv');
+            var payDelivery = document.getElementById('pay_delivery');
+            var payKdCredit = document.getElementById('pay_kd_credit');
+            if (payWallet) payWallet.addEventListener('change', toggleDistributorScRequired);
+            if (payDpbv) payDpbv.addEventListener('change', toggleDistributorScRequired);
+            if (payDelivery) payDelivery.addEventListener('change', toggleDistributorScRequired);
+            if (payKdCredit) payKdCredit.addEventListener('change', toggleDistributorScRequired);
+            toggleDistributorScRequired();
 
             // Check on page load if KD NO is already filled (but only if credit option doesn't already exist from server-side)
             var existingCreditOption = document.getElementById('pay_kd_credit_option');
@@ -621,10 +655,10 @@
             }
 
             // Check SC referral code on page load if existing
-            if (scInput && scInput.value.trim()) {
-                scInput.dispatchEvent(new Event('input'));
-            }
+            if (scReferralInput && scReferralInput.value.trim()) scReferralInput.dispatchEvent(new Event('input'));
+            if (scCollectionInput && scCollectionInput.value.trim()) scCollectionInput.dispatchEvent(new Event('input'));
         })();
     </script>
+    @include('partials.pwa-scripts')
 </body>
 </html>

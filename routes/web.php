@@ -1,6 +1,53 @@
 <?php
 
+use App\Http\Controllers\AccountantWalletController;
+use App\Http\Controllers\Admin\AnnouncementController;
+use App\Http\Controllers\Admin\BonusCollectionController;
+use App\Http\Controllers\Admin\DpbvCollectionController;
+use App\Http\Controllers\Admin\KdCustomerController;
+use App\Http\Controllers\Admin\KdRegistrationController;
+use App\Http\Controllers\Admin\KediKitController;
+use App\Http\Controllers\Admin\KediKitPurchaseController;
+use App\Http\Controllers\Admin\PromoCollectionController;
 use App\Http\Controllers\AdminContactController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BackOrderController;
+use App\Http\Controllers\BlogCommentLikeController;
+use App\Http\Controllers\BlogPostCommentController;
+use App\Http\Controllers\BlogPostLikeController;
+use App\Http\Controllers\BlogPublicController;
+use App\Http\Controllers\BonusController;
+use App\Http\Controllers\BranchStockController;
+use App\Http\Controllers\CartController;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\CustomerInvoiceController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DispatchOrderController;
+use App\Http\Controllers\DpbvController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\KdInfoController;
+use App\Http\Controllers\LandingController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\PharmacyDashboardController;
+use App\Http\Controllers\PharmacyReportsController;
+use App\Http\Controllers\PromoController;
+use App\Http\Controllers\PwaManifestController;
+use App\Http\Controllers\SuperAdminBankController;
+use App\Http\Controllers\SuperAdminCategoryController;
+use App\Http\Controllers\SuperAdminController;
+use App\Http\Controllers\SuperAdminCouponController;
+use App\Http\Controllers\SuperAdminExpenditureController;
+use App\Http\Controllers\SuperAdminInStockController;
+use App\Http\Controllers\SuperAdminInvoiceController;
+use App\Http\Controllers\SuperAdminProductController;
+use App\Http\Controllers\SuperAdminPurchaseController;
+use App\Http\Controllers\SuperAdminRoleController;
+use App\Http\Controllers\SuperAdminSupplierController;
+use App\Http\Controllers\SuperAdminUserController;
+use App\Http\Controllers\SuperAdminWalletTopupController;
+use App\Http\Controllers\UserBlogController;
+use App\Http\Controllers\WalletController;
 use App\Http\Middleware\RestrictAnnexAdmin;
 use App\Http\Middleware\RestrictBranchAdmin;
 use App\Http\Middleware\RestrictDispatchAdmin;
@@ -9,65 +56,38 @@ use App\Http\Middleware\RestrictResellerAdmin;
 use App\Http\Middleware\RestrictServiceCenterAdmin;
 use App\Http\Middleware\RestrictWholesaleStaffAdmin;
 use Illuminate\Support\Facades\Artisan;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\KdInfoController;
-use App\Http\Controllers\ContactController;
-use App\Http\Controllers\CartController;
-use App\Http\Controllers\CheckoutController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\HomeController;
-use App\Http\Controllers\OrderController;
-use App\Http\Controllers\PharmacyDashboardController;
-use App\Http\Controllers\PharmacyReportsController;
-use App\Http\Controllers\SuperAdminCategoryController;
-use App\Http\Controllers\SuperAdminController;
-use App\Http\Controllers\SuperAdminCouponController;
-use App\Http\Controllers\SuperAdminProductController;
-use App\Http\Controllers\SuperAdminPurchaseController;
-use App\Http\Controllers\SuperAdminSupplierController;
-use App\Http\Controllers\SuperAdminUserController;
-use App\Http\Controllers\SuperAdminWalletTopupController;
-use App\Http\Controllers\SuperAdminBankController;
-use App\Http\Controllers\BackOrderController;
-use App\Http\Controllers\BranchStockController;
-use App\Http\Controllers\SuperAdminInStockController;
-use App\Http\Controllers\SuperAdminInvoiceController;
-use App\Http\Controllers\SuperAdminRoleController;
-use App\Http\Controllers\CustomerInvoiceController;
-use App\Http\Controllers\AccountantWalletController;
-use App\Http\Controllers\DispatchOrderController;
-use App\Http\Controllers\DpbvController;
-use App\Http\Controllers\WalletController;
-use App\Http\Controllers\Admin\DpbvCollectionController;
-use App\Http\Controllers\Admin\PromoCollectionController;
-use App\Http\Controllers\Admin\BonusCollectionController;
-use App\Http\Controllers\Admin\KdCustomerController;
-use App\Http\Controllers\Admin\KdRegistrationController;
-use App\Http\Controllers\Admin\KediKitController;
-use App\Http\Controllers\Admin\KediKitPurchaseController;
-use App\Http\Controllers\BonusController;
-use App\Http\Controllers\PromoController;
-use App\Http\Controllers\SuperAdminExpenditureController;
-use App\Http\Controllers\Admin\AnnouncementController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/manifest.webmanifest', PwaManifestController::class)->name('pwa.manifest');
+
+Route::get('/', [LandingController::class, 'index'])->name('home');
+Route::get('/shop', [HomeController::class, 'index'])->name('shop');
+Route::get('/optimal-consult', [LandingController::class, 'index'])->name('landing');
 
 Route::get('/storage-link', function () {
     Artisan::call('storage:link');
-    return 'Storage linked successfully! <a href="' . url('/clear') . '">Clear cache</a>';
+
+    return 'Storage linked successfully! <a href="'.url('/clear').'">Clear cache</a>';
 });
 
 Route::get('/clear', function () {
     Artisan::call('config:clear');
     Artisan::call('cache:clear');
     Artisan::call('view:clear');
-    return 'Cache cleared! <a href="' . url('/storage-link') . '">Create storage link</a>';
+
+    return 'Cache cleared! <a href="'.url('/storage-link').'">Create storage link</a>';
 });
 
 // Contact Us (public – guests and auth)
 Route::get('/contact', [ContactController::class, 'show'])->name('contact.show');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
+
+// Public community blog — guests and logged-in users (no auth middleware).
+Route::get('/blog', [BlogPublicController::class, 'index'])->name('blog.index');
+Route::get('/blog/{user}/{blog_post:slug}', [BlogPublicController::class, 'show'])->name('blog.show');
+Route::post('/blog/{user}/{blog_post:slug}/like', [BlogPostLikeController::class, 'toggle'])->name('blog.like.toggle');
+Route::post('/blog/{user}/{blog_post:slug}/comments/{comment}/like', [BlogCommentLikeController::class, 'toggle'])->name('blog.comment.like.toggle');
+Route::post('/blog/{user}/{blog_post:slug}/comments', [BlogPostCommentController::class, 'store'])->name('blog.comments.store');
 
 // KD ID & Customer Name (session)
 Route::post('/kd-info', [KdInfoController::class, 'store'])->name('kd-info.store')->middleware('auth');
@@ -92,8 +112,8 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
-//    Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
-//    Route::post('/register', [AuthController::class, 'register']);
+    //    Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
+    //    Route::post('/register', [AuthController::class, 'register']);
 });
 
 Route::middleware('auth')->group(function () {
@@ -104,12 +124,19 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // User blog (every account can create posts)
+    Route::get('/my-blog', [UserBlogController::class, 'index'])->name('my-blog.index');
+    Route::get('/my-blog/create', [UserBlogController::class, 'create'])->name('my-blog.create');
+    Route::post('/my-blog', [UserBlogController::class, 'store'])->name('my-blog.store');
+    Route::get('/my-blog/{blog_post:id}/edit', [UserBlogController::class, 'edit'])->name('my-blog.edit');
+    Route::put('/my-blog/{blog_post:id}', [UserBlogController::class, 'update'])->name('my-blog.update');
+    Route::delete('/my-blog/{blog_post:id}', [UserBlogController::class, 'destroy'])->name('my-blog.destroy');
+
     // Customer: Checkout & Wallet
     Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
     Route::post('/checkout', [CheckoutController::class, 'placeOrder'])->name('checkout.place');
     Route::post('/checkout/check-kd-credit', [CheckoutController::class, 'checkKdCredit'])->name('checkout.check-kd-credit');
     Route::post('/checkout/validate-sc-code', [CheckoutController::class, 'validateScCode'])->name('checkout.validate-sc-code');
-    Route::post('/checkout/dpbv', [CheckoutController::class, 'buyWithDpbv'])->name('checkout.dpbv');
     Route::post('/checkout/save-draft', [CheckoutController::class, 'saveToDraft'])->name('checkout.save-draft');
     Route::post('/orders/{order}/restore-draft', [CheckoutController::class, 'restoreDraft'])->name('orders.restore-draft');
     Route::post('/orders/{order}/place-draft-wallet', [CheckoutController::class, 'placeDraftFromWallet'])->name('orders.place-draft-wallet');
@@ -130,6 +157,8 @@ Route::middleware('auth')->group(function () {
 
     // My DPBV (user view their DPBV records)
     Route::get('/dpbv', [DpbvController::class, 'index'])->name('dpbv.index');
+    Route::get('/dpbv/check-recipient-email', [DpbvController::class, 'checkRecipientEmail'])->name('dpbv.check-recipient-email');
+    Route::post('/dpbv/transfer', [DpbvController::class, 'transfer'])->name('dpbv.transfer');
     Route::get('/dpbv/spending', [DpbvController::class, 'spending'])->name('dpbv.spending');
 
     // My Promo (user view their promo records)
@@ -144,30 +173,38 @@ Route::middleware('auth')->group(function () {
     Route::post('/my-invoices', [CustomerInvoiceController::class, 'store'])->name('invoices.store');
     Route::get('/my-invoices/{invoice}/pdf', [CustomerInvoiceController::class, 'pdf'])->name('invoices.pdf');
 
-    // Admin area (super_admin: full; wholesale_staff: dashboard, reports, users, invoices; reseller: users + invoices; accountant: wallet; dispatch: orders only)
-    Route::middleware(['role:super_admin,wholesale_staff,reseller,accountant,dispatch,headquarters,branch,service_center,annex', RestrictWholesaleStaffAdmin::class, RestrictResellerAdmin::class, RestrictDispatchAdmin::class, RestrictHeadquartersAdmin::class, RestrictBranchAdmin::class, RestrictServiceCenterAdmin::class, RestrictAnnexAdmin::class])->group(function () {
+    // Admin area (super_admin: full; wholesale_staff: dashboard, reports, users, invoices; reseller: users + invoices; accountant: wallet; dispatch: orders only; cashier: limited kit purchase/admin access via parent)
+    Route::middleware(['role:super_admin,wholesale_staff,reseller,accountant,dispatch,headquarters,branch,service_center,annex,cashier,distributor', RestrictWholesaleStaffAdmin::class, RestrictResellerAdmin::class, RestrictDispatchAdmin::class, RestrictHeadquartersAdmin::class, RestrictBranchAdmin::class, RestrictServiceCenterAdmin::class, RestrictAnnexAdmin::class])->group(function () {
         Route::get('/admin', function () {
-            if (auth()->user()?->role?->name === 'reseller') {
+            $user = auth()->user();
+
+            if ($user && method_exists($user, 'isSuperAdmin') && $user->isSuperAdmin()) {
+                // Super Admin: show main admin dashboard view
+                return app(\App\Http\Controllers\SuperAdminController::class)->index(request());
+            }
+
+            if ($user?->role?->name === 'reseller') {
                 return redirect()->route('admin.users.index', ['role' => 'customer', 'created_by' => auth()->id()]);
             }
-            if (auth()->user()?->role?->name === 'accountant') {
+            if ($user?->role?->name === 'accountant') {
                 return redirect()->route('admin.accountant.wallet.index');
             }
-            if (auth()->user()?->role?->name === 'dispatch') {
+            if ($user?->role?->name === 'dispatch') {
                 return redirect()->route('admin.dispatch.orders.index');
             }
-            if (auth()->user()?->role?->name === 'headquarters') {
+            if ($user?->role?->name === 'headquarters') {
                 return redirect()->route('admin.invoices.index');
             }
-            if (auth()->user()?->role?->name === 'branch') {
+            if ($user?->role?->name === 'branch') {
                 return redirect()->route('admin.pharmacy.dashboard');
             }
-            if (auth()->user()?->role?->name === 'service_center') {
+            if ($user?->role?->name === 'service_center') {
                 return redirect()->route('admin.pharmacy.dashboard');
             }
-            if (auth()->user()?->role?->name === 'annex') {
+            if ($user?->role?->name === 'annex') {
                 return redirect()->route('admin.pharmacy.dashboard');
             }
+
             return redirect()->route('admin.pharmacy.dashboard');
         })->name('admin');
 
@@ -198,7 +235,26 @@ Route::middleware('auth')->group(function () {
         Route::put('/admin/users/{user}', [SuperAdminUserController::class, 'update'])->name('admin.users.update');
         Route::delete('/admin/users/{user}', [SuperAdminUserController::class, 'destroy'])->name('admin.users.destroy');
 
-        // Roles CRUD (Super Admin only)
+        Route::middleware('role:super_admin')->group(function () {
+            Route::get('/admin/users/{user}/transfer', [SuperAdminUserController::class, 'showTransferForm'])->name('admin.users.transfer');
+            Route::post('/admin/users/{user}/transfer', [SuperAdminUserController::class, 'performTransfer'])->name('admin.users.perform-transfer');
+            Route::get('/admin/users/trashed', [SuperAdminUserController::class, 'trashed'])->name('admin.users.trashed');
+            Route::patch('/admin/users/{id}/restore', [SuperAdminUserController::class, 'restore'])->name('admin.users.restore');
+            Route::delete('/admin/users/{id}/force-delete', [SuperAdminUserController::class, 'forceDelete'])->name('admin.users.force-delete');
+
+            // Product Trash
+            Route::get('/admin/products/trashed', [SuperAdminProductController::class, 'trashed'])->name('admin.products.trashed');
+            Route::patch('/admin/products/{id}/restore', [SuperAdminProductController::class, 'restore'])->name('admin.products.restore');
+            Route::delete('/admin/products/{id}/force-delete', [SuperAdminProductController::class, 'forceDelete'])->name('admin.products.force-delete');
+
+            // Order Trash
+            Route::get('/admin/orders/trashed', [DispatchOrderController::class, 'trashed'])->name('admin.orders.trashed');
+            Route::patch('/admin/orders/{id}/restore', [DispatchOrderController::class, 'restore'])->name('admin.orders.restore');
+            Route::delete('/admin/orders/{id}/force-delete', [DispatchOrderController::class, 'forceDelete'])->name('admin.orders.force-delete');
+            Route::delete('/admin/dispatch/orders/{order}', [DispatchOrderController::class, 'destroy'])->name('admin.dispatch.orders.destroy');
+        });
+
+        // Roles CRUD & Super Admin tools (Super Admin only)
         Route::middleware('role:super_admin')->group(function () {
             Route::get('/admin/roles', [SuperAdminRoleController::class, 'index'])->name('admin.roles.index');
             Route::get('/admin/roles/create', [SuperAdminRoleController::class, 'create'])->name('admin.roles.create');
@@ -206,6 +262,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/admin/roles/{role}/edit', [SuperAdminRoleController::class, 'edit'])->name('admin.roles.edit');
             Route::put('/admin/roles/{role}', [SuperAdminRoleController::class, 'update'])->name('admin.roles.update');
             Route::delete('/admin/roles/{role}', [SuperAdminRoleController::class, 'destroy'])->name('admin.roles.destroy');
+
+            // Dangerous: clear all orders and wallet records
+            Route::post('/admin/system/clear-orders-wallet', [SuperAdminController::class, 'clearOrdersAndWallet'])->name('admin.system.clear-orders-wallet');
 
             // Coupons Management
             Route::resource('/admin/coupons', SuperAdminCouponController::class)->names([
@@ -225,6 +284,18 @@ Route::middleware('auth')->group(function () {
             Route::put('/admin/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('admin.announcements.update');
             Route::delete('/admin/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('admin.announcements.destroy');
             Route::patch('/admin/announcements/{announcement}/toggle-active', [AnnouncementController::class, 'toggleActive'])->name('admin.announcements.toggle-active');
+
+            // About Us CMS
+            Route::get('/admin/about', [\App\Http\Controllers\Admin\SuperAdminAboutController::class, 'edit'])->name('admin.about.edit');
+            Route::put('/admin/about', [\App\Http\Controllers\Admin\SuperAdminAboutController::class, 'update'])->name('admin.about.update');
+
+            // Services CMS
+            Route::resource('/admin/services', \App\Http\Controllers\Admin\SuperAdminServiceController::class, ['as' => 'admin']);
+            Route::patch('/admin/services/{service}/toggle-active', [\App\Http\Controllers\Admin\SuperAdminServiceController::class, 'toggleActive'])->name('admin.services.toggle-active');
+
+            // Landing Page Sliders CMS
+            Route::resource('/admin/landing-sliders', \App\Http\Controllers\Admin\SuperAdminLandingSliderController::class, ['as' => 'admin']);
+            Route::patch('/admin/landing-sliders/{landing_slider}/toggle-active', [\App\Http\Controllers\Admin\SuperAdminLandingSliderController::class, 'toggleActive'])->name('admin.landing-sliders.toggle-active');
         });
 
         // Categories CRUD
@@ -313,15 +384,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/admin/kd/share/{kd}', [KdCustomerController::class, 'showShare'])->name('admin.kd.show-share-kd');
         Route::post('/admin/kd/share', [KdCustomerController::class, 'share'])->name('admin.kd.share');
 
-        // KD Registration
-        Route::get('/admin/kd/registration', [KdRegistrationController::class, 'index'])->name('admin.kd.registration.index');
-        Route::get('/admin/kd/registration/create', [KdRegistrationController::class, 'create'])->name('admin.kd.registration.create');
-        Route::post('/admin/kd/registration', [KdRegistrationController::class, 'store'])->name('admin.kd.registration.store');
-        Route::get('/admin/kd/registration/{registration}', [KdRegistrationController::class, 'show'])->name('admin.kd.registration.show');
-        Route::post('/admin/kd/registration/{registration}/add-credit', [KdRegistrationController::class, 'addCredit'])->name('admin.kd.registration.add-credit');
-        Route::get('/admin/kd/registration/{registration}/edit', [KdRegistrationController::class, 'edit'])->name('admin.kd.registration.edit');
-        Route::put('/admin/kd/registration/{registration}', [KdRegistrationController::class, 'update'])->name('admin.kd.registration.update');
-        Route::delete('/admin/kd/registration/{registration}', [KdRegistrationController::class, 'destroy'])->name('admin.kd.registration.destroy');
+        // KD Registration (including Cashier / Distributor – registers using parent wallet when applicable)
+        Route::middleware('role:super_admin,headquarters,branch,service_center,annex,accountant,cashier,distributor')->group(function () {
+            Route::get('/admin/kd/registration', [KdRegistrationController::class, 'index'])->name('admin.kd.registration.index');
+            Route::get('/admin/kd/registration/create', [KdRegistrationController::class, 'create'])->name('admin.kd.registration.create');
+            Route::post('/admin/kd/registration', [KdRegistrationController::class, 'store'])->name('admin.kd.registration.store');
+            Route::get('/admin/kd/registration/{registration}', [KdRegistrationController::class, 'show'])->name('admin.kd.registration.show');
+            Route::post('/admin/kd/registration/{registration}/add-credit', [KdRegistrationController::class, 'addCredit'])->name('admin.kd.registration.add-credit');
+            Route::get('/admin/kd/registration/{registration}/edit', [KdRegistrationController::class, 'edit'])->name('admin.kd.registration.edit');
+            Route::put('/admin/kd/registration/{registration}', [KdRegistrationController::class, 'update'])->name('admin.kd.registration.update');
+            Route::delete('/admin/kd/registration/{registration}', [KdRegistrationController::class, 'destroy'])->name('admin.kd.registration.destroy');
+        });
 
         // KEDI Kit Seller Dashboard - Super Admin, Headquarters, Branch, Service Center (sellers) - MUST BE BEFORE purchase/{purchase}
         Route::middleware('role:super_admin,headquarters,branch,service_center')->group(function () {
@@ -329,8 +402,8 @@ Route::middleware('auth')->group(function () {
             Route::post('/admin/kedi-kits/back-order/{backOrder}/fulfill', [KediKitPurchaseController::class, 'fulfillBackOrder'])->name('admin.kedi-kits.back-order.fulfill');
         });
 
-        // KEDI Kit Purchases - Headquarters, Branch, Service Center, Annex, Reseller, Customer
-        Route::middleware('role:headquarters,branch,service_center,annex,reseller,customer')->group(function () {
+        // KEDI Kit Purchases - Headquarters, Branch, Service Center, Annex, Reseller, Customer, Cashier
+        Route::middleware('role:headquarters,branch,service_center,annex,reseller,customer,cashier,distributor')->group(function () {
             Route::get('/admin/kedi-kits/purchase', [KediKitPurchaseController::class, 'index'])->name('admin.kedi-kits.purchase.index');
             Route::get('/admin/kedi-kits/purchase/create', [KediKitPurchaseController::class, 'create'])->name('admin.kedi-kits.purchase.create');
             Route::post('/admin/kedi-kits/purchase', [KediKitPurchaseController::class, 'store'])->name('admin.kedi-kits.purchase.store');
@@ -354,8 +427,8 @@ Route::middleware('auth')->group(function () {
             Route::delete('/admin/kedi-kits/{kediKit}', [KediKitController::class, 'destroy'])->name('admin.kedi-kits.destroy');
         });
 
-        // In Stock (Factory Invoices) - Super Admin only
-        Route::middleware('role:super_admin')->group(function () {
+        // In Stock (Factory Invoices) - Super Admin & Headquarters
+        Route::middleware('role:super_admin,headquarters')->group(function () {
             Route::get('/admin/in-stock', [SuperAdminInStockController::class, 'index'])->name('admin.in-stock.index');
             Route::get('/admin/in-stock/create', [SuperAdminInStockController::class, 'create'])->name('admin.in-stock.create');
             Route::post('/admin/in-stock', [SuperAdminInStockController::class, 'store'])->name('admin.in-stock.store');
@@ -415,3 +488,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/admin/wallet-management/users/{user}/transactions', [AccountantWalletController::class, 'userTransactions'])->name('admin.accountant.wallet.user-transactions');
     });
 });
+
+// Public SC & Annex Registration
+Route::get('/admin/register-sc-annex', [\App\Http\Controllers\Admin\SuperAdminServiceCenterAnnexController::class, 'create'])->name('admin.sc-annex.create');
+Route::post('/admin/register-sc-annex', [\App\Http\Controllers\Admin\SuperAdminServiceCenterAnnexController::class, 'store'])->name('admin.sc-annex.store');
+
+Route::get('/admin/register-staff', [\App\Http\Controllers\Admin\SuperAdminStaffRegistrationController::class, 'create'])->name('admin.staff.create');
+Route::post('/admin/register-staff', [\App\Http\Controllers\Admin\SuperAdminStaffRegistrationController::class, 'store'])->name('admin.staff.store');

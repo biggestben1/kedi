@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\WalletTopupApproverRequestMail;
+use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class WalletController extends Controller
 {
@@ -68,6 +71,41 @@ class WalletController extends Controller
                 'approved_at' => null,
             ]);
         });
+
+        // Notify Super Admins about the new pending request.
+        try {
+            $approvers = User::with('role')
+                ->whereHas('role', function ($q) {
+                    $q->where('name', 'super_admin');
+                })
+                ->get();
+
+            $roleName = $user->role?->name ?? '';
+            $sourceUnit = match ($roleName) {
+                'headquarters' => 'HQ',
+                'branch' => 'Branch',
+                'service_center' => 'Service Center',
+                'annex' => 'Annex',
+                default => ucfirst(str_replace('_', ' ', $roleName)),
+            };
+
+            $paymentMethod = 'Online';
+            $date = $tx && $tx->created_at ? $tx->created_at->toDateString() : now()->toDateString();
+
+            foreach ($approvers as $approver) {
+                Mail::to($approver->email)->send(new WalletTopupApproverRequestMail(
+                    $approver,
+                    $user,
+                    (float) $tx->amount,
+                    $date,
+                    (int) $tx->id,
+                    $sourceUnit,
+                    $paymentMethod
+                ));
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('API wallet top-up approver email failed: '.$e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Top-up request submitted. Your wallet will be credited after approval.',

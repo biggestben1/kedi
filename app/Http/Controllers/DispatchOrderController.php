@@ -516,4 +516,48 @@ class DispatchOrderController extends Controller
             }
         });
     }
+
+    public function destroy(Order $order)
+    {
+        $order->delete();
+        return back()->with('success', 'Order moved to trash.');
+    }
+
+    public function trashed(Request $request)
+    {
+        if (! auth()->user()->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $users = User::all()->keyBy('id'); // for index lookups if needed
+
+        $query = Order::onlyTrashed()->with('user')->orderByDesc('deleted_at');
+        $orders = $query->paginate(20)->withQueryString();
+
+        return view('admin.orders.trashed', compact('orders'));
+    }
+
+    public function restore($id)
+    {
+        if (! auth()->user()->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $order = Order::withTrashed()->findOrFail($id);
+        $order->restore();
+
+        return redirect()->route('admin.orders.trashed')->with('success', "Order #{$order->id} has been restored.");
+    }
+
+    public function forceDelete($id)
+    {
+        if (! auth()->user()->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $order = Order::withTrashed()->findOrFail($id);
+        $order->forceDelete();
+
+        return redirect()->route('admin.orders.trashed')->with('success', "Order #{$order->id} has been permanently deleted.");
+    }
 }

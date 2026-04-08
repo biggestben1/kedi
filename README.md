@@ -57,3 +57,15 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Progressive Web App (PWA)
+
+This app ships with installable PWA support:
+
+- **Manifest:** `GET /manifest.webmanifest` (`App\Http\Controllers\PwaManifestController`), configured in `config/pwa.php` and `.env` (`PWA_*` keys).
+- **Service worker:** `public/sw.js` — cached offline shell at `public/offline.html` for HTML navigations when the network is unavailable; API/Livewire requests stay network-only.
+- **Blade:** `partials/pwa-head` (manifest + meta) and `partials/pwa-scripts` (registration) are included on main layouts.
+
+**Production:** use **HTTPS** and a correct `APP_URL` so the manifest and icons resolve. Place **192×192** and **512×512** PNG icons at `public/images/logo.png` (or set `PWA_ICON`). After editing `public/sw.js`, bump `PWA_SW_VERSION` in `.env` so clients pick up the new worker.
+
+**Hybrid (native WebView):** not used for a normal browser or installed PWA. Set `HYBRID_ENABLED=true` in `.env` only when you embed the site in Capacitor/Android WebView and use the `X-Kedi-Client: hybrid` header or `?hybrid=1` for testing. See `config/hybrid.php` and `App\Support\HybridApp`.

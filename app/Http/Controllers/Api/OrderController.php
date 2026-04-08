@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Mail\OrderConfirmationMail;
 use App\Models\AnnexStock;
 use App\Models\BranchStock;
-use App\Models\ServiceCenterStock;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ServiceCenterStock;
 use App\Models\WalletTransaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -59,6 +59,8 @@ class OrderController extends Controller
         ]);
 
         $user = $request->user();
+        $user->loadMissing(['role', 'createdBy.role']);
+        $walletOwner = $user->walletOwnerForShopping();
         $branchUserId = ($user->role?->name === 'annex' && $user->created_by_user_id) ? (int) $user->created_by_user_id : null;
 
         $itemsByCode = [];
@@ -178,7 +180,7 @@ class OrderController extends Controller
                     'type' => WalletTransaction::TYPE_DEBIT,
                     'amount' => $totalAmount,
                     'balance_after' => $balanceAfter,
-                    'reference' => 'Order #' . $order->id,
+                    'reference' => 'Order #'.$order->id,
                 ]);
             }
 
@@ -192,7 +194,7 @@ class OrderController extends Controller
         try {
             Mail::to($user->email)->send(new OrderConfirmationMail($order));
         } catch (\Throwable $e) {
-            \Log::warning('Order confirmation email failed: ' . $e->getMessage());
+            \Log::warning('Order confirmation email failed: '.$e->getMessage());
         }
 
         return response()->json([
@@ -205,7 +207,7 @@ class OrderController extends Controller
     {
         return [
             'id' => $order->id,
-            'invoice_number' => $order->invoice_number ?? 'ORD-' . $order->id,
+            'invoice_number' => $order->invoice_number ?? 'ORD-'.$order->id,
             'tracking_number' => $order->tracking_number,
             'status' => $order->status,
             'payment_method' => $order->payment_method,
@@ -244,6 +246,7 @@ class OrderController extends Controller
         if ($role === 'annex') {
             return AnnexStock::getQuantity($userId, $productId);
         }
+
         return BranchStock::getQuantity($userId, $productId);
     }
 }

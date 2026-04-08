@@ -37,17 +37,31 @@
         <div class="card-body">
             {{-- Wallet Balance Display - Hide if coming from kit purchase --}}
             @if(!request('from_kit'))
-            <div class="alert alert-info mb-4">
-                <div class="d-flex justify-content-between align-items-center">
+            <div class="alert alert-info mb-3" id="walletInfo">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
-                        <strong>Wallet Balance:</strong> ₦{{ number_format($walletBalance ?? 0, 2) }}
+                        <strong>Wallet Balance:</strong> ₦<span id="walletBalanceDisplay">{{ number_format($walletBalance ?? 0, 2) }}</span>
                     </div>
                     <div>
-                        <strong>Registration Fee:</strong> ₦{{ number_format(12000, 2) }}
+                        <strong>Registration Type:</strong>
+                        <div class="d-inline-flex align-items-center ms-2">
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="radio" name="registration_type" id="reg_type_new" value="new" {{ old('registration_type', 'new') === 'new' ? 'checked' : '' }}>
+                                <label class="form-check-label" for="reg_type_new">New (Pay ₦12,000)</label>
+                            </div>
+                            <div class="form-check form-check-inline mb-0">
+                                <input class="form-check-input" type="radio" name="registration_type" id="reg_type_old" value="old" {{ old('registration_type') === 'old' ? 'checked' : '' }}>
+                                <label class="form-check-label" for="reg_type_old">Old (Already Paid)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="feeStatus">
+                        <strong>Registration Fee:</strong>
+                        <span id="feeAmount">₦{{ number_format(12000, 2) }}</span>
                         @if(($walletBalance ?? 0) < 12000)
-                            <span class="badge bg-danger ms-2">Insufficient Balance</span>
+                            <span class="badge bg-danger ms-2" id="feeBadge">Insufficient Balance</span>
                         @else
-                            <span class="badge bg-success ms-2">Sufficient Balance</span>
+                            <span class="badge bg-success ms-2" id="feeBadge">Sufficient Balance</span>
                         @endif
                     </div>
                 </div>
@@ -218,6 +232,43 @@
                 this.value = value;
             });
         });
+
+        // Toggle registration fee between New (wallet pay) and Old (already paid)
+        (function() {
+            const regTypeNew = document.getElementById('reg_type_new');
+            const regTypeOld = document.getElementById('reg_type_old');
+            const feeAmountEl = document.getElementById('feeAmount');
+            const feeBadgeEl = document.getElementById('feeBadge');
+            const walletBalance = {{ (float) ($walletBalance ?? 0) }};
+
+            function updateFeeDisplay() {
+                if (!feeAmountEl || !feeBadgeEl || !regTypeNew || !regTypeOld) return;
+                if (regTypeOld.checked) {
+                    feeAmountEl.textContent = '₦0.00';
+                    feeBadgeEl.classList.remove('bg-danger', 'bg-success');
+                    feeBadgeEl.classList.add('bg-secondary');
+                    feeBadgeEl.textContent = 'No Payment – Old KD';
+                } else {
+                    feeAmountEl.textContent = '₦12,000.00';
+                    feeBadgeEl.classList.remove('bg-secondary');
+                    if (walletBalance < 12000) {
+                        feeBadgeEl.classList.remove('bg-success');
+                        feeBadgeEl.classList.add('bg-danger');
+                        feeBadgeEl.textContent = 'Insufficient Balance';
+                    } else {
+                        feeBadgeEl.classList.remove('bg-danger');
+                        feeBadgeEl.classList.add('bg-success');
+                        feeBadgeEl.textContent = 'Sufficient Balance';
+                    }
+                }
+            }
+
+            if (regTypeNew && regTypeOld) {
+                regTypeNew.addEventListener('change', updateFeeDisplay);
+                regTypeOld.addEventListener('change', updateFeeDisplay);
+                updateFeeDisplay();
+            }
+        })();
     </script>
     @endpush
 @endsection
