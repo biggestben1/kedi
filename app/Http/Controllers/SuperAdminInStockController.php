@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FactoryInvoice;
 use App\Models\FactoryInvoiceItem;
 use App\Models\Product;
+use App\Models\Supplier;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,9 +34,11 @@ class SuperAdminInStockController extends Controller
     public function create()
     {
         $products = Product::where('is_active', true)->orderBy('name')->get();
+        $suppliers = Supplier::orderBy('name')->get();
 
         return view('admin.in-stock.create', [
             'products' => $products,
+            'suppliers' => $suppliers,
             'statusOptions' => FactoryInvoice::statusOptions(),
             'nextInvoiceNumber' => $this->generateInvoiceNumber(),
         ]);
@@ -108,10 +111,12 @@ class SuperAdminInStockController extends Controller
     {
         $inStock->load('items.product');
         $products = Product::where('is_active', true)->orderBy('name')->get();
+        $suppliers = Supplier::orderBy('name')->get();
 
         return view('admin.in-stock.edit', [
             'invoice' => $inStock,
             'products' => $products,
+            'suppliers' => $suppliers,
             'statusOptions' => FactoryInvoice::statusOptions(),
         ]);
     }

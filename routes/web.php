@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountantWalletController;
 use App\Http\Controllers\Admin\AnnouncementController;
+use App\Http\Controllers\Admin\QuestionnaireController;
 use App\Http\Controllers\Admin\BonusCollectionController;
 use App\Http\Controllers\Admin\DpbvCollectionController;
 use App\Http\Controllers\Admin\KdCustomerController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\BlogCommentLikeController;
 use App\Http\Controllers\BlogPostCommentController;
 use App\Http\Controllers\BlogPostLikeController;
 use App\Http\Controllers\BlogPublicController;
+use App\Http\Controllers\Api\StorageController as ApiStorageController;
 use App\Http\Controllers\BonusController;
 use App\Http\Controllers\BranchStockController;
 use App\Http\Controllers\CartController;
@@ -30,9 +32,12 @@ use App\Http\Controllers\KdInfoController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PharmacyDashboardController;
+use App\Http\Controllers\PharmacyJournalController;
 use App\Http\Controllers\PharmacyReportsController;
 use App\Http\Controllers\PromoController;
+use App\Http\Controllers\QuestionnairePublicController;
 use App\Http\Controllers\PwaManifestController;
+use App\Http\Controllers\ServiceCenterLookupController;
 use App\Http\Controllers\SuperAdminBankController;
 use App\Http\Controllers\SuperAdminCategoryController;
 use App\Http\Controllers\SuperAdminController;
@@ -40,10 +45,12 @@ use App\Http\Controllers\SuperAdminCouponController;
 use App\Http\Controllers\SuperAdminExpenditureController;
 use App\Http\Controllers\SuperAdminInStockController;
 use App\Http\Controllers\SuperAdminInvoiceController;
+use App\Http\Controllers\SuperAdminPosMachineController;
 use App\Http\Controllers\SuperAdminProductController;
 use App\Http\Controllers\SuperAdminPurchaseController;
 use App\Http\Controllers\SuperAdminRoleController;
 use App\Http\Controllers\SuperAdminSupplierController;
+use App\Http\Controllers\SuperAdminWarehouseController;
 use App\Http\Controllers\SuperAdminUserController;
 use App\Http\Controllers\SuperAdminWalletTopupController;
 use App\Http\Controllers\UserBlogController;
@@ -59,6 +66,23 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/manifest.webmanifest', PwaManifestController::class)->name('pwa.manifest');
+
+// Service worker (PWA). Some hosts don't serve /public/sw.js directly; provide a route fallback.
+Route::get('/sw.js', function () {
+    $path = public_path('sw.js');
+    abort_unless(is_file($path), 404);
+
+    return response()->file($path, [
+        'Content-Type' => 'application/javascript; charset=UTF-8',
+        // Allow caching, but still permit quick updates via ?v=...
+        'Cache-Control' => 'public, max-age=3600',
+    ]);
+})->name('pwa.sw');
+
+// Public storage endpoint (same handler as API) — avoids /storage 403 on some hosts
+Route::get('/api/v1/storage/{path}', [ApiStorageController::class, 'show'])
+    ->where('path', '.*')
+    ->name('storage.public');
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/shop', [HomeController::class, 'index'])->name('shop');
@@ -81,6 +105,12 @@ Route::get('/clear', function () {
 // Contact Us (public – guests and auth)
 Route::get('/contact', [ContactController::class, 'show'])->name('contact.show');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
+
+// Questionnaires (public: list + take survey; guests may submit with optional name/email)
+Route::get('/questionnaires', [QuestionnairePublicController::class, 'index'])->name('questionnaires.index');
+Route::get('/questionnaires/{slug}/thanks', [QuestionnairePublicController::class, 'thanks'])->name('questionnaires.thanks');
+Route::get('/questionnaires/{slug}', [QuestionnairePublicController::class, 'show'])->name('questionnaires.show');
+Route::post('/questionnaires/{slug}', [QuestionnairePublicController::class, 'store'])->name('questionnaires.store');
 
 // Public community blog — guests and logged-in users (no auth middleware).
 Route::get('/blog', [BlogPublicController::class, 'index'])->name('blog.index');
@@ -170,8 +200,17 @@ Route::middleware('auth')->group(function () {
     // My Invoices (customer view their invoices)
     Route::get('/my-invoices', [CustomerInvoiceController::class, 'index'])->name('invoices.index');
     Route::get('/my-invoices/create', [CustomerInvoiceController::class, 'create'])->name('invoices.create');
+    Route::post('/my-invoices/validate-coupon', [CustomerInvoiceController::class, 'validateCoupon'])->name('invoices.validate-coupon');
     Route::post('/my-invoices', [CustomerInvoiceController::class, 'store'])->name('invoices.store');
+    Route::get('/my-invoices/{invoice}', [CustomerInvoiceController::class, 'show'])->name('invoices.show');
+    Route::get('/my-invoices/{invoice}/edit', [CustomerInvoiceController::class, 'edit'])->name('invoices.edit');
+    Route::put('/my-invoices/{invoice}', [CustomerInvoiceController::class, 'update'])->name('invoices.update');
+    Route::delete('/my-invoices/{invoice}', [CustomerInvoiceController::class, 'destroy'])->name('invoices.destroy');
     Route::get('/my-invoices/{invoice}/pdf', [CustomerInvoiceController::class, 'pdf'])->name('invoices.pdf');
+
+    // Service Center lookup (wallet + DPBV)
+    Route::post('/service-center/resolve', [ServiceCenterLookupController::class, 'resolve'])->name('service-center.resolve');
+    Route::post('/service-center/balances', [ServiceCenterLookupController::class, 'balances'])->name('service-center.balances');
 
     // Admin area (super_admin: full; wholesale_staff: dashboard, reports, users, invoices; reseller: users + invoices; accountant: wallet; dispatch: orders only; cashier: limited kit purchase/admin access via parent)
     Route::middleware(['role:super_admin,wholesale_staff,reseller,accountant,dispatch,headquarters,branch,service_center,annex,cashier,distributor', RestrictWholesaleStaffAdmin::class, RestrictResellerAdmin::class, RestrictDispatchAdmin::class, RestrictHeadquartersAdmin::class, RestrictBranchAdmin::class, RestrictServiceCenterAdmin::class, RestrictAnnexAdmin::class])->group(function () {
@@ -226,6 +265,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/admin/pharmacy/referred-orders', [PharmacyDashboardController::class, 'referredOrders'])->name('admin.pharmacy.referred-orders');
         Route::get('/admin/pharmacy/reports/export/pdf', [PharmacyReportsController::class, 'exportPdf'])->name('admin.pharmacy.reports.export.pdf');
         Route::get('/admin/pharmacy/reports/export/excel', [PharmacyReportsController::class, 'exportExcel'])->name('admin.pharmacy.reports.export.excel');
+        Route::get('/admin/pharmacy/journal', [PharmacyJournalController::class, 'index'])->name('admin.pharmacy.journal.index');
+        Route::get('/admin/pharmacy/journal/create', [PharmacyJournalController::class, 'create'])->name('admin.pharmacy.journal.create');
+        Route::post('/admin/pharmacy/journal', [PharmacyJournalController::class, 'store'])->name('admin.pharmacy.journal.store');
 
         // Users CRUD
         Route::get('/admin/users', [SuperAdminUserController::class, 'index'])->name('admin.users.index');
@@ -298,6 +340,20 @@ Route::middleware('auth')->group(function () {
             Route::patch('/admin/landing-sliders/{landing_slider}/toggle-active', [\App\Http\Controllers\Admin\SuperAdminLandingSliderController::class, 'toggleActive'])->name('admin.landing-sliders.toggle-active');
         });
 
+        // Questionnaires (Super Admin + Headquarters)
+        Route::middleware('role:super_admin,headquarters')->group(function () {
+            Route::get('/admin/questionnaires/{questionnaire}/responses', [QuestionnaireController::class, 'responses'])->name('admin.questionnaires.responses');
+            Route::get('/admin/questionnaires/{questionnaire}/responses/{response}', [QuestionnaireController::class, 'responseShow'])->name('admin.questionnaires.responses.show');
+            Route::resource('/admin/questionnaires', QuestionnaireController::class)->except(['show'])->names([
+                'index' => 'admin.questionnaires.index',
+                'create' => 'admin.questionnaires.create',
+                'store' => 'admin.questionnaires.store',
+                'edit' => 'admin.questionnaires.edit',
+                'update' => 'admin.questionnaires.update',
+                'destroy' => 'admin.questionnaires.destroy',
+            ]);
+        });
+
         // Categories CRUD
         Route::get('/admin/categories', [SuperAdminCategoryController::class, 'index'])->name('admin.categories.index');
         Route::get('/admin/categories/create', [SuperAdminCategoryController::class, 'create'])->name('admin.categories.create');
@@ -308,6 +364,8 @@ Route::middleware('auth')->group(function () {
 
         // Products CRUD
         Route::get('/admin/products', [SuperAdminProductController::class, 'index'])->name('admin.products.index');
+        Route::get('/admin/products/export/pdf', [SuperAdminProductController::class, 'exportPdf'])->name('admin.products.export.pdf');
+        Route::get('/admin/products/export/excel', [SuperAdminProductController::class, 'exportExcel'])->name('admin.products.export.excel');
         Route::get('/admin/products/create', [SuperAdminProductController::class, 'create'])->name('admin.products.create');
         Route::post('/admin/products', [SuperAdminProductController::class, 'store'])->name('admin.products.store');
         Route::get('/admin/products/{product}/edit', [SuperAdminProductController::class, 'edit'])->name('admin.products.edit');
@@ -320,6 +378,23 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/suppliers', [SuperAdminSupplierController::class, 'store'])->name('admin.suppliers.store');
         Route::get('/admin/suppliers/{supplier}/edit', [SuperAdminSupplierController::class, 'edit'])->name('admin.suppliers.edit');
         Route::put('/admin/suppliers/{supplier}', [SuperAdminSupplierController::class, 'update'])->name('admin.suppliers.update');
+        Route::delete('/admin/suppliers/{supplier}', [SuperAdminSupplierController::class, 'destroy'])->name('admin.suppliers.destroy');
+
+        // Warehouses
+        Route::get('/admin/warehouses', [SuperAdminWarehouseController::class, 'index'])->name('admin.warehouses.index');
+        Route::get('/admin/warehouses/create', [SuperAdminWarehouseController::class, 'create'])->name('admin.warehouses.create');
+        Route::post('/admin/warehouses', [SuperAdminWarehouseController::class, 'store'])->name('admin.warehouses.store');
+        Route::get('/admin/warehouses/{warehouse}/edit', [SuperAdminWarehouseController::class, 'edit'])->name('admin.warehouses.edit');
+        Route::put('/admin/warehouses/{warehouse}', [SuperAdminWarehouseController::class, 'update'])->name('admin.warehouses.update');
+        Route::delete('/admin/warehouses/{warehouse}', [SuperAdminWarehouseController::class, 'destroy'])->name('admin.warehouses.destroy');
+
+        // POS Machines
+        Route::get('/admin/pos-machines', [SuperAdminPosMachineController::class, 'index'])->name('admin.pos-machines.index');
+        Route::get('/admin/pos-machines/create', [SuperAdminPosMachineController::class, 'create'])->name('admin.pos-machines.create');
+        Route::post('/admin/pos-machines', [SuperAdminPosMachineController::class, 'store'])->name('admin.pos-machines.store');
+        Route::get('/admin/pos-machines/{posMachine}/edit', [SuperAdminPosMachineController::class, 'edit'])->name('admin.pos-machines.edit');
+        Route::put('/admin/pos-machines/{posMachine}', [SuperAdminPosMachineController::class, 'update'])->name('admin.pos-machines.update');
+        Route::delete('/admin/pos-machines/{posMachine}', [SuperAdminPosMachineController::class, 'destroy'])->name('admin.pos-machines.destroy');
 
         // Banks CRUD (Super Admin, Wholesale Staff, Accountant, Headquarters)
         Route::middleware('role:super_admin,wholesale_staff,accountant,headquarters')->group(function () {
@@ -385,12 +460,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/kd/share', [KdCustomerController::class, 'share'])->name('admin.kd.share');
 
         // KD Registration (including Cashier / Distributor – registers using parent wallet when applicable)
-        Route::middleware('role:super_admin,headquarters,branch,service_center,annex,accountant,cashier,distributor')->group(function () {
+        // Note: Service Center role is intentionally excluded.
+        Route::middleware('role:super_admin,headquarters,branch,annex,accountant,cashier,distributor')->group(function () {
             Route::get('/admin/kd/registration', [KdRegistrationController::class, 'index'])->name('admin.kd.registration.index');
+            Route::get('/admin/kd/registration/service-centers/{user}/credit', [KdRegistrationController::class, 'addCreditForServiceCenterForm'])->name('admin.kd.service-centers.credit.form');
+            Route::post('/admin/kd/registration/service-centers/{user}/credit', [KdRegistrationController::class, 'addCreditForServiceCenter'])->name('admin.kd.service-centers.credit.store');
             Route::get('/admin/kd/registration/create', [KdRegistrationController::class, 'create'])->name('admin.kd.registration.create');
             Route::post('/admin/kd/registration', [KdRegistrationController::class, 'store'])->name('admin.kd.registration.store');
             Route::get('/admin/kd/registration/{registration}', [KdRegistrationController::class, 'show'])->name('admin.kd.registration.show');
             Route::post('/admin/kd/registration/{registration}/add-credit', [KdRegistrationController::class, 'addCredit'])->name('admin.kd.registration.add-credit');
+            Route::get('/admin/kd/credit-owners', [KdRegistrationController::class, 'creditOwners'])->name('admin.kd.credit-owners');
             Route::get('/admin/kd/registration/{registration}/edit', [KdRegistrationController::class, 'edit'])->name('admin.kd.registration.edit');
             Route::put('/admin/kd/registration/{registration}', [KdRegistrationController::class, 'update'])->name('admin.kd.registration.update');
             Route::delete('/admin/kd/registration/{registration}', [KdRegistrationController::class, 'destroy'])->name('admin.kd.registration.destroy');

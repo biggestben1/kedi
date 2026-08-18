@@ -29,8 +29,8 @@
                         @foreach($posts as $post)
                         <tr>
                             <td>
-                                @if($post->image)
-                                    <img src="{{ asset('storage/' . $post->image) }}" alt="Post image" class="br-7" style="width: 50px; height: 50px; object-fit: cover;">
+                                @if($post->image_url)
+                                    <img src="{{ $post->image_url }}" alt="Post image" class="br-7" style="width: 50px; height: 50px; object-fit: cover;" loading="lazy" decoding="async">
                                 @else
                                     <div class="bg-light d-flex align-items-center justify-content-center br-7" style="width: 50px; height: 50px;">
                                         <i class="fe fe-image text-muted"></i>

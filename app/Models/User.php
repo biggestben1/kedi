@@ -53,6 +53,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'wallet_balance' => 'decimal:2',
+            'kedi_credit_balance' => 'decimal:2',
         ];
     }
 
@@ -99,6 +100,32 @@ class User extends Authenticatable
     public function isSuperAdmin(): bool
     {
         return $this->hasRole(Role::SUPER_ADMIN);
+    }
+
+    /**
+     * True for any back-office role allowed into `/admin/*`.
+     * Keep this list aligned with the `role:` middleware in `routes/web.php`.
+     */
+    public function isAdmin(): bool
+    {
+        $this->loadMissing('role');
+        if (!$this->role) {
+            return false;
+        }
+
+        return in_array($this->role->name, [
+            Role::SUPER_ADMIN,
+            Role::WHOLESALE_STAFF,
+            Role::RESELLER,
+            Role::ACCOUNTANT,
+            Role::DISPATCH,
+            Role::HEADQUARTERS,
+            Role::BRANCH,
+            Role::SERVICE_CENTER,
+            Role::ANNEX,
+            Role::CASHIER,
+            Role::DISTRIBUTOR,
+        ], true);
     }
 
     public function isWholesaleStaff(): bool

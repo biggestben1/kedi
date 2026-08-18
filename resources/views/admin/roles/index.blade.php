@@ -58,7 +58,9 @@
                             <tr>
                                 <td class="align-middle"><code>{{ $role->name }}</code></td>
                                 <td class="align-middle">{{ $role->display_name }}</td>
-                                <td class="align-middle">{{ Str::limit($role->description, 60) ?? '—' }}</td>
+                                <td class="align-middle">
+                                    {{ $role->description ? \Illuminate\Support\Str::limit($role->description, 60) : '—' }}
+                                </td>
                                 <td class="text-end align-middle">{{ $role->users_count }}</td>
                                 <td class="text-end align-middle">
                                     <a href="{{ route('admin.roles.edit', $role) }}" class="btn btn-sm btn-outline-primary">Edit</a>

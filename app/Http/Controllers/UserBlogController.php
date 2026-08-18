@@ -52,6 +52,7 @@ class UserBlogController extends Controller
             'slug' => ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
             'body' => ['required', 'string'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+            'youtube_url' => ['nullable', 'url', 'max:500'],
             'is_published' => ['sometimes', 'boolean'],
         ]);
 
@@ -65,6 +66,10 @@ class UserBlogController extends Controller
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('blog_images', 'public');
         }
+        $youtubeUrl = isset($data['youtube_url']) ? trim((string) $data['youtube_url']) : null;
+        if ($youtubeUrl === '') {
+            $youtubeUrl = null;
+        }
 
         $post = new BlogPost([
             'title' => $data['title'],
@@ -72,6 +77,7 @@ class UserBlogController extends Controller
             'slug' => $slug ?? '',
             'body' => $data['body'],
             'image' => $imagePath,
+            'youtube_url' => $youtubeUrl,
             'is_published' => $request->boolean('is_published'),
         ]);
         $post->user_id = $user->id;
@@ -108,6 +114,7 @@ class UserBlogController extends Controller
             ],
             'body' => ['required', 'string'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
+            'youtube_url' => ['nullable', 'url', 'max:500'],
             'is_published' => ['sometimes', 'boolean'],
         ]);
 
@@ -126,6 +133,8 @@ class UserBlogController extends Controller
             }
             $blog_post->image = $request->file('image')->store('blog_images', 'public');
         }
+        $youtubeUrl = isset($data['youtube_url']) ? trim((string) $data['youtube_url']) : null;
+        $blog_post->youtube_url = ($youtubeUrl === '') ? null : $youtubeUrl;
 
         $blog_post->is_published = $request->boolean('is_published');
         $blog_post->save();

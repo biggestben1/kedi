@@ -53,6 +53,12 @@
                 </div>
                 @if(auth()->user()->isAdmin() || auth()->user()->isSuperAdmin())
                     <div class="ms-auto d-flex gap-2">
+                        <a href="{{ route('admin.products.export.pdf', request()->only(['q','category_id','warehouse_id'])) }}" class="btn btn-outline-secondary">
+                            <i class="fe fe-download me-2"></i>PDF
+                        </a>
+                        <a href="{{ route('admin.products.export.excel', request()->only(['q','category_id','warehouse_id'])) }}" class="btn btn-outline-secondary">
+                            <i class="fe fe-download me-2"></i>Excel
+                        </a>
                         @if(auth()->user()->isSuperAdmin())
                             <a href="{{ route('admin.products.trashed') }}" class="btn btn-outline-danger"><i class="fe fe-trash-2 me-2"></i>Trash</a>
                         @endif
@@ -171,118 +177,6 @@
                 {{ $products->links() }}
             </div>
         @endif
-    </div>
-
-    {{-- Stock / Expiry / Low Stock Reports --}}
-    <div class="card mt-4">
-        <div class="card-header">
-            <h3 class="card-title mb-0">Inventory Reports</h3>
-        </div>
-        <div class="card-body">
-            <ul class="nav nav-pills mb-3" id="inventoryReportTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="stock-report-tab" data-bs-toggle="pill" data-bs-target="#stock-report-panel" type="button" role="tab">Stock Report</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="expiry-report-tab" data-bs-toggle="pill" data-bs-target="#expiry-report-panel" type="button" role="tab">Expiry Report</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="lowstock-report-tab" data-bs-toggle="pill" data-bs-target="#lowstock-report-panel" type="button" role="tab">Low Stock Report</button>
-                </li>
-            </ul>
-            <div class="tab-content" id="inventoryReportTabsContent">
-                <div class="tab-pane fade show active" id="stock-report-panel" role="tabpanel">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Batch Number</th>
-                                    <th class="text-end">Quantity Available</th>
-                                    <th class="text-end">Cost Price</th>
-                                    <th class="text-end">Selling Price</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($stockProducts as $p)
-                                    <tr>
-                                        <td>{{ $p->name }} @if($p->pack_size)<small class="text-muted">({{ $p->pack_size }})</small>@endif</td>
-                                        <td>{{ $p->batch_number ?? '—' }}</td>
-                                        <td class="text-end">{{ $p->stock }}</td>
-                                        <td class="text-end">{{ $p->formatted_cost_price }}</td>
-                                        <td class="text-end">{{ $p->formatted_price }}</td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="5" class="text-center text-muted">No products.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="tab-pane fade" id="expiry-report-panel" role="tabpanel">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Expiry Date</th>
-                                    <th>Batch Tracking</th>
-                                    <th>Expiry Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($expiryProducts as $p)
-                                    <tr>
-                                        <td>{{ $p->name }} @if($p->pack_size)<small class="text-muted">({{ $p->pack_size }})</small>@endif</td>
-                                        <td>{{ $p->expiry_date?->format('M d, Y') ?? '—' }}</td>
-                                        <td>{{ $p->batch_number ?? '—' }}</td>
-                                        <td>
-                                            @if($p->expiry_date)
-                                                @if($p->expiry_date->isPast())
-                                                    <span class="badge bg-danger">Expired</span>
-                                                @elseif(!$p->expiry_date->isPast() && $p->expiry_date->diffInDays(now()->startOfDay(), false) <= 30)
-                                                    <span class="badge bg-warning">Expiring Soon</span>
-                                                @else
-                                                    <span class="badge bg-secondary">OK</span>
-                                                @endif
-                                            @else
-                                                —
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="4" class="text-center text-muted">No expiry dates set.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="tab-pane fade" id="lowstock-report-panel" role="tabpanel">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th class="text-end">Minimum Stock Level</th>
-                                    <th class="text-end">Current Quantity</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($lowStockProducts as $p)
-                                    <tr>
-                                        <td>{{ $p->name }} @if($p->pack_size)<small class="text-muted">({{ $p->pack_size }})</small>@endif</td>
-                                        <td class="text-end">{{ $p->min_stock }}</td>
-                                        <td class="text-end">{{ $p->stock }}</td>
-                                    </tr>
-                                @empty
-                                    <tr><td colspan="3" class="text-center text-muted">No low stock items.</td></tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     @push('scripts')

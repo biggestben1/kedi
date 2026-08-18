@@ -24,6 +24,26 @@ use Illuminate\Support\Facades\Mail;
 
 class CheckoutController extends Controller
 {
+    private function resolveServiceCenterByCode(?string $code): ?User
+    {
+        $code = trim((string) $code);
+        if ($code === '') {
+            return null;
+        }
+
+        $variants = array_values(array_unique(array_filter([
+            $code,
+            strtoupper($code),
+            strtolower($code),
+        ], fn ($v) => $v !== '')));
+
+        return User::whereIn('service_center_code', $variants)
+            ->whereHas('role', function ($q) {
+                $q->where('name', Role::SERVICE_CENTER);
+            })
+            ->first();
+    }
+
     private function effectiveDpbvQuery(User $user)
     {
         $query = DpbvCollection::query()->where('user_id', $user->id);
@@ -220,6 +240,7 @@ class CheckoutController extends Controller
         $paymentMethod = $request->input('payment_method');
         $kdId = trim((string) $request->input('kd_id', ''));
         $customerName = trim((string) $request->input('customer_name', ''));
+        $scReferralCode = trim((string) $request->input('sc_referral_code', ''));
 
         // Cashier → parent wallet; Distributor → own wallet
         $walletOwner = $user->walletOwnerForShopping();
@@ -353,7 +374,7 @@ class CheckoutController extends Controller
             );
         }
         $order = null;
-        DB::transaction(function () use ($user, $walletOwner, $data, $paymentMethod, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, $serviceCenterForDistributor, &$order) {
+        DB::transaction(function () use ($user, $walletOwner, $data, $paymentMethod, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, $serviceCenterForDistributor, $scReferralCode, &$order) {
             if (! $orderKdId || ! $orderCustomerName) {
                 Guest::firstOrCreate(
                     ['session_id' => $request->session()->getId(), 'user_id' => $user->id],
@@ -380,7 +401,7 @@ class CheckoutController extends Controller
                 'coupon_id' => $data['coupon'] ? $data['coupon']->id : null,
                 'coupon_code' => $data['coupon'] ? $data['coupon']->code : null,
                 'discount_amount' => $data['discountAmount'] ?? 0,
-                'sc_referral_code' => $request->input('sc_referral_code'),
+                'sc_referral_code' => $scReferralCode !== '' ? $scReferralCode : null,
                 'notes' => $request->input('notes'),
             ]);
 
@@ -431,7 +452,7 @@ class CheckoutController extends Controller
                     ]);
                 } else {
                     // Debit wallet from the wallet owner (parent for cashiers, self otherwise)
-                    $walletOwner->decrement('wallet_balance', $data['cartSubtotal']);
+                    $walletOwner->decrement('wallet_balance', $debitAmount);
                     $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
                     WalletTransaction::create([
                         'user_id' => $walletOwner->id,
@@ -440,6 +461,39 @@ class CheckoutController extends Controller
                         'balance_after' => $balanceAfter,
                         'reference' => 'Order #'.$order->id,
                     ]);
+                }
+
+                // Referral payout: if customer entered a Service Center referral code,
+                // credit that Service Center's wallet for this paid order.
+                if ($scReferralCode !== '') {
+                    $refServiceCenter = $this->resolveServiceCenterByCode($scReferralCode);
+                    $alreadyCreditedScId = ($user->role?->name === 'distributor' && $serviceCenterForDistributor)
+                        ? (int) $serviceCenterForDistributor->id
+                        : null;
+
+                    if (
+                        $refServiceCenter
+                        && (int) $refServiceCenter->id !== (int) $walletOwner->id
+                        && ($alreadyCreditedScId === null || (int) $refServiceCenter->id !== $alreadyCreditedScId)
+                    ) {
+                        $refServiceCenter->increment('wallet_balance', $debitAmount);
+                        $refBalanceAfter = (float) $refServiceCenter->fresh()->wallet_balance;
+                        WalletTransaction::create([
+                            'user_id' => $refServiceCenter->id,
+                            'type' => WalletTransaction::TYPE_CREDIT,
+                            'amount' => $debitAmount,
+                            'balance_after' => $refBalanceAfter,
+                            'reference' => 'Referral payout (Order #'.$order->id.')',
+                            'status' => WalletTransaction::STATUS_ACCEPTED,
+                            'approved_at' => now(),
+                        ]);
+                    } elseif (! $refServiceCenter) {
+                        \Log::warning('Checkout referral code not found', [
+                            'order_id' => $order->id,
+                            'sc_referral_code' => $scReferralCode,
+                            'user_id' => $user->id,
+                        ]);
+                    }
                 }
             }
 
@@ -995,9 +1049,14 @@ class CheckoutController extends Controller
             'code' => 'required|string|max:100',
         ]);
 
-        $code = $request->input('code');
+        $code = trim((string) $request->input('code'));
+        $variants = array_values(array_unique(array_filter([
+            $code,
+            strtoupper($code),
+            strtolower($code),
+        ], fn ($v) => $v !== '')));
 
-        $user = User::where('service_center_code', $code)
+        $user = User::whereIn('service_center_code', $variants)
             ->whereHas('role', function ($query) {
                 $query->where('name', Role::SERVICE_CENTER);
             })

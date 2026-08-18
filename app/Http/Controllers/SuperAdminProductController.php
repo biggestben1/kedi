@@ -8,16 +8,122 @@ use App\Models\Category;
 use App\Models\HeadquartersStock;
 use App\Models\Product;
 use App\Models\ServiceCenterStock;
+use App\Models\Warehouse;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class SuperAdminProductController extends Controller
 {
+    protected function exportQuery(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $categoryId = $request->query('category_id');
+        $warehouseId = $request->query('warehouse_id');
+
+        return Product::query()
+            ->with('category')
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($inner) use ($q) {
+                    $inner->where('item_code', 'like', "%{$q}%")
+                        ->orWhere('name', 'like', "%{$q}%")
+                        ->orWhere('pack_size', 'like', "%{$q}%");
+                });
+            })
+            ->when($categoryId !== null && $categoryId !== '', function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId);
+            })
+            ->when($warehouseId !== null && $warehouseId !== '', function ($query) use ($warehouseId) {
+                $query->where('warehouse_id', $warehouseId);
+            })
+            ->orderBy('sort_order')
+            ->orderBy('name');
+    }
+
+    protected function exportRows(Request $request): array
+    {
+        $currentUser = $request->user();
+        $isSuperAdmin = $currentUser?->isSuperAdmin() ?? false;
+        $isHeadquarters = $currentUser?->role?->name === 'headquarters';
+        $headquartersUserId = $isHeadquarters ? $currentUser->id : null;
+        $isServiceCenter = $currentUser?->role?->name === 'service_center';
+        $isAnnex = $currentUser?->role?->name === 'annex';
+        $isBranch = $currentUser?->role?->name === 'branch';
+        $branchUserId = $isBranch ? (int) $currentUser->id : null;
+        $serviceCenterUserId = $isServiceCenter ? (int) $currentUser->id : null;
+        $annexUserId = $isAnnex ? (int) $currentUser->id : null;
+        $showStockAsZero = ! $isSuperAdmin && ! $headquartersUserId && ! $branchUserId && ! $serviceCenterUserId && ! $annexUserId;
+
+        $products = $this->exportQuery($request)->get();
+
+        // Preload stock maps to avoid per-row queries (except `showStockAsZero`)
+        $productIds = $products->pluck('id')->all();
+        $hqStock = [];
+        $branchStock = [];
+        $scStock = [];
+        $annexStock = [];
+        if (! $showStockAsZero && $headquartersUserId && ! $isSuperAdmin) {
+            $hqStock = HeadquartersStock::where('headquarters_user_id', $headquartersUserId)
+                ->whereIn('product_id', $productIds)
+                ->pluck('quantity', 'product_id')
+                ->toArray();
+        } elseif (! $showStockAsZero && $branchUserId) {
+            $branchStock = BranchStock::where('branch_user_id', $branchUserId)
+                ->whereIn('product_id', $productIds)
+                ->pluck('quantity', 'product_id')
+                ->toArray();
+        } elseif (! $showStockAsZero && $serviceCenterUserId) {
+            $scStock = ServiceCenterStock::where('service_center_user_id', $serviceCenterUserId)
+                ->whereIn('product_id', $productIds)
+                ->pluck('quantity', 'product_id')
+                ->toArray();
+        } elseif (! $showStockAsZero && $annexUserId) {
+            $annexStock = AnnexStock::where('annex_user_id', $annexUserId)
+                ->whereIn('product_id', $productIds)
+                ->pluck('quantity', 'product_id')
+                ->toArray();
+        }
+
+        return $products->map(function (Product $p) use ($isSuperAdmin, $headquartersUserId, $branchUserId, $serviceCenterUserId, $annexUserId, $showStockAsZero, $hqStock, $branchStock, $scStock, $annexStock) {
+            if ($isSuperAdmin) {
+                $stock = $p->stock;
+            } else {
+                $stock = $showStockAsZero ? 0 : $p->stock;
+                if (! $showStockAsZero && $headquartersUserId) {
+                    $stock = $hqStock[$p->id] ?? 0;
+                } elseif (! $showStockAsZero && $branchUserId) {
+                    $stock = $branchStock[$p->id] ?? 0;
+                } elseif (! $showStockAsZero && $serviceCenterUserId) {
+                    $stock = $scStock[$p->id] ?? 0;
+                } elseif (! $showStockAsZero && $annexUserId) {
+                    $stock = $annexStock[$p->id] ?? 0;
+                }
+            }
+
+            return [
+                'item_code' => (string) ($p->item_code ?? ''),
+                'name' => (string) ($p->name ?? ''),
+                'category' => (string) ($p->category?->name ?? ''),
+                'pack_size' => (string) ($p->pack_size ?? ''),
+                'cost_price' => (float) ($p->cost_price ?? 0),
+                'selling_price' => (float) ($p->price ?? 0),
+                'stock' => (int) $stock,
+                'bv' => (float) ($p->bv ?? 0),
+                'pv' => (float) ($p->pv ?? 0),
+                'dpbv' => (bool) ($p->can_use_dpbv ?? true),
+                'status' => (bool) ($p->is_active ?? false),
+            ];
+        })->all();
+    }
+
     public function index(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
         $categoryId = $request->query('category_id');
+        $warehouseId = $request->query('warehouse_id');
 
         $currentUser = $request->user();
         $isSuperAdmin = $currentUser?->isSuperAdmin() ?? false;
@@ -44,6 +150,9 @@ class SuperAdminProductController extends Controller
             })
             ->when($categoryId !== null && $categoryId !== '', function ($query) use ($categoryId) {
                 $query->where('category_id', $categoryId);
+            })
+            ->when($warehouseId !== null && $warehouseId !== '', function ($query) use ($warehouseId) {
+                $query->where('warehouse_id', $warehouseId);
             })
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -94,11 +203,6 @@ class SuperAdminProductController extends Controller
             ]);
         }
 
-        // Inventory reports (for Stock / Expiry / Low Stock section)
-        $stockProducts = Product::with('category')->orderBy('name')->get();
-        $expiryProducts = Product::whereNotNull('expiry_date')->orderBy('expiry_date')->get();
-        $lowStockProducts = Product::whereRaw('min_stock > 0 AND stock <= min_stock')->orderBy('stock')->get();
-
         // Load headquarters stock for HQ, Service Center, and Annex (their parent HQ)
         // For Super Admin, keep product->stock as-is in reports
         if ($headquartersUserId && ! $isSuperAdmin) {
@@ -106,64 +210,10 @@ class SuperAdminProductController extends Controller
                 ->pluck('quantity', 'product_id')
                 ->toArray();
 
-            $stockProducts = $stockProducts->map(function ($product) use ($headquartersStockMap) {
-                $product->stock = $headquartersStockMap[$product->id] ?? 0;
-
-                return $product;
-            });
-        }
-
-        // Branch (with no HQ): show stock as 0 in reports
-        if ($showStockAsZero) {
-            $stockProducts = $stockProducts->map(function ($product) {
-                $product->stock = 0;
-
-                return $product;
-            });
-            $lowStockProducts = $lowStockProducts->map(function ($product) {
-                $product->stock = 0;
-
-                return $product;
-            });
+            // (Inventory report data removed from UI)
         }
 
         $categories = Category::orderBy('sort_order')->orderBy('name')->get();
-
-        if ($branchUserId) {
-            $branchStockMap = BranchStock::where('branch_user_id', $branchUserId)
-                ->pluck('quantity', 'product_id')
-                ->toArray();
-
-            $stockProducts = $stockProducts->map(function ($product) use ($branchStockMap) {
-                $product->stock = $branchStockMap[$product->id] ?? 0;
-
-                return $product;
-            });
-        }
-
-        if ($serviceCenterUserId) {
-            $scStockMap = ServiceCenterStock::where('service_center_user_id', $serviceCenterUserId)
-                ->pluck('quantity', 'product_id')
-                ->toArray();
-
-            $stockProducts = $stockProducts->map(function ($product) use ($scStockMap) {
-                $product->stock = $scStockMap[$product->id] ?? 0;
-
-                return $product;
-            });
-        }
-
-        if ($annexUserId) {
-            $annexStockMap = AnnexStock::where('annex_user_id', $annexUserId)
-                ->pluck('quantity', 'product_id')
-                ->toArray();
-
-            $stockProducts = $stockProducts->map(function ($product) use ($annexStockMap) {
-                $product->stock = $annexStockMap[$product->id] ?? 0;
-
-                return $product;
-            });
-        }
 
         $stockDebug = null;
         if ($request->query('debug') === '1') {
@@ -219,10 +269,8 @@ class SuperAdminProductController extends Controller
             'products' => $products,
             'q' => $q,
             'categoryId' => $categoryId,
+            'warehouseId' => $warehouseId,
             'categories' => $categories,
-            'stockProducts' => $stockProducts,
-            'expiryProducts' => $expiryProducts,
-            'lowStockProducts' => $lowStockProducts,
             'isHeadquarters' => $isHeadquarters,
             'headquartersUserId' => $headquartersUserId,
             'branchUserId' => $branchUserId,
@@ -233,17 +281,88 @@ class SuperAdminProductController extends Controller
         ]);
     }
 
+    public function exportPdf(Request $request)
+    {
+        $rows = $this->exportRows($request);
+
+        $pdf = Pdf::loadView('admin.products.export-pdf', [
+            'rows' => $rows,
+            'generatedAt' => now(),
+            'q' => (string) $request->query('q', ''),
+            'categoryId' => (string) $request->query('category_id', ''),
+        ]);
+
+        return $pdf->download('products-'.now()->format('Y-m-d_His').'.pdf');
+    }
+
+    public function exportExcel(Request $request)
+    {
+        $rows = $this->exportRows($request);
+
+        $sheet = (new Spreadsheet())->getActiveSheet();
+        $headers = [
+            'Item Code',
+            'Name',
+            'Category',
+            'Pack Size',
+            'Cost Price',
+            'Selling Price',
+            'Stock',
+            'BV',
+            'PV',
+            'DPBV',
+            'Status',
+        ];
+        $sheet->fromArray($headers, null, 'A1', true);
+
+        $data = array_map(function (array $r) {
+            return [
+                $r['item_code'],
+                $r['name'],
+                $r['category'],
+                $r['pack_size'],
+                $r['cost_price'],
+                $r['selling_price'],
+                $r['stock'],
+                $r['bv'],
+                $r['pv'],
+                $r['dpbv'] ? 'Allowed' : 'Not Allowed',
+                $r['status'] ? 'Active' : 'Inactive',
+            ];
+        }, $rows);
+        if (! empty($data)) {
+            $sheet->fromArray($data, null, 'A2', true);
+        }
+
+        // Basic sizing
+        foreach (range('A', 'K') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $writer = new Xlsx($sheet->getParent());
+        $tmp = tempnam(sys_get_temp_dir(), 'products_');
+        $filePath = $tmp.'.xlsx';
+        $writer->save($filePath);
+
+        return response()->download($filePath, 'products-'.now()->format('Y-m-d_His').'.xlsx')->deleteFileAfterSend(true);
+    }
+
     public function create()
     {
         $categories = Category::orderBy('sort_order')->orderBy('name')->get();
+        $warehouses = Warehouse::orderBy('name')->get();
 
-        return view('admin.products.create', ['categories' => $categories]);
+        return view('admin.products.create', [
+            'categories' => $categories,
+            'warehouses' => $warehouses,
+        ]);
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'item_code' => ['required', 'string', 'max:20', Rule::unique('products', 'item_code')],
             'name' => ['required', 'string', 'max:255'],
             'pack_size' => ['nullable', 'string', 'max:100'],
@@ -267,6 +386,7 @@ class SuperAdminProductController extends Controller
 
         Product::create([
             'category_id' => $data['category_id'] ?? null,
+            'warehouse_id' => $data['warehouse_id'] ?? null,
             'item_code' => $data['item_code'],
             'name' => $data['name'],
             'pack_size' => $data['pack_size'] ?? null,
@@ -290,14 +410,20 @@ class SuperAdminProductController extends Controller
     public function edit(Product $product)
     {
         $categories = Category::orderBy('sort_order')->orderBy('name')->get();
+        $warehouses = Warehouse::orderBy('name')->get();
 
-        return view('admin.products.edit', ['product' => $product, 'categories' => $categories]);
+        return view('admin.products.edit', [
+            'product' => $product,
+            'categories' => $categories,
+            'warehouses' => $warehouses,
+        ]);
     }
 
     public function update(Request $request, Product $product)
     {
         $data = $request->validate([
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'warehouse_id' => ['nullable', 'integer', 'exists:warehouses,id'],
             'item_code' => ['required', 'string', 'max:20', Rule::unique('products', 'item_code')->ignore($product->id)],
             'name' => ['required', 'string', 'max:255'],
             'pack_size' => ['nullable', 'string', 'max:100'],
@@ -325,6 +451,7 @@ class SuperAdminProductController extends Controller
 
         $product->update([
             'category_id' => $data['category_id'] ?? null,
+            'warehouse_id' => $data['warehouse_id'] ?? null,
             'item_code' => $data['item_code'],
             'name' => $data['name'],
             'pack_size' => $data['pack_size'] ?? null,

@@ -4,7 +4,7 @@
 <ul class="side-menu">
     <li class="sub-category"><h3>Main</h3></li>
     <li class="slide">
-        <a class="side-menu__item" href="{{ url('/') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
+        <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
     </li>
     <li class="slide">
         <a class="side-menu__item {{ $active === 'dashboard' ? 'active' : '' }}" href="{{ route('dashboard') }}"><i class="side-menu__icon fe fe-grid"></i><span class="side-menu__label">Dashboard</span></a>
@@ -34,6 +34,9 @@
     </li>
     <li class="slide">
         <a class="side-menu__item {{ $active === 'bonus' ? 'active' : '' }}" href="{{ route('bonus.index') }}"><i class="side-menu__icon fe fe-trending-up"></i><span class="side-menu__label">My Bonus</span></a>
+    </li>
+    <li class="slide">
+        <a class="side-menu__item {{ $active === 'questionnaires' ? 'active' : '' }}" href="{{ route('questionnaires.index') }}"><i class="side-menu__icon fe fe-help-circle"></i><span class="side-menu__label">Questionnaires</span></a>
     </li>
     <li class="slide">
         <a class="side-menu__item {{ $active === 'contact' ? 'active' : '' }}" href="{{ route('contact.show') }}"><i class="side-menu__icon fe fe-mail"></i><span class="side-menu__label">Contact Us</span></a>

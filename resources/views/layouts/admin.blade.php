@@ -63,10 +63,6 @@
     </style>
 </head>
 <body class="app sidebar-mini ltr light-mode">
-    <div id="global-loader">
-        <img src="{{ asset('sash/assets/images/loader.svg') }}" class="loader-img" alt="Loader">
-    </div>
-
     <div class="page">
         <div class="page-main">
             <!-- app-Header -->
@@ -90,6 +86,29 @@
                                                 <span class="light-layout"><i class="fe fe-sun"></i></span>
                                             </a>
                                         </div>
+                                        @php
+                                            $canSeeKediCreditTop = auth()->user() && (
+                                                auth()->user()->isSuperAdmin()
+                                                || in_array(auth()->user()->role?->name, ['headquarters', 'branch', 'service_center', 'annex', 'accountant', 'cashier', 'distributor'], true)
+                                            );
+                                        @endphp
+                                        @if($canSeeKediCreditTop)
+                                        <div class="dropdown d-flex">
+                                            <a href="javascript:void(0)" data-bs-toggle="dropdown" class="nav-link d-flex align-items-center">
+                                                <i class="fe fe-credit-card me-1"></i>
+                                                <span class="d-none d-md-inline">Kedi Credit</span>
+                                                <i class="fe fe-chevron-down ms-1"></i>
+                                            </a>
+                                            <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                                                <a class="dropdown-item" href="{{ route('admin.users.index', ['role' => 'service_center']) }}">
+                                                    <i class="dropdown-icon fe fe-users"></i> Service Centers
+                                                </a>
+                                                <a class="dropdown-item" href="{{ route('admin.kd.credit-owners') }}">
+                                                    <i class="dropdown-icon fe fe-users"></i> Who is owning
+                                                </a>
+                                            </div>
+                                        </div>
+                                        @endif
                                         <div class="dropdown d-flex profile-1">
                                             <a href="javascript:void(0)" data-bs-toggle="dropdown" class="nav-link leading-none d-flex">
                                                 <span class="avatar profile-user brround cover-image bg-primary text-white d-flex align-items-center justify-content-center">{{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 1)) }}</span>
@@ -102,10 +121,10 @@
                                                     </div>
                                                 </div>
                                                 <div class="dropdown-divider m-0"></div>
-                                                <a class="dropdown-item" href="{{ route('home') }}"><i class="dropdown-icon fe fe-shopping-bag"></i> Back to Shop</a>
-                                                <a class="dropdown-item" href="{{ url('/') }}#about"><i class="dropdown-icon fe fe-info"></i> About Us</a>
+                                                <a class="dropdown-item" href="{{ route('shop') }}"><i class="dropdown-icon fe fe-shopping-bag"></i> Back to Shop</a>
                                                 <a class="dropdown-item" href="{{ route('dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('password.change') }}"><i class="dropdown-icon fe fe-lock"></i> Change Password</a>
+                                                {{-- Kedi Credit is available as a standalone top menu --}}
                                                 @if(auth()->user()->role?->name === 'reseller')
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Reseller</a>
                                                 <a class="dropdown-item" href="{{ route('admin.users.index', ['role' => 'customer']) }}"><i class="dropdown-icon fe fe-users"></i> My Customers</a>
@@ -114,6 +133,7 @@
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Headquarters</a>
                                                 <a class="dropdown-item" href="{{ route('admin.users.index') }}"><i class="dropdown-icon fe fe-users"></i> My Users</a>
                                                 <a class="dropdown-item" href="{{ route('admin.invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> Invoices</a>
+                                                <a class="dropdown-item" href="{{ route('admin.questionnaires.index') }}"><i class="dropdown-icon fe fe-help-circle"></i> Questionnaires</a>
                                                 <a class="dropdown-item" href="{{ route('admin.banks.index') }}"><i class="dropdown-icon fe fe-credit-card"></i> Banks</a>
                                                 @elseif(auth()->user()->role?->name === 'branch')
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Branch</a>
@@ -141,6 +161,9 @@
                                                 <a class="dropdown-item" href="{{ route('admin.accountant.wallet.index') }}"><i class="dropdown-icon fe fe-wallet"></i> Wallet Management</a>
                                                 @else
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Admin</a>
+                                                @if(auth()->user()->isSuperAdmin())
+                                                <a class="dropdown-item" href="{{ route('admin.questionnaires.index') }}"><i class="dropdown-icon fe fe-help-circle"></i> Questionnaires</a>
+                                                @endif
                                                 <a class="dropdown-item" href="{{ route('admin.users.index') }}"><i class="dropdown-icon fe fe-users"></i> Users</a>
                                                 @endif
                                                 <form method="POST" action="{{ route('logout') }}">
@@ -174,10 +197,7 @@
                             {{-- Reseller menu: Users (customers only), Invoices --}}
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin') && !request()->routeIs('admin.*') ? 'active' : '' }}" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
@@ -208,6 +228,17 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}" href="{{ route('admin.kd.registration.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">KD Registration</span></a>
                             </li>
+                            <li class="slide {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'is-expanded' : '' }}">
+                                <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)">
+                                    <i class="side-menu__icon fe fe-credit-card"></i>
+                                    <span class="side-menu__label">Kedi Credit</span>
+                                    <i class="angle fe fe-chevron-right"></i>
+                                </a>
+                                <ul class="slide-menu {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'open' : '' }}" style="{{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'display: block;' : '' }}">
+                                    <li><a href="{{ route('admin.kd.registration.index') }}" class="slide-item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}">Add Credit</a></li>
+                                    <li><a href="{{ route('admin.kd.credit-owners') }}" class="slide-item {{ request()->routeIs('admin.kd.credit-owners') ? 'active' : '' }}">Who is owning</a></li>
+                                </ul>
+                            </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.contacts*') ? 'active' : '' }}" href="{{ route('admin.contacts.index') }}"><i class="side-menu__icon fe fe-mail"></i><span class="side-menu__label">Contact Us</span></a>
                             </li>
@@ -218,10 +249,7 @@
                             {{-- Dispatch menu: Orders, Products (view only) --}}
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
@@ -245,14 +273,22 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}" href="{{ route('admin.kd.registration.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">KD Registration</span></a>
                             </li>
+                            <li class="slide {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'is-expanded' : '' }}">
+                                <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)">
+                                    <i class="side-menu__icon fe fe-credit-card"></i>
+                                    <span class="side-menu__label">Kedi Credit</span>
+                                    <i class="angle fe fe-chevron-right"></i>
+                                </a>
+                                <ul class="slide-menu {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'open' : '' }}" style="{{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'display: block;' : '' }}">
+                                    <li><a href="{{ route('admin.kd.registration.index') }}" class="slide-item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}">Add Credit</a></li>
+                                    <li><a href="{{ route('admin.kd.credit-owners') }}" class="slide-item {{ request()->routeIs('admin.kd.credit-owners') ? 'active' : '' }}">Who is owning</a></li>
+                                </ul>
+                            </li>
                             @elseif(in_array(auth()->user()->role?->name, ['cashier', 'distributor'], true))
                             {{-- Cashier: parent wallet & stock. Distributor: own wallet; same KD/kits/stock from parent. --}}
                             <li class="sub-category"><h3>{{ auth()->user()->role?->name === 'distributor' ? 'Distributor' : 'Cashier' }}</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('wallet.*') ? 'active' : '' }}" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-credit-card"></i><span class="side-menu__label">Wallet</span></a>
@@ -270,16 +306,16 @@
                             {{-- Headquarters menu: All invoices, Products CRUD, Categories CRUD --}}
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.dashboard') ? 'active' : '' }}" href="{{ route('admin.pharmacy.dashboard') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Dashboard</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.questionnaires*') ? 'active' : '' }}" href="{{ route('admin.questionnaires.index') }}"><i class="side-menu__icon fe fe-help-circle"></i><span class="side-menu__label">Questionnaires</span></a>
                             </li>
                             <li class="sub-category"><h3>Headquarters</h3></li>
                             <li class="slide">
@@ -303,6 +339,17 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}" href="{{ route('admin.kd.registration.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">KD Registration</span></a>
+                            </li>
+                            <li class="slide {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'is-expanded' : '' }}">
+                                <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)">
+                                    <i class="side-menu__icon fe fe-credit-card"></i>
+                                    <span class="side-menu__label">Kedi Credit</span>
+                                    <i class="angle fe fe-chevron-right"></i>
+                                </a>
+                                <ul class="slide-menu {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'open' : '' }}" style="{{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'display: block;' : '' }}">
+                                    <li><a href="{{ route('admin.kd.registration.index') }}" class="slide-item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}">Add Credit</a></li>
+                                    <li><a href="{{ route('admin.kd.credit-owners') }}" class="slide-item {{ request()->routeIs('admin.kd.credit-owners') ? 'active' : '' }}">Who is owning</a></li>
+                                </ul>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kedi-kits.purchase*') && !request()->routeIs('admin.kedi-kits.purchase.seller*') ? 'active' : '' }}" href="{{ route('admin.kedi-kits.purchase.index') }}"><i class="side-menu__icon fe fe-shopping-cart"></i><span class="side-menu__label">Purchase Kits</span></a>
@@ -352,10 +399,7 @@
                             {{-- Branch menu: like Headquarters but cannot create Branch users --}}
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
@@ -422,6 +466,17 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}" href="{{ route('admin.kd.registration.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">KD Registration</span></a>
                             </li>
+                            <li class="slide {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'is-expanded' : '' }}">
+                                <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)">
+                                    <i class="side-menu__icon fe fe-credit-card"></i>
+                                    <span class="side-menu__label">Kedi Credit</span>
+                                    <i class="angle fe fe-chevron-right"></i>
+                                </a>
+                                <ul class="slide-menu {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'open' : '' }}" style="{{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'display: block;' : '' }}">
+                                    <li><a href="{{ route('admin.kd.registration.index') }}" class="slide-item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}">Add Credit</a></li>
+                                    <li><a href="{{ route('admin.kd.credit-owners') }}" class="slide-item {{ request()->routeIs('admin.kd.credit-owners') ? 'active' : '' }}">Who is owning</a></li>
+                                </ul>
+                            </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kedi-kits.purchase*') && !request()->routeIs('admin.kedi-kits.purchase.seller*') ? 'active' : '' }}" href="{{ route('admin.kedi-kits.purchase.index') }}"><i class="side-menu__icon fe fe-shopping-cart"></i><span class="side-menu__label">Purchase Kits</span></a>
                             </li>
@@ -429,10 +484,7 @@
                             {{-- Service Center menu: Dashboard, Reports, Banks, Wallet, Users, Invoices, Back Orders --}}
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
@@ -485,9 +537,7 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kd*') ? 'active' : '' }}" href="{{ route('admin.kd.index') }}"><i class="side-menu__icon fe fe-hash"></i><span class="side-menu__label">Borrow</span></a>
                             </li>
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}" href="{{ route('admin.kd.registration.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">KD Registration</span></a>
-                            </li>
+                            {{-- KD Registration intentionally hidden from Service Center role --}}
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kedi-kits.purchase*') && !request()->routeIs('admin.kedi-kits.purchase.seller*') ? 'active' : '' }}" href="{{ route('admin.kedi-kits.purchase.index') }}"><i class="side-menu__icon fe fe-shopping-cart"></i><span class="side-menu__label">Purchase Kits</span></a>
                             </li>
@@ -495,10 +545,7 @@
                             {{-- Annex menu: Dashboard, Reports, Users (Accountant, Dispatch), Products (view only), Invoices (own), Back Orders (own) --}}
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
@@ -549,10 +596,7 @@
                             @else
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('home') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}#about"><i class="side-menu__icon fe fe-info"></i><span class="side-menu__label">About Us</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
@@ -563,7 +607,10 @@
                             <li class="sub-category"><h3>Admin</h3></li>
                             @if(auth()->user()->role?->name !== 'accountant')
                             <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.reports*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.reports') }}"><i class="side-menu__icon fe fe-bar-chart-2"></i><span class="side-menu__label">Pharmacy Reports</span></a>
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.reports*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.reports') }}"><i class="side-menu__icon fe fe-bar-chart-2"></i><span class="side-menu__label">Report</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.journal*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.journal.index') }}"><i class="side-menu__icon fe fe-book-open"></i><span class="side-menu__label">Journal</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.referred-orders*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Referred Orders</span></a>
@@ -602,11 +649,17 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.announcements*') ? 'active' : '' }}" href="{{ route('admin.announcements.index') }}"><i class="side-menu__icon fe fe-bell"></i><span class="side-menu__label">Announcements</span></a>
                             </li>
-                            <li class="slide {{ (request()->routeIs('admin.categories*') || request()->routeIs('admin.products*') || request()->routeIs('admin.in-stock*')) ? 'is-expanded' : '' }}">
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.questionnaires*') ? 'active' : '' }}" href="{{ route('admin.questionnaires.index') }}"><i class="side-menu__icon fe fe-help-circle"></i><span class="side-menu__label">Questionnaires</span></a>
+                            </li>
+                            <li class="slide {{ (request()->routeIs('admin.categories*') || request()->routeIs('admin.products*') || request()->routeIs('admin.suppliers*') || request()->routeIs('admin.warehouses*') || request()->routeIs('admin.pos-machines*') || request()->routeIs('admin.in-stock*')) ? 'is-expanded' : '' }}">
                                 <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">Products</span><i class="angle fe fe-chevron-right"></i></a>
-                                <ul class="slide-menu {{ (request()->routeIs('admin.categories*') || request()->routeIs('admin.products*') || request()->routeIs('admin.in-stock*')) ? 'open' : '' }}" style="{{ (request()->routeIs('admin.categories*') || request()->routeIs('admin.products*') || request()->routeIs('admin.in-stock*')) ? 'display: block;' : '' }}">
+                                <ul class="slide-menu {{ (request()->routeIs('admin.categories*') || request()->routeIs('admin.products*') || request()->routeIs('admin.suppliers*') || request()->routeIs('admin.warehouses*') || request()->routeIs('admin.pos-machines*') || request()->routeIs('admin.in-stock*')) ? 'open' : '' }}" style="{{ (request()->routeIs('admin.categories*') || request()->routeIs('admin.products*') || request()->routeIs('admin.suppliers*') || request()->routeIs('admin.warehouses*') || request()->routeIs('admin.pos-machines*') || request()->routeIs('admin.in-stock*')) ? 'display: block;' : '' }}">
                                     <li><a href="{{ route('admin.categories.index') }}" class="slide-item {{ request()->routeIs('admin.categories*') ? 'active' : '' }}">Categories</a></li>
                                     <li><a href="{{ route('admin.products.index') }}" class="slide-item {{ request()->routeIs('admin.products*') ? 'active' : '' }}">Products</a></li>
+                                    <li><a href="{{ route('admin.suppliers.index') }}" class="slide-item {{ request()->routeIs('admin.suppliers*') ? 'active' : '' }}">Suppliers</a></li>
+                                    <li><a href="{{ route('admin.warehouses.index') }}" class="slide-item {{ request()->routeIs('admin.warehouses*') ? 'active' : '' }}">Warehouses</a></li>
+                                    <li><a href="{{ route('admin.pos-machines.index') }}" class="slide-item {{ request()->routeIs('admin.pos-machines*') ? 'active' : '' }}">POS Machines</a></li>
                                     @if(auth()->user()->isSuperAdmin())
                                     <li><a href="{{ route('admin.in-stock.index') }}" class="slide-item {{ request()->routeIs('admin.in-stock*') ? 'active' : '' }}">In Stock</a></li>
                                     @endif
@@ -688,6 +741,17 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}" href="{{ route('admin.kd.registration.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">KD Registration</span></a>
+                            </li>
+                            <li class="slide {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'is-expanded' : '' }}">
+                                <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)">
+                                    <i class="side-menu__icon fe fe-credit-card"></i>
+                                    <span class="side-menu__label">Kedi Credit</span>
+                                    <i class="angle fe fe-chevron-right"></i>
+                                </a>
+                                <ul class="slide-menu {{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'open' : '' }}" style="{{ request()->routeIs('admin.kd.registration*') || request()->routeIs('admin.kd.credit-owners') ? 'display: block;' : '' }}">
+                                    <li><a href="{{ route('admin.kd.registration.index') }}" class="slide-item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}">Add Credit</a></li>
+                                    <li><a href="{{ route('admin.kd.credit-owners') }}" class="slide-item {{ request()->routeIs('admin.kd.credit-owners') ? 'active' : '' }}">Who is owning</a></li>
+                                </ul>
                             </li>
                             @endif
                             @if(auth()->user()->role?->name !== 'accountant')

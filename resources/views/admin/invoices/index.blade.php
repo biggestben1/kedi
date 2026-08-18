@@ -4,12 +4,43 @@
 
 @section('content')
     <div class="page-header">
-        <h1 class="page-title">Invoices</h1>
-        <div>
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ route('admin') }}">Admin</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Invoices</li>
-            </ol>
+        <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+            <div>
+                <h1 class="page-title mb-1">Invoices</h1>
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="{{ route('admin') }}">Admin</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Invoices</li>
+                </ol>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="{{ route('admin.invoices.index', array_merge(request()->only(['status','q']), ['period' => 'today'])) }}" class="btn btn-lg {{ $periodFilter === 'today' ? 'btn-primary' : 'btn-outline-primary' }} d-inline-flex align-items-center">
+                    Today
+                    <span class="badge bg-secondary ms-2">{{ (int) ($periodCounts['today'] ?? 0) }}</span>
+                </a>
+                <a href="{{ route('admin.invoices.index', array_merge(request()->only(['status','q']), ['period' => 'month'])) }}" class="btn btn-lg {{ $periodFilter === 'month' ? 'btn-primary' : 'btn-outline-primary' }} d-inline-flex align-items-center">
+                    Month
+                    <span class="badge bg-secondary ms-2">{{ (int) ($periodCounts['month'] ?? 0) }}</span>
+                </a>
+                <a href="{{ route('admin.invoices.index', array_merge(request()->only(['status','q']), ['period' => 'year'])) }}" class="btn btn-lg {{ $periodFilter === 'year' ? 'btn-primary' : 'btn-outline-primary' }} d-inline-flex align-items-center">
+                    Year
+                    <span class="badge bg-secondary ms-2">{{ (int) ($periodCounts['year'] ?? 0) }}</span>
+                </a>
+                <a href="{{ route('admin.invoices.index', request()->except(['page','period'])) }}" class="btn btn-lg btn-outline-secondary d-inline-flex align-items-center">
+                    Clear period
+                </a>
+                <a href="{{ route('admin.invoices.index', ['status' => 'draft']) }}" class="btn btn-lg btn-outline-primary d-inline-flex align-items-center">
+                    Draft
+                    <span class="badge bg-secondary ms-2">{{ (int) ($statusCounts['draft'] ?? 0) }}</span>
+                </a>
+                <a href="{{ route('admin.invoices.index', ['status' => 'sent']) }}" class="btn btn-lg btn-outline-primary d-inline-flex align-items-center">
+                    Sent
+                    <span class="badge bg-warning text-dark ms-2">{{ (int) ($statusCounts['sent'] ?? 0) }}</span>
+                </a>
+                <a href="{{ route('admin.invoices.index', ['status' => 'paid']) }}" class="btn btn-lg btn-outline-primary d-inline-flex align-items-center">
+                    Paid
+                    <span class="badge bg-success ms-2">{{ (int) ($statusCounts['paid'] ?? 0) }}</span>
+                </a>
+            </div>
         </div>
     </div>
 
@@ -33,7 +64,7 @@
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h3 class="card-title mb-0">Invoices</h3>
             <div class="d-flex gap-2 flex-wrap">
-                <form method="GET" action="{{ route('admin.invoices.index') }}" class="d-flex gap-2">
+                <form method="GET" action="{{ route('admin.invoices.index') }}" class="d-flex gap-2 flex-wrap align-items-center">
                     <input type="search" name="q" class="form-control form-control-sm" placeholder="Search..." value="{{ $search }}" style="min-width: 200px;">
                     <select name="status" class="form-select form-select-sm" style="min-width: 150px;">
                         <option value="">All Status</option>
@@ -43,9 +74,15 @@
                         <option value="overdue" {{ $statusFilter === 'overdue' ? 'selected' : '' }}>Overdue</option>
                         <option value="cancelled" {{ $statusFilter === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
                     </select>
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ request('from_date') }}" style="max-width: 170px;">
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ request('to_date') }}" style="max-width: 170px;">
+                    @if($periodFilter)
+                        <input type="hidden" name="period" value="{{ $periodFilter }}">
+                    @endif
                     <button type="submit" class="btn btn-sm btn-outline-primary">Filter</button>
-                    @if($search || $statusFilter)
-                        <a href="{{ route('admin.invoices.index') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
+                    <a href="{{ route('admin.invoices.index', request()->except(['page','from_date','to_date'])) }}" class="btn btn-sm btn-outline-secondary">Clear range</a>
+                    @if($search || $statusFilter || $periodFilter)
+                        <a href="{{ route('admin.invoices.index') }}" class="btn btn-sm btn-outline-secondary">Clear all</a>
                     @endif
                 </form>
                 <a href="{{ route('admin.invoices.create') }}" class="btn btn-primary btn-sm"><i class="fe fe-plus me-1"></i>New Invoice</a>
@@ -77,7 +114,7 @@
                                 </td>
                                 <td>{{ $invoice->invoice_date->format('M d, Y') }}</td>
                                 <td>{{ $invoice->due_date ? $invoice->due_date->format('M d, Y') : '—' }}</td>
-                                <td class="text-end">₦{{ number_format($invoice->total, 2) }}</td>
+                                <td class="text-end">₦{{ preg_match('/\.00$/', number_format($invoice->total, 2)) ? number_format($invoice->total, 0) : number_format($invoice->total, 2) }}</td>
                                 <td>
                                     @if($invoice->status === 'draft')
                                         <span class="badge bg-secondary">Draft</span>

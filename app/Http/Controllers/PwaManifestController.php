@@ -9,8 +9,11 @@ class PwaManifestController extends Controller
     public function __invoke(): JsonResponse
     {
         $pwa = config('pwa');
-        $iconPath = $pwa['icon'] ?? 'images/logo.png';
-        $iconUrl = asset($iconPath);
+        $iconFallback = $pwa['icon'] ?? 'images/logo.png';
+        $icon192Path = $pwa['icon_192'] ?? $iconFallback;
+        $icon512Path = $pwa['icon_512'] ?? $iconFallback;
+        $icon192Url = asset($icon192Path);
+        $icon512Url = asset($icon512Path);
 
         $root = url('/');
         $scopePath = parse_url($root, PHP_URL_PATH);
@@ -28,7 +31,7 @@ class PwaManifestController extends Controller
                 'url' => url($sc['path']),
                 'icons' => [
                     [
-                        'src' => $iconUrl,
+                        'src' => $icon192Url,
                         'sizes' => '192x192',
                         'type' => 'image/png',
                     ],
@@ -52,19 +55,19 @@ class PwaManifestController extends Controller
             'theme_color' => $pwa['theme_color'] ?? '#5b2c83',
             'icons' => [
                 [
-                    'src' => $iconUrl,
+                    'src' => $icon192Url,
                     'sizes' => '192x192',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => $iconUrl,
+                    'src' => $icon512Url,
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => $iconUrl,
+                    'src' => $icon512Url,
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'maskable',

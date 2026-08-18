@@ -22,21 +22,17 @@
     </style>
 </head>
 <body class="app sidebar-mini ltr">
-    <div id="global-loader">
-        <img src="{{ asset('sash/assets/images/loader.svg') }}" class="loader-img" alt="Loader">
-    </div>
-
     <div class="page">
         <div class="page-main">
             <div class="app-header header sticky">
                 <div class="container-fluid main-container">
                     <div class="d-flex">
                         <a aria-label="Hide Sidebar" class="app-sidebar__toggle" data-bs-toggle="sidebar" href="javascript:void(0)"></a>
-                        <a class="logo-horizontal" href="{{ url('/') }}">
+                        <a class="logo-horizontal" href="{{ route('shop') }}">
                             <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
                         </a>
                         <div class="main-header-center ms-3 d-none d-lg-block">
-                            <a href="{{ url('/') }}" class="btn btn-outline-primary btn-sm">Back to Shop</a>
+                            <a href="{{ route('shop') }}" class="btn btn-outline-primary btn-sm">Back to Shop</a>
                         </div>
                         <div class="d-flex order-lg-2 ms-auto header-right-icons">
                             <button class="navbar-toggler navresponsive-toggler d-lg-none ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent-4" aria-controls="navbarSupportedContent-4" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,7 +41,7 @@
                             <div class="navbar navbar-collapse responsive-navbar p-0">
                                 <div class="collapse navbar-collapse" id="navbarSupportedContent-4">
                                     <div class="d-flex order-lg-2">
-                                        <a class="nav-link icon text-center" href="{{ url('/') }}">
+                                        <a class="nav-link icon text-center" href="{{ route('shop') }}">
                                             <i class="fe fe-shopping-cart"></i><span class="badge bg-secondary header-badge">{{ $cartCount }}</span>
                                         </a>
                                         <div class="dropdown d-flex profile-1">
@@ -106,7 +102,7 @@
                         <ul class="side-menu">
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('dashboard') }}"><i class="side-menu__icon fe fe-grid"></i><span class="side-menu__label">Dashboard</span></a>

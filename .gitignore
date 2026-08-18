@@ -22,3 +22,19 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# safety: never upload secrets, deps, or bulky generated files
+.env.local
+/vendor/
+/node_modules/
+composer.phar
+*.sql
+*.zip
+.dart_tool/
+/build/
+.idea/
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies
+/storage/logs/*.log
+auth.json

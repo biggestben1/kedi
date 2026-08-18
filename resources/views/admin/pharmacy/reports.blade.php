@@ -1,14 +1,14 @@
 @extends('layouts.admin')
 
-@section('title', 'Pharmacy Reports')
+@section('title', 'Reports')
 
 @section('content')
     <div class="page-header d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div>
-            <h1 class="page-title">Pharmacy Reports</h1>
+            <h1 class="page-title">Reports</h1>
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('admin') }}">Admin</a></li>
-                <li class="breadcrumb-item"><a href="{{ route('admin.pharmacy.dashboard') }}">Pharmacy Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ route('admin.pharmacy.dashboard') }}">Dashboard</a></li>
                 <li class="breadcrumb-item active" aria-current="page">Reports</li>
             </ol>
         </div>
@@ -80,7 +80,7 @@
         </div>
     </div>
 
-    {{-- Tabs: Sales | Inventory | Purchase | Payment | P&L | Product Performance | Customer | Batch --}}
+    {{-- Tabs: Sales | Inventory | Purchase | Costs | Journal | Assets | Payment | P&L | Product Performance | Customer | Batch --}}
     <ul class="nav nav-tabs mb-3" id="reportTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales" type="button" role="tab">Sales</button>
@@ -90,6 +90,15 @@
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="purchase-tab" data-bs-toggle="tab" data-bs-target="#purchase" type="button" role="tab">Purchase</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="costs-tab" data-bs-toggle="tab" data-bs-target="#costs" type="button" role="tab">Costs</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="journal-tab" data-bs-toggle="tab" data-bs-target="#journal" type="button" role="tab">Journal</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="assets-tab" data-bs-toggle="tab" data-bs-target="#assets" type="button" role="tab">Assets</button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="payment-tab" data-bs-toggle="tab" data-bs-target="#payment" type="button" role="tab">Payment</button>
@@ -300,6 +309,159 @@
             </div>
         </div>
 
+        {{-- C2. Costs / Expenses --}}
+        <div class="tab-pane fade" id="costs" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Costs & Expenses</h3>
+                    <div class="small text-muted mt-1">Direct costs are tagged with cost_type = <code>direct</code>. Everything else is treated as operating expense.</div>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="border rounded p-3">
+                                <div class="text-muted small">Direct Costs (Date Range)</div>
+                                <div class="fs-5 fw-semibold">₦{{ number_format((float) ($directCostsPL ?? 0), 0) }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3">
+                                <div class="text-muted small">Operating Expenses (Date Range)</div>
+                                <div class="fs-5 fw-semibold">₦{{ number_format((float) ($operatingExpensesPL ?? 0), 0) }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3">
+                                <div class="text-muted small">Total (Date Range)</div>
+                                <div class="fs-5 fw-semibold">₦{{ number_format((float) (($directCostsPL ?? 0) + ($operatingExpensesPL ?? 0)), 0) }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th>Type</th>
+                                    <th class="text-end">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($expenditures as $e)
+                                    <tr>
+                                        <td>{{ $e->date?->format('M d, Y') ?? '—' }}</td>
+                                        <td>{{ $e->description }}</td>
+                                        <td>{{ $e->category ?? '—' }}</td>
+                                        <td>
+                                            @if(($e->cost_type ?? '') === 'direct')
+                                                <span class="badge bg-warning text-dark">Direct cost</span>
+                                            @else
+                                                <span class="badge bg-secondary">Expense</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end">₦{{ number_format((float) $e->amount, 0) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="5" class="text-center text-muted p-4">No costs/expenses in date range.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- C3. Journal --}}
+        <div class="tab-pane fade" id="journal" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Journal (Adjustments)</h3>
+                    <div class="small text-muted mt-1">For error correction, provisions and accruals (debit/credit entries).</div>
+                    <div class="mt-2">
+                        <a href="{{ route('admin.pharmacy.journal.index') }}" class="btn btn-sm btn-outline-primary">Open Journal Module</a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Reference</th>
+                                    <th>Type</th>
+                                    <th>Memo</th>
+                                    <th class="text-end">Total Debit</th>
+                                    <th class="text-end">Total Credit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($journalEntries as $je)
+                                    @php
+                                        $totalDebit = (float) $je->lines->sum('debit');
+                                        $totalCredit = (float) $je->lines->sum('credit');
+                                    @endphp
+                                    <tr>
+                                        <td>{{ $je->entry_date?->format('M d, Y') ?? '—' }}</td>
+                                        <td>{{ $je->reference ?? '—' }}</td>
+                                        <td>{{ $je->type ?? '—' }}</td>
+                                        <td>{{ \Illuminate\Support\Str::limit($je->memo ?? '', 80) }}</td>
+                                        <td class="text-end">₦{{ number_format($totalDebit, 0) }}</td>
+                                        <td class="text-end">₦{{ number_format($totalCredit, 0) }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="6" class="text-center text-muted p-4">No journal entries in date range.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- C4. Assets --}}
+        <div class="tab-pane fade" id="assets" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Assets Register</h3>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Asset</th>
+                                    <th>Category</th>
+                                    <th>Purchase Date</th>
+                                    <th class="text-end">Cost</th>
+                                    <th class="text-end">Accum. Depreciation</th>
+                                    <th class="text-end">Net Book Value</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($assets as $a)
+                                    <tr>
+                                        <td>{{ $a->name }}</td>
+                                        <td>{{ $a->category ?? '—' }}</td>
+                                        <td>{{ $a->purchase_date?->format('M d, Y') ?? '—' }}</td>
+                                        <td class="text-end">₦{{ number_format((float) $a->cost, 0) }}</td>
+                                        <td class="text-end">₦{{ number_format((float) $a->accumulated_depreciation, 0) }}</td>
+                                        <td class="text-end">₦{{ number_format((float) ($a->net_book_value ?? 0), 0) }}</td>
+                                        <td>{{ $a->status ?? '—' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="7" class="text-center text-muted p-4">No assets recorded yet.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {{-- D. Payment (placeholder) --}}
         <div class="tab-pane fade" id="payment" role="tabpanel">
             <div class="card">
@@ -316,8 +478,10 @@
                 <div class="card-body">
                     <table class="table table-bordered">
                         <tr><td>Total Sales</td><td class="text-end">₦{{ number_format($totalSalesPL, 0) }}</td></tr>
-                        <tr><td>Total Purchase Cost</td><td class="text-end">₦{{ number_format($totalCostPL, 0) }}</td></tr>
-                        <tr><td><strong>Net Profit</strong></td><td class="text-end text-success"><strong>₦{{ number_format($netProfitPL, 0) }}</strong></td></tr>
+                        <tr><td>COGS (Cost of Goods Sold)</td><td class="text-end">₦{{ number_format($totalCostPL, 0) }}</td></tr>
+                        <tr><td>Direct Costs (Other)</td><td class="text-end">₦{{ number_format((float) ($directCostsPL ?? 0), 0) }}</td></tr>
+                        <tr><td>Operating Expenses</td><td class="text-end">₦{{ number_format((float) ($operatingExpensesPL ?? 0), 0) }}</td></tr>
+                        <tr><td><strong>Net Profit</strong></td><td class="text-end {{ ($netProfitPL ?? 0) >= 0 ? 'text-success' : 'text-danger' }}"><strong>₦{{ number_format($netProfitPL, 0) }}</strong></td></tr>
                     </table>
                 </div>
             </div>

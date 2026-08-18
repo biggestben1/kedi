@@ -60,6 +60,17 @@
                 </div>
 
                 <div class="col-md-6">
+                    <label class="form-label">Warehouse (optional)</label>
+                    <select name="warehouse_id" class="form-select">
+                        <option value="">— Select warehouse —</option>
+                        @foreach($warehouses ?? [] as $w)
+                            <option value="{{ $w->id }}" {{ (string) old('warehouse_id', $product->warehouse_id) === (string) $w->id ? 'selected' : '' }}>{{ $w->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('warehouse_id')<div class="text-danger small">{{ $message }}</div>@enderror
+                </div>
+
+                <div class="col-md-6">
                     <label class="form-label">Pack size (optional)</label>
                     <input type="text" name="pack_size" class="form-control" value="{{ old('pack_size', $product->pack_size) }}" maxlength="100">
                     @error('pack_size')<div class="text-danger small">{{ $message }}</div>@enderror

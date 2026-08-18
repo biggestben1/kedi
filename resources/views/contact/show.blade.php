@@ -35,9 +35,6 @@
 </head>
 <body class="app sidebar-mini ltr">
     <div class="login-img">
-        <div id="global-loader">
-            <img src="{{ asset('sash/assets/images/loader.svg') }}" class="loader-img" alt="Loader">
-        </div>
         <div class="page">
             <div class="container-login100">
                 <div class="wrap-login100 p-6" style="max-width: 560px;">
@@ -92,7 +89,7 @@
                             @auth
                                 <a href="{{ route('dashboard') }}" class="text-primary">Back to Dashboard</a>
                             @else
-                                <a href="{{ url('/') }}" class="text-primary me-3">Back to Shop</a>
+                                <a href="{{ route('shop') }}" class="text-primary me-3">Back to Shop</a>
                                 <a href="{{ route('login') }}" class="text-primary">Sign In</a>
                             @endauth
                         </div>

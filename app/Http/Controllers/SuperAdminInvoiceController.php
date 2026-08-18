@@ -63,24 +63,44 @@ class SuperAdminInvoiceController extends Controller
                 ->all();
         }
 
-        $invoices = Invoice::with('user', 'order')
-            ->when($customerIds !== null, function ($q) use ($customerIds) {
-                $q->whereIn('user_id', $customerIds);
-            })
-            ->when($branchCustomerIds !== null, function ($q) use ($branchCustomerIds) {
-                $q->whereIn('user_id', $branchCustomerIds);
-            })
-            ->when($serviceCenterUserIds !== null, function ($q) use ($serviceCenterUserIds) {
-                $q->whereIn('user_id', $serviceCenterUserIds);
-            })
-            ->when($headquartersUserIds !== null, function ($q) use ($headquartersUserIds) {
-                $q->whereIn('user_id', $headquartersUserIds);
-            })
-            ->when($annexOwnInvoiceIds !== null, function ($q) use ($annexOwnInvoiceIds) {
-                $q->whereIn('user_id', $annexOwnInvoiceIds);
-            })
+        $applyUserInvoiceScope = function ($query) use ($customerIds, $branchCustomerIds, $serviceCenterUserIds, $headquartersUserIds, $annexOwnInvoiceIds) {
+            return $query
+                ->when($customerIds !== null, function ($q) use ($customerIds) {
+                    $q->whereIn('user_id', $customerIds);
+                })
+                ->when($branchCustomerIds !== null, function ($q) use ($branchCustomerIds) {
+                    $q->whereIn('user_id', $branchCustomerIds);
+                })
+                ->when($serviceCenterUserIds !== null, function ($q) use ($serviceCenterUserIds) {
+                    $q->whereIn('user_id', $serviceCenterUserIds);
+                })
+                ->when($headquartersUserIds !== null, function ($q) use ($headquartersUserIds) {
+                    $q->whereIn('user_id', $headquartersUserIds);
+                })
+                ->when($annexOwnInvoiceIds !== null, function ($q) use ($annexOwnInvoiceIds) {
+                    $q->whereIn('user_id', $annexOwnInvoiceIds);
+                });
+        };
+
+        $invoices = $applyUserInvoiceScope(Invoice::with('user', 'order'))
             ->when($request->query('status'), function ($q, $status) {
                 $q->where('status', $status);
+            })
+            ->when($request->query('period'), function ($q, $period) {
+                if ($period === 'today') {
+                    $q->whereDate('invoice_date', now()->toDateString());
+                } elseif ($period === 'month') {
+                    $q->whereYear('invoice_date', now()->year)
+                        ->whereMonth('invoice_date', now()->month);
+                } elseif ($period === 'year') {
+                    $q->whereYear('invoice_date', now()->year);
+                }
+            })
+            ->when($request->query('from_date'), function ($q, $fromDate) {
+                $q->whereDate('invoice_date', '>=', $fromDate);
+            })
+            ->when($request->query('to_date'), function ($q, $toDate) {
+                $q->whereDate('invoice_date', '<=', $toDate);
             })
             ->when($request->query('q'), function ($q, $search) {
                 $q->where(function ($query) use ($search) {
@@ -128,11 +148,63 @@ class SuperAdminInvoiceController extends Controller
             }
         }
 
+        // Compute status counts (before status filter applied)
+        $statusCountsQuery = $applyUserInvoiceScope(Invoice::query())
+            ->when($request->query('q'), function ($q, $search) {
+                $q->where(function ($query) use ($search) {
+                    $query->where('invoice_number', 'like', "%{$search}%")
+                        ->orWhere('customer_name', 'like', "%{$search}%")
+                        ->orWhere('customer_email', 'like', "%{$search}%");
+                });
+            })
+            ->whereIn('status', ['draft', 'sent', 'paid'])
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->toArray();
+
+        $periodCounts = [
+            'today' => $applyUserInvoiceScope(Invoice::query())
+                ->when($request->query('q'), function ($q, $search) {
+                    $q->where(function ($query) use ($search) {
+                        $query->where('invoice_number', 'like', "%{$search}%")
+                            ->orWhere('customer_name', 'like', "%{$search}%")
+                            ->orWhere('customer_email', 'like', "%{$search}%");
+                    });
+                })
+                ->whereDate('invoice_date', now()->toDateString())
+                ->count(),
+            'month' => $applyUserInvoiceScope(Invoice::query())
+                ->when($request->query('q'), function ($q, $search) {
+                    $q->where(function ($query) use ($search) {
+                        $query->where('invoice_number', 'like', "%{$search}%")
+                            ->orWhere('customer_name', 'like', "%{$search}%")
+                            ->orWhere('customer_email', 'like', "%{$search}%");
+                    });
+                })
+                ->whereYear('invoice_date', now()->year)
+                ->whereMonth('invoice_date', now()->month)
+                ->count(),
+            'year' => $applyUserInvoiceScope(Invoice::query())
+                ->when($request->query('q'), function ($q, $search) {
+                    $q->where(function ($query) use ($search) {
+                        $query->where('invoice_number', 'like', "%{$search}%")
+                            ->orWhere('customer_name', 'like', "%{$search}%")
+                            ->orWhere('customer_email', 'like', "%{$search}%");
+                    });
+                })
+                ->whereYear('invoice_date', now()->year)
+                ->count(),
+        ];
+
         return view('admin.invoices.index', [
             'invoices' => $invoices,
             'statusFilter' => $request->query('status'),
+            'periodFilter' => $request->query('period'),
             'search' => $request->query('q'),
             'invoiceIdsRequireApproval' => $invoiceIdsRequireApproval,
+            'statusCounts' => $statusCountsQuery,
+            'periodCounts' => $periodCounts,
         ]);
     }
 

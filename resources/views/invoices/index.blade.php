@@ -22,21 +22,17 @@
     </style>
 </head>
 <body class="app sidebar-mini ltr">
-    <div id="global-loader">
-        <img src="{{ asset('sash/assets/images/loader.svg') }}" class="loader-img" alt="Loader">
-    </div>
-
     <div class="page">
         <div class="page-main">
             <div class="app-header header sticky">
                 <div class="container-fluid main-container">
                     <div class="d-flex">
                         <a aria-label="Hide Sidebar" class="app-sidebar__toggle" data-bs-toggle="sidebar" href="javascript:void(0)"></a>
-                        <a class="logo-horizontal" href="{{ url('/') }}">
+                        <a class="logo-horizontal" href="{{ route('shop') }}">
                             <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img light-logo1" alt="{{ config('app.name') }}">
                         </a>
                         <div class="main-header-center ms-3 d-none d-lg-block">
-                            <a href="{{ url('/') }}" class="btn btn-outline-primary btn-sm">Back to Shop</a>
+                            <a href="{{ route('shop') }}" class="btn btn-outline-primary btn-sm">Back to Shop</a>
                         </div>
                         <div class="d-flex order-lg-2 ms-auto header-right-icons">
                             <button class="navbar-toggler navresponsive-toggler d-lg-none ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent-invoices" aria-controls="navbarSupportedContent-invoices" aria-expanded="false" aria-label="Toggle navigation">
@@ -45,7 +41,7 @@
                             <div class="navbar navbar-collapse responsive-navbar p-0">
                                 <div class="collapse navbar-collapse" id="navbarSupportedContent-invoices">
                                     <div class="d-flex order-lg-2">
-                                        <a class="nav-link icon text-center" href="{{ url('/') }}">
+                                        <a class="nav-link icon text-center" href="{{ route('shop') }}">
                                             <i class="fe fe-shopping-cart"></i><span class="badge bg-secondary header-badge">{{ $cartCount ?? 0 }}</span>
                                         </a>
                                         <div class="dropdown d-flex profile-1">
@@ -111,7 +107,7 @@
                         <ul class="side-menu">
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('dashboard') }}"><i class="side-menu__icon fe fe-grid"></i><span class="side-menu__label">Dashboard</span></a>
@@ -169,14 +165,37 @@
                 <div class="side-app">
                     <div class="main-container container-fluid">
                         <div class="page-header">
-                            <h1 class="page-title">My Invoices</h1>
-                            <div>
-                                <ol class="breadcrumb">
-                                    <li class="breadcrumb-item"><a href="{{ url('/') }}">Home</a></li>
-                                    <li class="breadcrumb-item active" aria-current="page">My Invoices</li>
-                                </ol>
+                            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+                                <div>
+                                    <h1 class="page-title mb-1">My Invoices</h1>
+                                    <ol class="breadcrumb mb-0">
+                                        <li class="breadcrumb-item"><a href="{{ url('/') }}">Home</a></li>
+                                        <li class="breadcrumb-item active" aria-current="page">My Invoices</li>
+                                    </ol>
+                                </div>
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <a href="{{ route('invoices.index', ['status' => 'draft']) }}" class="btn btn-lg btn-outline-primary d-inline-flex align-items-center">
+                                        Draft
+                                        <span class="badge bg-secondary ms-2">{{ (int) ($statusCounts['draft'] ?? 0) }}</span>
+                                    </a>
+                                    <a href="{{ route('invoices.index', ['status' => 'sent']) }}" class="btn btn-lg btn-outline-primary d-inline-flex align-items-center">
+                                        Sent
+                                        <span class="badge bg-warning text-dark ms-2">{{ (int) ($statusCounts['sent'] ?? 0) }}</span>
+                                    </a>
+                                    <a href="{{ route('invoices.index', ['status' => 'paid']) }}" class="btn btn-lg btn-outline-primary d-inline-flex align-items-center">
+                                        Paid
+                                        <span class="badge bg-success ms-2">{{ (int) ($statusCounts['paid'] ?? 0) }}</span>
+                                    </a>
+                                </div>
                             </div>
                         </div>
+
+                        @if(!empty($status))
+                            <div class="alert alert-info py-2">
+                                Showing invoices with status: <strong>{{ ucfirst($status) }}</strong>
+                                <a href="{{ route('invoices.index') }}" class="ms-2">Clear filter</a>
+                            </div>
+                        @endif
 
                         @if(session('success'))
                             <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -188,9 +207,9 @@
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title">Invoice History</h3>
-                                <div class="card-options">
+                                <div class="card-options d-flex align-items-center flex-wrap gap-2">
                                     <a href="{{ route('invoices.create') }}" class="btn btn-sm btn-success me-1"><i class="fe fe-plus me-1"></i>Create Invoice</a>
-                                    <a href="{{ url('/') }}" class="btn btn-sm btn-primary"><i class="fe fe-shopping-bag me-1"></i> Back to Shop</a>
+                                    <a href="{{ route('shop') }}" class="btn btn-sm btn-primary"><i class="fe fe-shopping-bag me-1"></i> Back to Shop</a>
                                 </div>
                             </div>
                             <div class="card-body p-0">
@@ -228,9 +247,16 @@
                                                             <span class="badge bg-warning text-dark">Cancelled</span>
                                                         @endif
                                                     </td>
-                                                    <td class="text-end">₦{{ number_format($invoice->total, 2) }}</td>
+                                                    <td class="text-end">₦{{ preg_match('/\.00$/', number_format($invoice->total, 2)) ? number_format($invoice->total, 0) : number_format($invoice->total, 2) }}</td>
                                                     <td>
+                                                        <a href="{{ route('invoices.show', $invoice) }}" class="btn btn-sm btn-outline-primary me-1" title="View"><i class="fe fe-eye me-1"></i>View</a>
+                                                        <a href="{{ route('invoices.edit', $invoice) }}" class="btn btn-sm btn-outline-warning me-1" title="Edit"><i class="fe fe-edit-2 me-1"></i>Edit</a>
                                                         <a href="{{ route('invoices.pdf', $invoice) }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" title="Download PDF"><i class="fe fe-download me-1"></i>PDF</a>
+                                                        <form action="{{ route('invoices.destroy', $invoice) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this invoice? This cannot be undone.');">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger ms-1" title="Delete"><i class="fe fe-trash-2 me-1"></i>Delete</button>
+                                                        </form>
                                                     </td>
                                                 </tr>
                                                 @endforeach

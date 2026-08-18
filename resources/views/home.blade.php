@@ -75,10 +75,6 @@
     </style>
 </head>
 <body class="app sidebar-mini ltr">
-    <div id="global-loader">
-        <img src="{{ asset('sash/assets/images/loader.svg') }}" class="loader-img" alt="Loader">
-    </div>
-
     <div class="page">
         <div class="page-main">
             <!-- app-Header -->
@@ -215,7 +211,7 @@
                 <div class="app-sidebar__overlay" data-bs-toggle="sidebar"></div>
                 <div class="app-sidebar">
                     <div class="side-header">
-                        <a class="header-brand1" href="{{ url('/') }}">
+                        <a class="header-brand1" href="{{ route('shop') }}">
                             <img src="{{ asset('images/logo.png') }}?v=3" class="header-brand-img light-logo1" alt="{{ config('app.name') }}" onerror="this.onerror=null;this.src='{{ asset('sash/assets/images/brand/logo.png') }}?v=3';">
                         </a>
                     </div>
@@ -224,7 +220,7 @@
                         <ul class="side-menu">
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ url('/') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('blog.index') }}"><i class="side-menu__icon fe fe-book-open"></i><span class="side-menu__label">Community blog</span></a>

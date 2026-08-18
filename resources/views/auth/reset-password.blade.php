@@ -32,10 +32,6 @@
 <body class="app sidebar-mini ltr">
 
     <div class="login-img">
-        <div id="global-loader">
-            <img src="{{ asset('sash/assets/images/loader.svg') }}" class="loader-img" alt="Loader">
-        </div>
-
         <div class="page">
             <div class="">
                 <div class="col col-login mx-auto mt-7">
@@ -108,7 +104,6 @@
     <script src="{{ asset('sash/assets/js/show-password.min.js') }}"></script>
     <script src="{{ asset('sash/assets/js/themeColors.js') }}"></script>
     <script src="{{ asset('sash/assets/js/custom.js') }}"></script>
-    <script>document.addEventListener('DOMContentLoaded', function() { document.getElementById('global-loader') && (document.getElementById('global-loader').style.display = 'none'); });</script>
     @include('partials.pwa-scripts')
 </body>
 

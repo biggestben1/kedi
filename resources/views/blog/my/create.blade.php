@@ -35,6 +35,13 @@
                     <small class="text-muted">Max size: 2MB. Recommended ratio: 16:9.</small>
                 </div>
             </div>
+            <div class="row mb-4">
+                <label class="col-md-3 form-label" for="blog-youtube-url">YouTube link <span class="text-muted">(optional)</span></label>
+                <div class="col-md-9">
+                    <input type="url" name="youtube_url" id="blog-youtube-url" class="form-control" value="{{ old('youtube_url') }}" placeholder="https://www.youtube.com/watch?v=..." maxlength="500">
+                    <small class="text-muted">Upload your video to YouTube, then paste the link here (saves server space).</small>
+                </div>
+            </div>
             <!-- Same layout as public/sash/html/add-product.html — Product Description -->
             <div class="row">
                 <label class="col-md-3 form-label mb-4">Post description :</label>

@@ -113,6 +113,10 @@
                             <th>Phone</th>
                             <th>Role</th>
                             <th class="text-end">DPBV</th>
+                            @if(($roleFilter ?? '') === 'service_center')
+                                <th class="text-end">Wallet</th>
+                                <th class="text-end">Kedi Credit</th>
+                            @endif
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
@@ -124,6 +128,10 @@
                                 <td>{{ $user->phone ?? '—' }}</td>
                                 <td>{{ $user->role?->display_name ?? '—' }}</td>
                                 <td class="text-end">{{ $user->dpbv_collections_sum_dpbv ? number_format($user->dpbv_collections_sum_dpbv, 2) : '—' }}</td>
+                                @if(($roleFilter ?? '') === 'service_center')
+                                    <td class="text-end fw-semibold">₦{{ number_format((float) ($user->wallet_balance ?? 0), 2) }}</td>
+                                    <td class="text-end fw-semibold">₦{{ number_format((float) ($user->kedi_credit_balance ?? 0), 2) }}</td>
+                                @endif
                                 <td class="text-end">
                                     @if(isset($roleFilter) && $roleFilter === 'reseller')
                                         <a href="{{ route('admin.users.index', ['role' => 'customer', 'created_by' => $user->id]) }}" class="btn btn-sm btn-outline-info">Customers</a>
@@ -135,6 +143,10 @@
                                     @if(auth()->user()->isSuperAdmin())
                                         <a href="{{ route('admin.users.transfer', $user) }}" class="btn btn-sm btn-outline-warning">Transfer</a>
                                     @endif
+                                    @if(($roleFilter ?? '') === 'service_center')
+                                        <a href="{{ route('admin.accountant.wallet.user-transactions', $user) }}" class="btn btn-sm btn-outline-success">Wallet</a>
+                                        <a href="{{ route('admin.kd.service-centers.credit.form', $user) }}" class="btn btn-sm btn-outline-primary">Add Credit</a>
+                                    @endif
                                     <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                                     <form action="{{ route('admin.users.destroy', $user) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this user?');">
                                         @csrf
@@ -145,7 +157,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ auth()->user()->role?->name === 'reseller' ? 6 : 5 }}" class="text-center text-muted p-4">No users found.</td>
+                                <td colspan="{{ ($roleFilter ?? '') === 'service_center' ? 8 : (auth()->user()->role?->name === 'reseller' ? 6 : 5) }}" class="text-center text-muted p-4">No users found.</td>
                             </tr>
                         @endforelse
                     </tbody>

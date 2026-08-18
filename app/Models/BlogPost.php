@@ -17,6 +17,7 @@ class BlogPost extends Model
         'slug',
         'body',
         'image',
+        'youtube_url',
         'is_published',
         'published_at',
     ];
@@ -126,5 +127,47 @@ class BlogPost extends Model
         return Storage::disk('public')->exists($path)
             ? url('api/v1/storage/' . ltrim($path, '/'))
             : null;
+    }
+
+    public function getYoutubeEmbedUrlAttribute(): ?string
+    {
+        $raw = trim((string) ($this->youtube_url ?? ''));
+        if ($raw === '') {
+            return null;
+        }
+
+        $u = parse_url($raw);
+        if (! is_array($u)) {
+            return null;
+        }
+
+        $host = strtolower($u['host'] ?? '');
+        $path = (string) ($u['path'] ?? '');
+        $query = (string) ($u['query'] ?? '');
+
+        $id = null;
+        if ($host === 'youtu.be') {
+            $id = ltrim($path, '/');
+        } elseif (str_ends_with($host, 'youtube.com')) {
+            if ($path === '/watch') {
+                parse_str($query, $q);
+                $id = $q['v'] ?? null;
+            } elseif (str_starts_with($path, '/shorts/')) {
+                $id = trim(substr($path, strlen('/shorts/')), '/');
+            } elseif (str_starts_with($path, '/embed/')) {
+                $id = trim(substr($path, strlen('/embed/')), '/');
+            }
+        }
+
+        $id = is_string($id) ? trim($id) : null;
+        if (! $id) {
+            return null;
+        }
+        // Very small sanity check: YouTube IDs are typically 11 chars, but allow longer to be safe.
+        if (! preg_match('/^[a-zA-Z0-9_-]{6,}$/', $id)) {
+            return null;
+        }
+
+        return 'https://www.youtube-nocookie.com/embed/'.$id;
     }
 }

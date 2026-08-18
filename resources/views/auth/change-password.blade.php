@@ -32,10 +32,6 @@
 <body class="app sidebar-mini ltr">
 
     <div class="login-img">
-        <div id="global-loader">
-            <img src="{{ asset('sash/assets/images/loader.svg') }}" class="loader-img" alt="Loader">
-        </div>
-
         <div class="page">
             <div class="">
                 <div class="col col-login mx-auto mt-7">

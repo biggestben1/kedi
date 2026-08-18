@@ -55,6 +55,17 @@
             </div>
             <div class="card-body">
                 <h3 class="mb-3"><a href="javascript:void(0);" class="text-dark text-decoration-none">{{ $post->title }}</a></h3>
+                @if($post->youtube_embed_url)
+                    <div class="mb-4 ratio ratio-16x9 rounded-3 overflow-hidden border">
+                        <iframe
+                            src="{{ $post->youtube_embed_url }}"
+                            title="{{ $post->title }}"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowfullscreen
+                            loading="lazy"
+                            referrerpolicy="strict-origin-when-cross-origin"></iframe>
+                    </div>
+                @endif
                 <div class="richText blog-rich-readonly">
                     <div class="richText-editor">
                         @if($looksLikeHtml)

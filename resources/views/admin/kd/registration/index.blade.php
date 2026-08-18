@@ -1,15 +1,14 @@
 @extends('layouts.admin')
 
-@section('title', 'KD Registrations')
+@section('title', 'Service Centers')
 
 @section('content')
     <div class="page-header">
-        <h1 class="page-title">KD Registrations</h1>
+        <h1 class="page-title">Service Centers</h1>
         <div>
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('admin') }}">Admin</a></li>
-                <li class="breadcrumb-item"><a href="{{ route('admin.kd.index') }}">Borrow</a></li>
-                <li class="breadcrumb-item active" aria-current="page">KD Registrations</li>
+                <li class="breadcrumb-item active" aria-current="page">Service Centers</li>
             </ol>
         </div>
     </div>
@@ -23,18 +22,21 @@
 
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div class="d-flex align-items-center gap-2">
-                <h3 class="card-title mb-0">All KD Registrations</h3>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h3 class="card-title mb-0">All Service Centers</h3>
                 <form method="GET" class="d-flex gap-2 align-items-center">
-                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search KD NO, name, phone..." value="{{ $search ?? '' }}" style="width:250px">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search name, email, phone, SC code..." value="{{ $search ?? '' }}" style="width:280px">
                     <button type="submit" class="btn btn-sm btn-outline-secondary">Search</button>
                     @if($search ?? '')
                         <a href="{{ route('admin.kd.registration.index') }}" class="btn btn-sm btn-outline-secondary">Clear</a>
                     @endif
                 </form>
+                <a href="{{ route('admin.kd.credit-owners') }}" class="btn btn-sm btn-outline-primary">
+                    <i class="fe fe-users me-1"></i>Who is owning
+                </a>
             </div>
-            <a href="{{ route('admin.kd.registration.create') }}" class="btn btn-primary">
-                <i class="fe fe-plus me-2"></i>New Registration
+            <a href="{{ route('admin.users.index', ['role' => 'service_center']) }}" class="btn btn-primary">
+                <i class="fe fe-users me-2"></i>Manage Service Centers
             </a>
         </div>
         <div class="card-body p-0">
@@ -42,56 +44,40 @@
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
-                            <th>KD NO</th>
-                            <th>Full Name</th>
-                            <th>Gender</th>
-                            <th>State</th>
+                            <th>Name</th>
+                            <th>Email</th>
                             <th>Phone</th>
-                            <th>Sponsor</th>
-                            <th>Registration Date</th>
-                            <th>Registered By</th>
+                            <th>Service Center Code</th>
+                            <th class="text-end">Wallet</th>
+                            <th class="text-end">Kedi Credit</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($registrations as $reg)
+                        @forelse($serviceCenters as $sc)
                             <tr>
-                                <td><strong>{{ $reg->kd_no }}</strong></td>
-                                <td>{{ $reg->full_name }}</td>
-                                <td>{{ $reg->gender }}</td>
-                                <td>{{ $reg->state }}</td>
-                                <td>{{ $reg->phone_number }}</td>
-                                <td>
-                                    <small>{{ $reg->sponsor_kd_no }}</small><br>
-                                    <small class="text-muted">{{ $reg->sponsor_name }}</small>
-                                </td>
-                                <td>{{ $reg->registration_date->format('Y-m-d') }}</td>
-                                <td>
-                                    @if($reg->registeredBy)
-                                        {{ $reg->registeredBy->name }}
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
+                                <td class="fw-semibold">{{ $sc->name }}</td>
+                                <td>{{ $sc->email }}</td>
+                                <td>{{ $sc->phone ?? '—' }}</td>
+                                <td>{{ $sc->service_center_code ?? '—' }}</td>
+                                <td class="text-end fw-semibold">₦{{ number_format((float) ($sc->wallet_balance ?? 0), 2) }}</td>
+                                <td class="text-end fw-semibold">₦{{ number_format((float) ($sc->kedi_credit_balance ?? 0), 2) }}</td>
                                 <td class="text-end">
-                                    <a href="{{ route('admin.kd.registration.show', $reg) }}" class="btn btn-sm btn-outline-primary">View</a>
-                                    <a href="{{ route('admin.kd.registration.edit', $reg) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
-                                    <form action="{{ route('admin.kd.registration.destroy', $reg) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this registration?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
-                                    </form>
+                                    <a href="{{ route('admin.kd.service-centers.credit.form', $sc) }}" class="btn btn-sm btn-primary">
+                                        <i class="fe fe-plus-circle me-1"></i>Add Credit
+                                    </a>
+                                    <a href="{{ route('admin.users.edit', $sc) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="text-center text-muted p-4">No registrations found. <a href="{{ route('admin.kd.registration.create') }}">Create one</a>.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted p-4">No Service Centers found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
-        @if($registrations->hasPages())
-            <div class="card-footer">{{ $registrations->links() }}</div>
+        @if(($serviceCenters ?? null) && $serviceCenters->hasPages())
+            <div class="card-footer">{{ $serviceCenters->links() }}</div>
         @endif
     </div>
 @endsection

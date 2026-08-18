@@ -6,7 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="{{ ($isHybridApp ?? false) ? 'black-translucent' : 'default' }}">
 <meta name="apple-mobile-web-app-title" content="{{ $pwa['short_name'] ?? config('app.name') }}">
-<link rel="apple-touch-icon" href="{{ asset($pwa['icon'] ?? 'images/logo.png') }}?v=3">
+@php($pwaAppleIcon = $pwa['icon_192'] ?? ($pwa['icon'] ?? 'images/logo.png'))
+<link rel="apple-touch-icon" href="{{ asset($pwaAppleIcon) }}?v={{ config('pwa.sw_version', '1') }}">
 @if($isHybridApp ?? false)
 <meta name="format-detection" content="telephone=no">
 <meta name="msapplication-tap-highlight" content="no">

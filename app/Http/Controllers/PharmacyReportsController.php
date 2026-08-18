@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Expenditure;
+use App\Models\Asset;
+use App\Models\JournalEntry;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -216,7 +219,26 @@ class PharmacyReportsController extends Controller
                 $totalCostPL += $cost * $item->quantity;
             }
         }
-        $netProfitPL = $totalSalesPL - $totalCostPL;
+        // Costs & expenses (Expenditures)
+        $expenditures = Expenditure::query()
+            ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
+            ->orderByDesc('date')
+            ->limit(500)
+            ->get();
+        $directCosts = $expenditures->where('cost_type', 'direct')->sum('amount');
+        $operatingExpenses = $expenditures->where('cost_type', '!=', 'direct')->sum('amount');
+
+        // Net Profit = Sales - COGS - Direct Costs - Operating Expenses
+        $netProfitPL = $totalSalesPL - $totalCostPL - $directCosts - $operatingExpenses;
+
+        // Assets & Journal
+        $assets = Asset::query()->orderBy('name')->limit(500)->get();
+        $journalEntries = JournalEntry::query()
+            ->with('lines')
+            ->whereBetween('entry_date', [$from->toDateString(), $to->toDateString()])
+            ->orderByDesc('entry_date')
+            ->limit(200)
+            ->get();
 
         $categories = Category::orderBy('name')->get();
         $products = Product::orderBy('name')->get(['id', 'name', 'item_code']);
@@ -255,8 +277,13 @@ class PharmacyReportsController extends Controller
             'customerReport' => $customerReport,
             'totalSalesPL' => $totalSalesPL,
             'totalCostPL' => $totalCostPL,
+            'directCostsPL' => $directCosts,
+            'operatingExpensesPL' => $operatingExpenses,
             'netProfitPL' => $netProfitPL,
             'purchaseReportLines' => $purchaseReportLines,
+            'expenditures' => $expenditures,
+            'assets' => $assets,
+            'journalEntries' => $journalEntries,
         ]);
     }
 

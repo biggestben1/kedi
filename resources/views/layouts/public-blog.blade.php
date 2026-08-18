@@ -24,23 +24,20 @@
     @stack('styles')
 </head>
 <body class="app sidebar-mini ltr public-blog-page">
-    <div id="global-loader">
-        <img src="{{ asset('sash/assets/images/loader.svg') }}" class="loader-img" alt="Loader">
-    </div>
     <div class="page">
         <div class="page-main">
             <div class="app-header header sticky">
                 <div class="container-fluid main-container">
                     <div class="d-flex align-items-center w-100 py-2">
-                        <a class="me-3" href="{{ url('/') }}">
+                        <a class="me-3" href="{{ route('shop') }}">
                             <img src="{{ asset('images/logo.png') . '?v=3' }}" alt="{{ config('app.name') }}" style="max-height: 44px;">
                         </a>
                         <div class="ms-auto d-flex align-items-center gap-2 flex-wrap">
                             <a href="{{ route('blog.index') }}" class="btn btn-sm btn-outline-primary">Community blog</a>
-                            <a href="{{ url('/') }}" class="btn btn-sm btn-outline-secondary">Shop</a>
+                            <a href="{{ route('shop') }}" class="btn btn-sm btn-outline-secondary">Shop</a>
                             @auth
                                 <a href="{{ route('my-blog.index') }}" class="btn btn-sm btn-outline-secondary">My blog</a>
-                                <a class="nav-link icon text-center" href="{{ url('/') }}">
+                                <a class="nav-link icon text-center" href="{{ route('shop') }}">
                                     <i class="fe fe-shopping-cart"></i><span class="badge bg-secondary header-badge">{{ $cartCount }}</span>
                                 </a>
                                 <a href="{{ route('dashboard') }}" class="btn btn-sm btn-primary">Dashboard</a>

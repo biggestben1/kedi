@@ -24,7 +24,12 @@ return [
     /*
     | Icon paths are under public/ (same as asset()).
     */
+    // Backward-compatible single icon (used as fallback)
     'icon' => env('PWA_ICON', 'images/logo.png'),
+
+    // Recommended: dedicated square PNGs for PWA install icons
+    'icon_192' => env('PWA_ICON_192', 'images/pwa/icon-192.png'),
+    'icon_512' => env('PWA_ICON_512', 'images/pwa/icon-512.png'),
 
     /*
     | Service worker cache version — bump when you change public/sw.js

@@ -46,4 +46,10 @@ class SuperAdminSupplierController extends Controller
         $supplier->update($data);
         return redirect()->route('admin.suppliers.index')->with('success', 'Supplier updated.');
     }
+
+    public function destroy(Supplier $supplier)
+    {
+        $supplier->delete();
+        return redirect()->route('admin.suppliers.index')->with('success', 'Supplier deleted.');
+    }
 }

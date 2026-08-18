@@ -14,6 +14,7 @@ class Product extends Model
 
     protected $fillable = [
         'category_id',
+        'warehouse_id',
         'item_code',
         'name',
         'pack_size',
@@ -104,6 +105,11 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function warehouse()
+    {
+        return $this->belongsTo(Warehouse::class);
     }
 
     /** Full URL for the product image (served via API to avoid 403 on direct storage). */

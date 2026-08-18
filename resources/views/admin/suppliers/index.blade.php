@@ -43,8 +43,16 @@
                                 <td>{{ $s->name }}</td>
                                 <td>{{ $s->email ?? '—' }}</td>
                                 <td>{{ $s->phone ?? '—' }}</td>
-                                <td>{{ Str::limit($s->address, 40) ?? '—' }}</td>
-                                <td><a href="{{ route('admin.suppliers.edit', $s) }}" class="btn btn-sm btn-outline-primary">Edit</a></td>
+                                <td>{{ $s->address ? Str::limit($s->address, 40) : '—' }}</td>
+                                <td class="text-end">
+                                    <a href="{{ route('admin.suppliers.edit', $s) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    <form action="{{ route('admin.suppliers.destroy', $s) }}" method="POST" class="d-inline"
+                                        onsubmit="return confirm('Delete this supplier?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                    </form>
+                                </td>
                             </tr>
                         @empty
                             <tr><td colspan="5" class="text-center text-muted p-4">No suppliers. <a href="{{ route('admin.suppliers.create') }}">Add one</a>.</td></tr>

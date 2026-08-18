@@ -8,6 +8,8 @@ use App\Models\KdRegistration;
 use App\Models\KdRegistrationCredit;
 use App\Models\KediKitItem;
 use App\Models\KediKitPurchase;
+use App\Models\KediCreditTransaction;
+use App\Models\Role;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Http\Request;
@@ -30,42 +32,31 @@ class KdRegistrationController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        $roleName = $user->role->name ?? '';
-
-        $query = KdRegistration::with(['user', 'registeredBy']);
-
-        // Super Admin and Super Admin Accountant can see all registrations
-        // Other users can only see registrations they created
-        $isSuperAdmin = $roleName === 'super_admin';
-
-        // Check if accountant was created by Super Admin
-        $isSuperAdminAccountant = false;
-        if ($roleName === 'accountant' && $user->created_by_user_id) {
-            $createdBy = User::with('role')->find($user->created_by_user_id);
-            $isSuperAdminAccountant = $createdBy && $createdBy->role && $createdBy->role->name === 'super_admin';
-        }
-
-        if (! $isSuperAdmin && ! $isSuperAdminAccountant) {
-            // Filter to show only registrations created by this user
-            $query->where('registered_by_user_id', $user->id);
-        }
+        // Requirement: show Service Center users from users table (not kd_registrations).
+        $query = User::query()
+            ->with('role')
+            ->whereHas('role', function ($q) {
+                $q->where('name', Role::SERVICE_CENTER);
+            });
 
         if ($request->filled('search')) {
-            $search = $request->query('search');
+            $search = trim((string) $request->query('search'));
             $query->where(function ($q) use ($search) {
-                $q->where('kd_no', 'like', '%'.$search.'%')
-                    ->orWhere('full_name', 'like', '%'.$search.'%')
-                    ->orWhere('phone_number', 'like', '%'.$search.'%')
-                    ->orWhere('sponsor_kd_no', 'like', '%'.$search.'%')
-                    ->orWhere('sponsor_name', 'like', '%'.$search.'%');
+                $q->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%')
+                    ->orWhere('phone', 'like', '%'.$search.'%')
+                    ->orWhere('service_center_code', 'like', '%'.$search.'%')
+                    ->orWhere('kid', 'like', '%'.$search.'%');
             });
         }
 
-        $registrations = $query->orderByDesc('created_at')->paginate(50)->withQueryString();
+        $serviceCenters = $query
+            ->orderBy('name')
+            ->paginate(50)
+            ->withQueryString();
 
         return view('admin.kd.registration.index', [
-            'registrations' => $registrations,
+            'serviceCenters' => $serviceCenters,
             'search' => $request->query('search'),
         ]);
     }
@@ -406,6 +397,98 @@ class KdRegistrationController extends Controller
 
             return back()->withInput()
                 ->with('error', 'Failed to add credit transaction: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Report: Service Centers that currently have Kedi Credit.
+     */
+    public function creditOwners(Request $request)
+    {
+        $query = User::query()
+            ->with('role')
+            ->whereHas('role', function ($q) {
+                $q->where('name', Role::SERVICE_CENTER);
+            });
+
+        if ($request->filled('search')) {
+            $search = $request->query('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('email', 'like', '%'.$search.'%')
+                    ->orWhere('phone', 'like', '%'.$search.'%')
+                    ->orWhere('service_center_code', 'like', '%'.$search.'%');
+            });
+        }
+
+        $min = (float) $request->query('min', 0.01);
+        $query->where('kedi_credit_balance', '>=', $min);
+
+        $owners = $query
+            ->orderByDesc('kedi_credit_balance')
+            ->orderByDesc('created_at')
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('admin.kd.credit-owners', [
+            'owners' => $owners,
+            'search' => $request->query('search'),
+            'min' => $min,
+        ]);
+    }
+
+    public function addCreditForServiceCenterForm(Request $request, User $user)
+    {
+        $user->loadMissing('role');
+        abort_unless($user->role?->name === Role::SERVICE_CENTER, 404);
+
+        return view('admin.kd.add-credit-service-center', [
+            'serviceCenter' => $user,
+            'currentBalance' => (float) ($user->kedi_credit_balance ?? 0),
+        ]);
+    }
+
+    public function addCreditForServiceCenter(Request $request, User $user)
+    {
+        $user->loadMissing('role');
+        abort_unless($user->role?->name === Role::SERVICE_CENTER, 404);
+
+        $validated = $request->validate([
+            'type' => 'required|in:credit,debit',
+            'amount' => 'required|numeric|min:0.01',
+            'reference' => 'nullable|string|max:255',
+            'notes' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $amount = (float) $validated['amount'];
+            $currentBalance = (float) ($user->fresh()->kedi_credit_balance ?? 0);
+            $newBalance = $validated['type'] === KediCreditTransaction::TYPE_CREDIT
+                ? $currentBalance + $amount
+                : $currentBalance - $amount;
+
+            $user->kedi_credit_balance = $newBalance;
+            $user->save();
+
+            KediCreditTransaction::create([
+                'user_id' => $user->id,
+                'type' => $validated['type'],
+                'amount' => $amount,
+                'balance_after' => $newBalance,
+                'reference' => $validated['reference'] ?? ('Service Center: '.($user->service_center_code ?: $user->email)),
+                'notes' => $validated['notes'] ?? null,
+                'created_by_user_id' => $request->user()->id,
+            ]);
+
+            DB::commit();
+
+            return redirect()
+                ->route('admin.kd.registration.index', ['search' => $user->service_center_code ?: $user->email])
+                ->with('success', 'Credit updated for '.$user->name.'. New balance: ₦'.number_format($newBalance, 2));
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', 'Failed: '.$e->getMessage());
         }
     }
 }

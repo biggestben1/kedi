@@ -87,11 +87,14 @@
                 <label class="form-label text-muted small">Bill To</label>
                 <div class="border rounded p-3 bg-light">
                     @if($invoice->customer_name)<strong>{{ $invoice->customer_name }}</strong><br>@endif
+                    @if($invoice->sc_referral_code)
+                        <strong>Service Center Referral Code:</strong> {{ $invoice->sc_referral_code }}<br>
+                    @endif
                     @if($invoice->customer_email){{ $invoice->customer_email }}<br>@endif
                     @if($invoice->customer_phone){{ $invoice->customer_phone }}<br>@endif
                     @if($invoice->user?->kid)<strong>Kid:</strong> {{ $invoice->user->kid }}<br>@endif
                     @if($invoice->customer_address){!! nl2br(e($invoice->customer_address)) !!}@endif
-                    @if(!$invoice->customer_name && !$invoice->customer_email && !$invoice->customer_phone && !$invoice->customer_address)
+                    @if(!$invoice->customer_name && !$invoice->sc_referral_code && !$invoice->customer_email && !$invoice->customer_phone && !$invoice->customer_address)
                         <span class="text-muted">—</span>
                     @endif
                 </div>

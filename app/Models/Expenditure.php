@@ -11,6 +11,7 @@ class Expenditure extends Model
         'description',
         'amount',
         'category',
+        'cost_type',
         'notes',
         'created_by',
     ];

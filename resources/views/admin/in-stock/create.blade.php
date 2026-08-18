@@ -29,7 +29,15 @@
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Factory Name</label>
-                        <input type="text" name="factory_name" class="form-control" value="{{ old('factory_name') }}" placeholder="Optional">
+                        <select name="factory_name" class="form-select">
+                            <option value="">— Select supplier (optional) —</option>
+                            @foreach($suppliers as $s)
+                                <option value="{{ $s->name }}" {{ old('factory_name') === $s->name ? 'selected' : '' }}>{{ $s->name }}</option>
+                            @endforeach
+                            @if(old('factory_name') && ! $suppliers->contains('name', old('factory_name')))
+                                <option value="{{ old('factory_name') }}" selected>{{ old('factory_name') }}</option>
+                            @endif
+                        </select>
                         @error('factory_name')<div class="text-danger small">{{ $message }}</div>@enderror
                     </div>
                     <div class="col-md-3">
