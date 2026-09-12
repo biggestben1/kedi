@@ -77,7 +77,8 @@ Route::get('/sw.js', function () {
 
     return response()->file($path, [
         'Content-Type' => 'application/javascript; charset=UTF-8',
-        'Cache-Control' => 'no-store, no-cache, must-revalidate',
+        // Allow caching, but still permit quick updates via ?v=...
+        'Cache-Control' => 'public, max-age=3600',
     ]);
 })->name('pwa.sw');
 
