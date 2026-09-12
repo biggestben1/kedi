@@ -23,7 +23,7 @@
     <div class="header">
         <div>
             <h1>Order Receipt</h1>
-            <p class="meta">Order #: {{ $order->invoice_number ?? 'ORD-' . $order->id }} | Date: {{ $order->created_at->format('M d, Y H:i') }} | Payment: {{ $order->payment_method === 'wallet' ? 'Wallet' : 'Pay on Delivery' }}</p>
+            <p class="meta">Order #: {{ $order->invoice_number ?? 'ORD-' . $order->id }} | Date: {{ $order->created_at->format('M d, Y H:i') }} | Payment: {{ $order->paymentLabel() }}</p>
             <p class="meta">KD NO: {{ $order->kd_id ?? '—' }} | Customer Name: {{ $order->customer_name ?? '—' }}</p>
         </div>
         <div class="text-end">

@@ -141,8 +141,10 @@
                                 <span class="badge bg-info">Wallet</span>
                             @elseif($order->payment_method === 'dpbv')
                                 <span class="badge bg-purple" style="background:#6f42c1;">DPBV</span>
+                            @elseif($order->payment_method === 'split')
+                                <span class="badge bg-primary">Split</span>
                             @else
-                                <span class="badge bg-secondary">Pay on Delivery</span>
+                                <span class="badge bg-secondary">{{ $order->paymentLabel() }}</span>
                             @endif
                         </p>
                     </div>

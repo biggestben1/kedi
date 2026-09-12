@@ -21,6 +21,9 @@ class Order extends Model
         'total_bv',
         'total_pv',
         'payment_method',
+        'pos_amount_paid',
+        'payment_breakdown',
+        'stock_deducted_at',
         'status',
         'delivered_at',
         'packed_at',
@@ -56,7 +59,24 @@ class Order extends Model
             'delivered_at' => 'datetime',
             'packed_at' => 'datetime',
             'shipped_at' => 'datetime',
+            'pos_amount_paid' => 'decimal:2',
+            'payment_breakdown' => 'array',
+            'stock_deducted_at' => 'datetime',
         ];
+    }
+
+    public function paymentLabel(): string
+    {
+        return match ($this->payment_method) {
+            self::PAYMENT_WALLET => 'Wallet',
+            self::PAYMENT_DPBV => 'DPBV',
+            'kd_credit' => 'KD Credit',
+            'split' => 'Split',
+            'cash' => 'Cash',
+            'cheque' => 'Cheque',
+            'transfer' => 'Transfer',
+            default => 'Pay on Delivery',
+        };
     }
 
     public function isDelivered(): bool

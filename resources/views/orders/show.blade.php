@@ -229,7 +229,16 @@
                                             <p class="mb-3"><span class="badge bg-secondary fs-12">Not delivered</span></p>
                                         @endif
                                         <p class="mb-1"><strong>Order date</strong><br>{{ $order->created_at->format('l, F j, Y \a\t g:i A') }}</p>
-                                        <p class="mb-1"><strong>Payment</strong><br>{{ $order->payment_method === 'wallet' ? 'Wallet' : 'Pay on Delivery' }}</p>
+                                        <p class="mb-1"><strong>Payment</strong><br>{{ $order->paymentLabel() }}</p>
+                                        @if(is_array($order->payment_breakdown) && $order->payment_method === 'split')
+                                            <ul class="small text-muted ps-3 mb-2">
+                                                @foreach(['wallet' => 'Wallet', 'kd_credit' => 'KD Credit', 'dpbv' => 'DPBV', 'cash' => 'Cash', 'cheque' => 'Cheque', 'pos' => 'POS', 'bank' => 'Bank'] as $key => $label)
+                                                    @if((float) ($order->payment_breakdown[$key] ?? 0) > 0)
+                                                        <li>{{ $label }}: ₦{{ number_format($order->payment_breakdown[$key], 2) }}</li>
+                                                    @endif
+                                                @endforeach
+                                            </ul>
+                                        @endif
                                         @if($order->shipping_address || $order->shipping_phone)
                                         <p class="mb-1 mt-2"><strong>Shipping address</strong><br>
                                             @if($order->shipping_address){{ $order->shipping_address }}<br>@endif

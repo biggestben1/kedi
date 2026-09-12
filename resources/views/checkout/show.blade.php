@@ -272,6 +272,19 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div style="display:none;">
+                                        <input type="hidden" name="payment_method" id="payment_method_hidden" value="{{ old('payment_method', 'pay_on_delivery') }}">
+                                        <input type="checkbox" id="split-payment-toggle" name="split_payment" value="1" {{ old('split_payment') ? 'checked' : '' }}>
+                                        <input type="number" step="0.01" min="0" name="pos_amount_paid" id="pos_amount_paid_hidden" value="{{ old('pos_amount_paid') }}">
+                                        <input type="number" step="0.01" min="0" name="bank_amount_paid" id="bank_amount_paid_hidden" value="{{ old('bank_amount_paid') }}">
+                                        <input type="hidden" name="pos_machine_id" id="pos_machine_id_hidden" value="{{ old('pos_machine_id') }}">
+                                        <input type="hidden" name="bank_account_id" id="bank_account_id_hidden" value="{{ old('bank_account_id') }}">
+                                        <input type="number" step="0.01" min="0" name="split_wallet_amount" value="{{ old('split_wallet_amount', 0) }}">
+                                        <input type="number" step="0.01" min="0" name="split_kd_credit_amount" value="{{ old('split_kd_credit_amount', 0) }}">
+                                        <input type="number" step="0.01" min="0" name="split_cash_amount" value="{{ old('split_cash_amount', 0) }}">
+                                        <input type="number" step="0.01" min="0" name="split_cheque_amount" value="{{ old('split_cheque_amount', 0) }}">
+                                        <input type="number" step="0.01" min="0" name="split_dpbv_amount" value="{{ old('split_dpbv_amount', 0) }}">
+                                    </div>
                                 </form>
                                 <div class="card">
                                     <div class="card-header">
@@ -337,8 +350,9 @@
                             </div>
                             <div class="col-lg-4">
                                 <div class="card">
-                                    <div class="card-header">
-                                        <h3 class="card-title">Payment</h3>
+                                    <div class="card-header d-flex align-items-center justify-content-between">
+                                        <h3 class="card-title mb-0">Payment</h3>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#paymentModal">Payment</button>
                                     </div>
                                     <div class="card-body text-center">
                                         <div class="p-3 bg-light rounded mb-3">
@@ -356,52 +370,29 @@
                                             <h2 class="mb-0 fw-bold">₦{{ number_format($cartTotal, 0) }}</h2>
                                         </div>
 
-                                        <div class="mb-4 text-start">
-                                            <p class="mb-2"><i class="fe fe-wallet me-2"></i> <strong>Wallet balance:</strong> ₦{{ number_format($walletBalance, 0) }}</p>
+                                        <div class="mb-3 text-start">
+                                            <p class="mb-2"><i class="fe fe-wallet me-2"></i> <strong>Wallet balance:</strong> ₦{{ number_format($walletBalance, 2) }}</p>
                                             <p class="mb-2"><i class="fe fe-award me-2"></i> <strong>DPBV balance:</strong> {{ number_format($totalDpbv ?? 0, 2) }} DPBV = ₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }}</p>
-                                            @if($kdId && $kdCreditBalance > 0)
-                                            <p class="mb-0" id="kd_credit_balance_display"><i class="fe fe-credit-card me-2"></i> <strong>KD Credit balance:</strong> ₦{{ number_format($kdCreditBalance, 2) }}</p>
-                                            @endif
-                                        </div>
-
-                                            <div class="mb-3">
-                                                <label class="form-label">Payment method</label>
-                                            @if($kdId && $kdCreditBalance > 0)
-                                            <div class="form-check" id="pay_kd_credit_option">
-                                                    <input class="form-check-input" type="radio" name="payment_method" id="pay_kd_credit" value="kd_credit" form="checkout-form" {{ $canPayWithCredit ? '' : 'disabled' }}>
-                                                    <label class="form-check-label" for="pay_kd_credit">
-                                                        Pay with KD Credit (₦{{ number_format($kdCreditBalance, 2) }} available)
-                                                        @if(!$canPayWithCredit)
-                                                            <span class="text-muted">(insufficient balance)</span>
-                                                        @endif
-                                                    </label>
-                                                </div>
-                                                @endif
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" name="payment_method" id="pay_wallet" value="wallet" form="checkout-form" {{ $canPayWithWallet ? '' : 'disabled' }}>
-                                                    <label class="form-check-label" for="pay_wallet">
-                                                        Pay with Wallet
-                                                        @if(!$canPayWithWallet)
-                                                            <span class="text-muted">(insufficient balance – <a href="{{ route('wallet.index') }}">top up</a>)</span>
-                                                        @endif
-                                                    </label>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" name="payment_method" id="pay_dpbv" value="dpbv" form="checkout-form" {{ ($canPayWithDpbv ?? false) ? '' : 'disabled' }}>
-                                                    <label class="form-check-label" for="pay_dpbv">
-                                                        Pay with DPBV (₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }} available)
-                                                        @if(!($canPayWithDpbv ?? false))
-                                                            <span class="text-muted">(insufficient balance)</span>
-                                                        @elseif(!($dpbvProductsAllowed ?? true))
-                                                            <span class="text-muted">(some items not eligible for DPBV)</span>
-                                                        @endif
-                                                    </label>
-                                                </div>
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="radio" name="payment_method" id="pay_delivery" value="pay_on_delivery" form="checkout-form" checked>
-                                                    <label class="form-check-label" for="pay_delivery">Pay on Delivery</label>
-                                                </div>
+                                            <p class="mb-2" id="kd_credit_balance_display" style="{{ ($kdId && $kdCreditBalance > 0) ? '' : 'display:none;' }}"><i class="fe fe-credit-card me-2"></i> <strong>KD Credit balance:</strong> ₦<span id="kd-credit-balance-text">{{ number_format($kdCreditBalance, 2) }}</span></p>
+                                            <div class="small text-muted">
+                                                Method: <span id="payment-summary-method">{{ old('split_payment') ? 'Split' : 'Pay on Delivery' }}</span>
+                                                <span class="mx-1">•</span>
+                                                POS: ₦<span id="payment-summary-pos">{{ number_format((float) old('pos_amount_paid', 0), 2) }}</span>
+                                                <span class="mx-1">•</span>
+                                                Split: <span id="payment-summary-split">{{ old('split_payment') ? 'Yes' : 'No' }}</span>
                                             </div>
+                                            @error('payment_method')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                            @error('split_payment')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                            @error('split_wallet_amount')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                            @error('split_kd_credit_amount')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                            @error('split_dpbv_amount')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        </div>
+                                        <div class="text-start text-muted fw-semibold mb-2" style="font-size: 15px;">
+                                            DPBV Available: <strong><span id="split-dpbv-total">{{ number_format($totalDpbv ?? 0, 2) }}</span> DPBV</strong> (₦<span id="split-dpbv-naira">{{ number_format($dpbvNairaEquivalent ?? 0, 2) }}</span>)
+                                        </div>
+                                        <div class="text-start text-muted fw-semibold mb-4" style="font-size: 15px;">
+                                            Total due: ₦<span id="split-total-due">{{ number_format($cartTotal, 2) }}</span> • Split total: ₦<span id="split-total-entered">0.00</span> • Remaining: ₦<span id="split-remaining">{{ number_format($cartTotal, 2) }}</span>
+                                        </div>
                                             <button type="submit" form="checkout-form" class="btn btn-primary btn-lg w-100 mb-2"><i class="fe fe-check-circle me-2"></i>Place Order</button>
                                             <button type="submit" form="checkout-form" formaction="{{ route('checkout.save-draft') }}" formmethod="POST" class="btn btn-outline-secondary w-100" formnovalidate><i class="fe fe-save me-2"></i>Save to Draft</button>
                                     </div>
@@ -409,6 +400,112 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="paymentModalLabel">Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="text-muted fw-semibold" style="font-size: 15px;">
+                                DPBV Available: <strong><span id="split-dpbv-total-modal">{{ number_format($totalDpbv ?? 0, 2) }}</span> DPBV</strong> (₦<span id="split-dpbv-naira-modal">{{ number_format($dpbvNairaEquivalent ?? 0, 2) }}</span>)
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="text-muted fw-semibold" style="font-size: 15px;">
+                                Total due: ₦<span id="split-total-due-modal">{{ number_format($cartTotal, 2) }}</span> • Split total: ₦<span id="split-total-entered-modal">0.00</span> • Remaining: ₦<span id="split-remaining-modal">{{ number_format($cartTotal, 2) }}</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Coupon Code</label>
+                            @if(session('coupon_code'))
+                                <div class="alert alert-success py-2 mb-0">Applied: <strong>{{ session('coupon_code') }}</strong></div>
+                            @else
+                                <form action="{{ route('cart.apply-coupon') }}" method="POST" class="d-flex gap-2">
+                                    @csrf
+                                    <input type="text" name="code" class="form-control" placeholder="Enter coupon code (optional)">
+                                    <button type="submit" class="btn btn-outline-primary">Apply</button>
+                                </form>
+                            @endif
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="split_payment_modal" {{ old('split_payment') ? 'checked' : '' }}>
+                                <label class="form-check-label" for="split_payment_modal">Split payment (Wallet + Credit + DPBV + Cash + Cheque + POS + Bank)</label>
+                            </div>
+                        </div>
+                        <div class="col-12" id="split_fields_modal" style="display:none;">
+                            <div class="row g-3">
+                                <div class="col-md-4" id="split_wallet_amount_modal_wrap" style="{{ $walletBalance > 0 ? '' : 'display:none;' }}">
+                                    <div class="text-muted fw-semibold mb-1" style="font-size: 14px;">Balance: ₦<span id="split-wallet-available-modal">{{ number_format($walletBalance, 2) }}</span></div>
+                                    <label class="form-label">Wallet Amount</label>
+                                    <input type="text" inputmode="decimal" id="split_wallet_amount_modal" class="form-control" value="{{ old('split_wallet_amount') }}" placeholder="0.00">
+                                </div>
+                                <div class="col-md-4" id="split_kd_credit_amount_modal_wrap" style="{{ $kdCreditBalance > 0 ? '' : 'display:none;' }}">
+                                    <div class="text-muted fw-semibold mb-1" style="font-size: 14px;">Balance: ₦<span id="split-kd-credit-available-modal">{{ number_format($kdCreditBalance, 2) }}</span></div>
+                                    <label class="form-label">Credit Amount</label>
+                                    <input type="text" inputmode="decimal" id="split_kd_credit_amount_modal" class="form-control" value="{{ old('split_kd_credit_amount') }}" placeholder="0.00">
+                                </div>
+                                <div class="col-md-4" id="split_dpbv_amount_modal_wrap" style="{{ ($dpbvNairaEquivalent ?? 0) > 0 ? '' : 'display:none;' }}">
+                                    <div class="text-muted fw-semibold mb-1" style="font-size: 14px;">Balance: ₦<span id="split-dpbv-available-modal">{{ number_format($dpbvNairaEquivalent ?? 0, 2) }}</span></div>
+                                    <label class="form-label">DPBV Amount</label>
+                                    <input type="text" inputmode="decimal" id="split_dpbv_amount_modal" class="form-control" value="{{ old('split_dpbv_amount') }}" placeholder="0.00">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Cash Amount</label>
+                                    <input type="text" inputmode="decimal" id="split_cash_amount_modal" class="form-control" value="{{ old('split_cash_amount') }}" placeholder="0.00">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Cheque Amount</label>
+                                    <input type="text" inputmode="decimal" id="split_cheque_amount_modal" class="form-control" value="{{ old('split_cheque_amount') }}" placeholder="0.00">
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">POS Machine</label>
+                                    <select id="pos_machine_modal" class="form-select">
+                                        <option value="">Select POS machine (optional)</option>
+                                        @foreach(($posMachines ?? collect()) as $m)
+                                            <option value="{{ $m->id }}" data-bank="{{ $m->bank_name }}" data-account-name="{{ $m->account_name }}" data-account-number="{{ $m->account_number }}" {{ (string) old('pos_machine_id') === (string) $m->id ? 'selected' : '' }}>
+                                                {{ $m->bank_name ?: 'POS' }}{{ $m->account_number ? ' • '.$m->account_number : '' }}{{ $m->account_name ? ' • '.$m->account_name : '' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div id="pos_machine_modal_note" class="small text-muted mt-1"></div>
+                                    <div id="pos_amount_paid_modal_wrap" class="mt-2" style="display:none;">
+                                        <input type="text" inputmode="decimal" id="pos_amount_paid_modal" class="form-control" value="{{ old('pos_amount_paid') }}" placeholder="Enter amount (e.g. 1,000,000)">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label mb-1">Bank Account</label>
+                                    <select id="bank_account_modal" class="form-select">
+                                        <option value="">Select bank (optional)</option>
+                                        @foreach(($banks ?? collect()) as $b)
+                                            <option value="{{ $b->id }}" data-bank="{{ $b->name }}" data-account-name="{{ $b->account_name }}" data-account-number="{{ $b->account_number }}" {{ (string) old('bank_account_id') === (string) $b->id ? 'selected' : '' }}>
+                                                {{ $b->name ?: 'Bank' }}{{ $b->account_number ? ' • '.$b->account_number : '' }}{{ $b->account_name ? ' • '.$b->account_name : '' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div id="bank_account_modal_note" class="small text-muted mt-1"></div>
+                                    <div id="bank_amount_paid_modal_wrap" class="mt-2" style="display:none;">
+                                        <input type="text" inputmode="decimal" id="bank_amount_paid_modal" class="form-control" value="{{ old('bank_amount_paid') }}" placeholder="Enter amount (e.g. 1,000,000)">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="payment_apply_btn">Apply</button>
                 </div>
             </div>
         </div>
@@ -527,57 +624,30 @@
                 });
             }
             
-            function showKdCreditOption(balance, canPay) {
-                var creditOption = document.getElementById('pay_kd_credit_option');
-                var creditInput = document.getElementById('pay_kd_credit');
-                
-                if (!creditOption) {
-                    // Credit option doesn't exist, create it
-                    // DPBV option removed; insert KD Credit inside the same payment-method container as Wallet.
-                    var paymentMethods = document.getElementById('pay_wallet')?.closest('.mb-3') || document.querySelector('.mb-3');
-                    if (paymentMethods) {
-                        var creditHtml = '<div class="form-check" id="pay_kd_credit_option">' +
-                            '<input class="form-check-input" type="radio" name="payment_method" id="pay_kd_credit" value="kd_credit" form="checkout-form"' + (canPay ? '' : ' disabled') + '>' +
-                            '<label class="form-check-label" for="pay_kd_credit">' +
-                            'Pay with KD Credit (₦' + parseFloat(balance).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' available)' +
-                            (canPay ? '' : ' <span class="text-muted">(insufficient balance)</span>') +
-                            '</label></div>';
-                        paymentMethods.insertAdjacentHTML('afterbegin', creditHtml);
-                    }
-                } else {
-                    // Credit option exists, update it
-                    if (creditInput) {
-                        creditInput.disabled = !canPay;
-                        var creditLabel = creditInput.nextElementSibling;
-                        if (creditLabel) {
-                            creditLabel.innerHTML = 'Pay with KD Credit (₦' + parseFloat(balance).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' available)' +
-                                (canPay ? '' : ' <span class="text-muted">(insufficient balance)</span>');
-                        }
-                    }
-                }
-                
-                // Update credit balance display
-                var balanceDisplay = document.getElementById('kd_credit_balance_display');
-                if (!balanceDisplay) {
-                    var balanceContainer = document.querySelector('.mb-3.p-3.bg-light.rounded');
-                    if (balanceContainer) {
-                        var balanceHtml = '<p class="mb-0" id="kd_credit_balance_display"><i class="fe fe-credit-card me-2"></i> <strong>KD Credit balance:</strong> ₦' + parseFloat(balance).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '</p>';
-                        balanceContainer.insertAdjacentHTML('beforeend', balanceHtml);
-                    }
-                } else {
-                    balanceDisplay.innerHTML = '<i class="fe fe-credit-card me-2"></i> <strong>KD Credit balance:</strong> ₦' + parseFloat(balance).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                }
+            function moneyText(balance) {
+                return parseFloat(balance || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            }
+
+            function showKdCreditOption(balance) {
+                var text = document.getElementById('kd-credit-balance-text');
+                var display = document.getElementById('kd_credit_balance_display');
+                var modalAvail = document.getElementById('split-kd-credit-available-modal');
+                var wrap = document.getElementById('split_kd_credit_amount_modal_wrap');
+                if (text) text.textContent = moneyText(balance);
+                if (display) display.style.display = '';
+                if (modalAvail) modalAvail.textContent = moneyText(balance);
+                if (wrap) wrap.style.display = parseFloat(balance) > 0 ? '' : 'none';
             }
             
             function hideKdCreditOption() {
-                var creditOption = document.getElementById('pay_kd_credit_option');
-                if (creditOption) {
-                    creditOption.remove();
-                }
-                var balanceDisplay = document.getElementById('kd_credit_balance_display');
-                if (balanceDisplay) {
-                    balanceDisplay.remove();
-                }
+                var display = document.getElementById('kd_credit_balance_display');
+                var modalAvail = document.getElementById('split-kd-credit-available-modal');
+                var wrap = document.getElementById('split_kd_credit_amount_modal_wrap');
+                var modalInput = document.getElementById('split_kd_credit_amount_modal');
+                if (display) display.style.display = 'none';
+                if (modalAvail) modalAvail.textContent = '0.00';
+                if (wrap) wrap.style.display = 'none';
+                if (modalInput) modalInput.value = '';
             }
             
             // Service Center code validation helper (for referral + distributor collection code)
@@ -627,32 +697,177 @@
             var scReferralInput = wireScCodeValidation('checkout_sc_referral_code', 'sc_referral_feedback');
             var scCollectionInput = wireScCodeValidation('checkout_sc_collection_code', 'sc_collection_feedback');
 
-            function toggleDistributorScRequired() {
-                if (!scCollectionInput) return;
-                var payWallet = document.getElementById('pay_wallet');
-                var isWallet = payWallet ? !!payWallet.checked : false;
-                scCollectionInput.required = isWallet;
-            }
+            if (scCollectionInput) scCollectionInput.required = true;
 
-            var payWallet = document.getElementById('pay_wallet');
-            var payDpbv = document.getElementById('pay_dpbv');
-            var payDelivery = document.getElementById('pay_delivery');
-            var payKdCredit = document.getElementById('pay_kd_credit');
-            if (payWallet) payWallet.addEventListener('change', toggleDistributorScRequired);
-            if (payDpbv) payDpbv.addEventListener('change', toggleDistributorScRequired);
-            if (payDelivery) payDelivery.addEventListener('change', toggleDistributorScRequired);
-            if (payKdCredit) payKdCredit.addEventListener('change', toggleDistributorScRequired);
-            toggleDistributorScRequired();
-
-            // Check on page load if KD NO is already filled (but only if credit option doesn't already exist from server-side)
-            var existingCreditOption = document.getElementById('pay_kd_credit_option');
-            if (kdInput.value.trim() && !existingCreditOption) {
+            if (kdInput.value.trim()) {
                 checkKdCreditBalance(kdInput.value.trim());
             }
 
             // Check SC referral code on page load if existing
             if (scReferralInput && scReferralInput.value.trim()) scReferralInput.dispatchEvent(new Event('input'));
             if (scCollectionInput && scCollectionInput.value.trim()) scCollectionInput.dispatchEvent(new Event('input'));
+        })();
+
+        (function () {
+            var due = {{ json_encode((float) $cartTotal) }};
+            var hiddenMethod = document.getElementById('payment_method_hidden');
+            var hiddenPos = document.getElementById('pos_amount_paid_hidden');
+            var hiddenBankAmt = document.getElementById('bank_amount_paid_hidden');
+            var hiddenPosMachine = document.getElementById('pos_machine_id_hidden');
+            var hiddenBankAccount = document.getElementById('bank_account_id_hidden');
+            var hiddenSplit = document.getElementById('split-payment-toggle');
+            var hiddenWallet = document.querySelector('input[name="split_wallet_amount"]');
+            var hiddenKd = document.querySelector('input[name="split_kd_credit_amount"]');
+            var hiddenCash = document.querySelector('input[name="split_cash_amount"]');
+            var hiddenCheque = document.querySelector('input[name="split_cheque_amount"]');
+            var hiddenDpbv = document.querySelector('input[name="split_dpbv_amount"]');
+            var modalSplit = document.getElementById('split_payment_modal');
+            var modalSplitWrap = document.getElementById('split_fields_modal');
+            var modalWallet = document.getElementById('split_wallet_amount_modal');
+            var modalKd = document.getElementById('split_kd_credit_amount_modal');
+            var modalCash = document.getElementById('split_cash_amount_modal');
+            var modalCheque = document.getElementById('split_cheque_amount_modal');
+            var modalDpbv = document.getElementById('split_dpbv_amount_modal');
+            var modalPos = document.getElementById('pos_amount_paid_modal');
+            var modalBankAmount = document.getElementById('bank_amount_paid_modal');
+            var modalPosMachine = document.getElementById('pos_machine_modal');
+            var modalBankAccount = document.getElementById('bank_account_modal');
+            var applyBtn = document.getElementById('payment_apply_btn');
+            if (!hiddenMethod || !modalSplit || !applyBtn) return;
+
+            function parseMoney(str) {
+                var cleaned = String(str || '').replace(/,/g, '').replace(/[^0-9.]/g, '');
+                var firstDot = cleaned.indexOf('.');
+                if (firstDot !== -1) {
+                    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+                }
+                var num = Number(cleaned);
+                return Number.isFinite(num) ? num : 0;
+            }
+            function fmt(num) {
+                return (parseFloat(num || 0) || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            }
+            function updateTotals() {
+                var sum = parseMoney(modalWallet && modalWallet.value) + parseMoney(modalKd && modalKd.value) + parseMoney(modalCash && modalCash.value) + parseMoney(modalCheque && modalCheque.value) + parseMoney(modalDpbv && modalDpbv.value) + parseMoney(modalPos && modalPos.value) + parseMoney(modalBankAmount && modalBankAmount.value);
+                var rem = due - sum;
+                ['split-total-due', 'split-total-due-modal'].forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el) el.textContent = fmt(due);
+                });
+                ['split-total-entered', 'split-total-entered-modal'].forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el) el.textContent = fmt(sum);
+                });
+                ['split-remaining', 'split-remaining-modal'].forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el) el.textContent = fmt(rem);
+                });
+                return { sum: sum, rem: rem };
+            }
+            function accountNote(select, noteEl, fallback) {
+                if (!select || !noteEl) return;
+                var opt = select.options[select.selectedIndex];
+                if (!select.value) {
+                    noteEl.textContent = '';
+                    return;
+                }
+                noteEl.textContent = (opt.getAttribute('data-bank') || fallback) + (opt.getAttribute('data-account-number') ? ' • ' + opt.getAttribute('data-account-number') : '') + (opt.getAttribute('data-account-name') ? ' • ' + opt.getAttribute('data-account-name') : '');
+            }
+            function toggleMachineAmount(select, wrap, input) {
+                if (!wrap) return;
+                var on = !!(select && select.value);
+                wrap.style.display = on ? '' : 'none';
+                if (!on && input) input.value = '';
+            }
+            function applySplitVisibility() {
+                if (modalSplitWrap) modalSplitWrap.style.display = modalSplit.checked ? '' : 'none';
+                toggleMachineAmount(modalPosMachine, document.getElementById('pos_amount_paid_modal_wrap'), modalPos);
+                toggleMachineAmount(modalBankAccount, document.getElementById('bank_amount_paid_modal_wrap'), modalBankAmount);
+                accountNote(modalPosMachine, document.getElementById('pos_machine_modal_note'), 'POS');
+                accountNote(modalBankAccount, document.getElementById('bank_account_modal_note'), 'Bank');
+                updateTotals();
+            }
+            function syncFromHidden() {
+                modalSplit.checked = !!hiddenSplit.checked;
+                if (modalWallet && hiddenWallet) modalWallet.value = parseFloat(hiddenWallet.value || 0) > 0 ? fmt(hiddenWallet.value) : '';
+                if (modalKd && hiddenKd) modalKd.value = parseFloat(hiddenKd.value || 0) > 0 ? fmt(hiddenKd.value) : '';
+                if (modalCash && hiddenCash) modalCash.value = parseFloat(hiddenCash.value || 0) > 0 ? fmt(hiddenCash.value) : '';
+                if (modalCheque && hiddenCheque) modalCheque.value = parseFloat(hiddenCheque.value || 0) > 0 ? fmt(hiddenCheque.value) : '';
+                if (modalDpbv && hiddenDpbv) modalDpbv.value = parseFloat(hiddenDpbv.value || 0) > 0 ? fmt(hiddenDpbv.value) : '';
+                if (modalPos && hiddenPos) modalPos.value = hiddenPos.value ? fmt(hiddenPos.value) : '';
+                if (modalBankAmount && hiddenBankAmt) modalBankAmount.value = hiddenBankAmt.value ? fmt(hiddenBankAmt.value) : '';
+                if (modalPosMachine && hiddenPosMachine) modalPosMachine.value = hiddenPosMachine.value || '';
+                if (modalBankAccount && hiddenBankAccount) modalBankAccount.value = hiddenBankAccount.value || '';
+                applySplitVisibility();
+            }
+            function applyToHidden() {
+                var totals = updateTotals();
+                if (modalSplit.checked && Math.abs(totals.rem) > 0.009) {
+                    alert('Payment amounts must add up to the order total. Remaining: ₦' + fmt(totals.rem));
+                    return false;
+                }
+                hiddenSplit.checked = !!modalSplit.checked;
+                hiddenMethod.value = modalSplit.checked ? 'split' : 'pay_on_delivery';
+                if (hiddenWallet && modalWallet) hiddenWallet.value = parseMoney(modalWallet.value).toFixed(2);
+                if (hiddenKd && modalKd) hiddenKd.value = parseMoney(modalKd.value).toFixed(2);
+                if (hiddenCash && modalCash) hiddenCash.value = parseMoney(modalCash.value).toFixed(2);
+                if (hiddenCheque && modalCheque) hiddenCheque.value = parseMoney(modalCheque.value).toFixed(2);
+                if (hiddenDpbv && modalDpbv) hiddenDpbv.value = parseMoney(modalDpbv.value).toFixed(2);
+                if (hiddenPos && modalPos) hiddenPos.value = modalPos.value.trim() === '' ? '' : parseMoney(modalPos.value).toFixed(2);
+                if (hiddenBankAmt && modalBankAmount) hiddenBankAmt.value = modalBankAmount.value.trim() === '' ? '' : parseMoney(modalBankAmount.value).toFixed(2);
+                if (hiddenPosMachine && modalPosMachine) hiddenPosMachine.value = modalPosMachine.value || '';
+                if (hiddenBankAccount && modalBankAccount) hiddenBankAccount.value = modalBankAccount.value || '';
+                var sumMethod = document.getElementById('payment-summary-method');
+                var sumPos = document.getElementById('payment-summary-pos');
+                var sumSplit = document.getElementById('payment-summary-split');
+                if (sumMethod) sumMethod.textContent = hiddenMethod.value === 'split' ? 'Split' : 'Pay on Delivery';
+                if (sumPos) sumPos.textContent = fmt(hiddenPos.value);
+                if (sumSplit) sumSplit.textContent = hiddenSplit.checked ? 'Yes' : 'No';
+                return true;
+            }
+            function wireMoney(el) {
+                if (!el) return;
+                el.addEventListener('input', function () {
+                    el.value = String(el.value || '').replace(/[^0-9.,]/g, '');
+                    updateTotals();
+                });
+                el.addEventListener('blur', function () {
+                    if ((el.value || '').trim() === '') return;
+                    el.value = fmt(parseMoney(el.value));
+                    updateTotals();
+                });
+            }
+            [modalWallet, modalKd, modalCash, modalCheque, modalDpbv, modalPos, modalBankAmount].forEach(wireMoney);
+            modalSplit.addEventListener('change', applySplitVisibility);
+            if (modalPosMachine) modalPosMachine.addEventListener('change', applySplitVisibility);
+            if (modalBankAccount) modalBankAccount.addEventListener('change', applySplitVisibility);
+            applyBtn.addEventListener('click', function () {
+                if (!applyToHidden()) return;
+                var modalEl = document.getElementById('paymentModal');
+                if (modalEl && window.bootstrap && bootstrap.Modal) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                }
+            });
+            var paymentModalEl = document.getElementById('paymentModal');
+            if (paymentModalEl) {
+                paymentModalEl.addEventListener('shown.bs.modal', syncFromHidden);
+            }
+            var checkoutForm = document.getElementById('checkout-form');
+            if (checkoutForm) {
+                checkoutForm.addEventListener('submit', function (e) {
+                    var submitter = e.submitter;
+                    if (submitter && submitter.getAttribute('formaction')) return;
+                    if (hiddenSplit.checked) {
+                        syncFromHidden();
+                        var totals = updateTotals();
+                        if (Math.abs(totals.rem) > 0.009) {
+                            e.preventDefault();
+                            alert('Open Payment and make the amounts add up to the order total. Remaining: ₦' + fmt(totals.rem));
+                        }
+                    }
+                });
+            }
+            syncFromHidden();
         })();
     </script>
     @include('partials.pwa-scripts')

@@ -64,7 +64,7 @@
                                             <h2 class="mb-0">Order Receipt</h2>
                                             <p class="text-muted mb-0"><strong>Order #:</strong> {{ $ord->invoice_number ?? 'ORD-' . $ord->id }}</p>
                                             <p class="text-muted mb-0"><strong>Date:</strong> {{ $ord->created_at->format('M d, Y H:i') }}</p>
-                                            <p class="text-muted mb-0"><strong>Payment:</strong> {{ $ord->payment_method === 'wallet' ? 'Wallet' : 'Pay on Delivery' }}</p>
+                                            <p class="text-muted mb-0"><strong>Payment:</strong> {{ $ord->paymentLabel() }}</p>
                                             <p class="text-muted mb-0 mt-2"><strong>KD NO:</strong> {{ $ord->kd_id ?? '—' }}</p>
                                             <p class="text-muted mb-0"><strong>Customer Name:</strong> {{ $ord->customer_name ?? '—' }}</p>
                                         </div>
@@ -127,7 +127,7 @@
                                         <h2 class="mb-0">Order Receipt</h2>
                                         <p class="text-muted mb-0"><strong>Order #:</strong> {{ $order->invoice_number ?? 'ORD-' . $order->id }}</p>
                                         <p class="text-muted mb-0"><strong>Date:</strong> {{ $order->created_at->format('M d, Y H:i') }}</p>
-                                        <p class="text-muted mb-0"><strong>Payment:</strong> {{ $order->payment_method === 'wallet' ? 'Wallet' : 'Pay on Delivery' }}</p>
+                                        <p class="text-muted mb-0"><strong>Payment:</strong> {{ $order->paymentLabel() }}</p>
                                         <p class="text-muted mb-0 mt-2"><strong>KD NO:</strong> {{ $order->kd_id ?? '—' }}</p>
                                         <p class="text-muted mb-0"><strong>Customer Name:</strong> {{ $order->customer_name ?? '—' }}</p>
                                     </div>

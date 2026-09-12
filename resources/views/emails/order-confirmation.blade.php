@@ -27,7 +27,7 @@
     <p>
         <strong>Order Number:</strong> {{ $order->invoice_number ?? 'ORD-' . $order->id }}<br>
         <strong>Order Date:</strong> {{ $order->created_at->format('F j, Y \a\t g:i A') }}<br>
-        <strong>Payment Method:</strong> {{ $order->payment_method === 'wallet' ? 'Wallet' : 'Pay on Delivery' }}
+        <strong>Payment Method:</strong> {{ $order->paymentLabel() }}
     </p>
 
     <h2>Purchased Items</h2>

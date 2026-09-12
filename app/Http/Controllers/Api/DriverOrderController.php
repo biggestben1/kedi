@@ -228,6 +228,10 @@ class DriverOrderController extends Controller
      */
     private function deductStockFromOrder(Order $order): void
     {
+        if ($order->stock_deducted_at) {
+            return;
+        }
+
         $order->load('items');
         $branchUserId = $order->branch_user_id;
 
@@ -258,6 +262,8 @@ class DriverOrderController extends Controller
                     }
                 }
             }
+
+            $order->update(['stock_deducted_at' => now()]);
         });
     }
 }

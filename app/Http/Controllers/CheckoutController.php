@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Mail\OrderConfirmationMail;
 use App\Models\AnnexStock;
+use App\Models\Bank;
 use App\Models\BranchStock;
 use App\Models\DpbvCollection;
+use App\Models\PosMachine;
 use App\Models\Guest;
 use App\Models\HeadquartersStock;
 use App\Models\KdCustomer;
@@ -42,6 +44,48 @@ class CheckoutController extends Controller
                 $q->where('name', Role::SERVICE_CENTER);
             })
             ->first();
+    }
+
+    /**
+     * @return array{posMachines: \Illuminate\Support\Collection, banks: \Illuminate\Support\Collection}
+     */
+    private function checkoutPaymentOptions(?User $user): array
+    {
+        $posMachines = PosMachine::query()
+            ->orderBy('bank_name')
+            ->orderBy('account_name')
+            ->get();
+
+        $banksQuery = Bank::where('is_active', true);
+        $hqId = null;
+        if ($user) {
+            $user->loadMissing('role');
+            $forBanks = $user->bankContextUser();
+            if ($forBanks->role?->name === 'headquarters') {
+                $hqId = (int) $forBanks->id;
+            } elseif ($forBanks->role?->name === 'branch') {
+                $hqId = (int) $forBanks->created_by_user_id;
+            } elseif ($forBanks->role?->name === 'service_center' && $forBanks->created_by_user_id) {
+                $branch = User::find($forBanks->created_by_user_id);
+                $hqId = ($branch && $branch->created_by_user_id) ? (int) $branch->created_by_user_id : null;
+            } elseif (in_array($forBanks->role?->name, ['annex', 'dispatch', 'accountant'], true) && $forBanks->created_by_user_id) {
+                $creator = User::with('role')->find($forBanks->created_by_user_id);
+                if ($creator && $creator->role?->name === 'service_center' && $creator->created_by_user_id) {
+                    $branch = User::find($creator->created_by_user_id);
+                    $hqId = ($branch && $branch->created_by_user_id) ? (int) $branch->created_by_user_id : null;
+                } elseif ($creator && $creator->role?->name === 'branch') {
+                    $hqId = (int) $creator->created_by_user_id;
+                }
+            }
+        }
+        if ($hqId) {
+            $banksQuery->where('headquarters_user_id', $hqId);
+        }
+
+        return [
+            'posMachines' => $posMachines,
+            'banks' => $banksQuery->orderBy('name')->get(),
+        ];
     }
 
     private function effectiveDpbvQuery(User $user)
@@ -155,6 +199,8 @@ class CheckoutController extends Controller
             }
         }
 
+        $paymentOptions = $this->checkoutPaymentOptions($user);
+
         return view('checkout.show', array_merge($data, [
             'walletBalance' => $walletBalance,
             'canPayWithWallet' => $canPayWithWallet,
@@ -166,6 +212,8 @@ class CheckoutController extends Controller
             'customerName' => $customerName,
             'kdCreditBalance' => $kdCreditBalance,
             'canPayWithCredit' => $canPayWithCredit,
+            'posMachines' => $paymentOptions['posMachines'],
+            'banks' => $paymentOptions['banks'],
         ]));
     }
 
@@ -216,8 +264,19 @@ class CheckoutController extends Controller
         }
 
         $deliveryType = $request->input('delivery_type', 'ship');
+        $splitPayment = $request->boolean('split_payment');
         $rules = [
-            'payment_method' => 'required|in:wallet,pay_on_delivery,dpbv,kd_credit',
+            'payment_method' => 'nullable|in:wallet,pay_on_delivery,dpbv,kd_credit,split',
+            'split_payment' => 'nullable',
+            'pos_amount_paid' => 'nullable|numeric|min:0',
+            'bank_amount_paid' => 'nullable|numeric|min:0',
+            'pos_machine_id' => 'nullable|integer',
+            'bank_account_id' => 'nullable|integer',
+            'split_wallet_amount' => 'nullable|numeric|min:0',
+            'split_kd_credit_amount' => 'nullable|numeric|min:0',
+            'split_cash_amount' => 'nullable|numeric|min:0',
+            'split_cheque_amount' => 'nullable|numeric|min:0',
+            'split_dpbv_amount' => 'nullable|numeric|min:0',
             'kd_id' => 'nullable|string|max:100',
             'customer_name' => 'nullable|string|max:255',
             'delivery_type' => 'required|in:walk_in,ship',
@@ -237,7 +296,11 @@ class CheckoutController extends Controller
 
         $user = $request->user();
         $user?->load(['role', 'createdBy.role']);
-        $paymentMethod = $request->input('payment_method');
+        $paymentMethod = $splitPayment ? 'split' : ($request->input('payment_method') ?: Order::PAYMENT_PAY_ON_DELIVERY);
+        $paymentBreakdown = null;
+        $walletAmt = 0.0;
+        $kdAmt = 0.0;
+        $dpbvAmt = 0.0;
         $kdId = trim((string) $request->input('kd_id', ''));
         $customerName = trim((string) $request->input('customer_name', ''));
         $scReferralCode = trim((string) $request->input('sc_referral_code', ''));
@@ -266,7 +329,81 @@ class CheckoutController extends Controller
             }
         }
 
-        if ($paymentMethod === 'wallet') {
+        if ($splitPayment) {
+            $walletAmt = round((float) $request->input('split_wallet_amount', 0), 2);
+            $kdAmt = round((float) $request->input('split_kd_credit_amount', 0), 2);
+            $cashAmt = round((float) $request->input('split_cash_amount', 0), 2);
+            $chequeAmt = round((float) $request->input('split_cheque_amount', 0), 2);
+            $posAmt = round((float) $request->input('pos_amount_paid', 0), 2);
+            $bankAmt = round((float) $request->input('bank_amount_paid', 0), 2);
+            $dpbvAmt = round((float) $request->input('split_dpbv_amount', 0), 2);
+            $sum = round($walletAmt + $kdAmt + $cashAmt + $chequeAmt + $posAmt + $bankAmt + $dpbvAmt, 2);
+
+            if ($sum <= 0) {
+                return back()->withErrors(['split_payment' => 'Enter at least one payment amount.'])->withInput();
+            }
+            if ($sum !== round((float) $data['cartTotal'], 2)) {
+                return back()->withErrors([
+                    'split_payment' => 'Payment amounts must add up to the order total (₦'.number_format((float) $data['cartTotal'], 2).').',
+                ])->withInput();
+            }
+
+            $walletBalance = $walletOwner ? (float) ($walletOwner->wallet_balance ?? 0) : 0;
+            if ($walletAmt > 0 && $walletBalance < $walletAmt) {
+                return back()->withErrors(['split_wallet_amount' => 'Insufficient wallet balance for the wallet amount entered.'])->withInput();
+            }
+
+            if ($kdAmt > 0) {
+                if ($kdId === '') {
+                    return back()->withErrors(['kd_id' => 'KD NO is required to pay any amount from KD Credit.'])->withInput();
+                }
+                $kdRegistration = KdRegistration::where('kd_no', $kdId)->first();
+                if (! $kdRegistration) {
+                    return back()->with('error', 'KD Registration not found.');
+                }
+                $kdCreditBalance = $kdRegistration->credits()->sum(DB::raw("CASE WHEN type = 'credit' THEN amount ELSE -amount END"));
+                if ($kdCreditBalance < $kdAmt) {
+                    return back()->withErrors(['split_kd_credit_amount' => 'Insufficient KD Credit balance for the credit amount entered.'])->withInput();
+                }
+            }
+
+            if ($dpbvAmt > 0) {
+                $totalDpbv = (float) $this->effectiveDpbvQuery($user)->sum('dpbv');
+                $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
+                if (round($dpbvNairaEquivalent, 2) < $dpbvAmt) {
+                    return back()->withErrors(['split_dpbv_amount' => 'Insufficient DPBV balance. You have ₦'.number_format($dpbvNairaEquivalent, 2).' available.'])->withInput();
+                }
+                $productsNotAllowed = [];
+                foreach ($data['cartItems'] as $item) {
+                    if (! ($item->product->can_use_dpbv ?? true)) {
+                        $productsNotAllowed[] = $item->product->name;
+                    }
+                }
+                if ($productsNotAllowed !== []) {
+                    return back()->with('error', 'The following products cannot be purchased with DPBV: '.implode(', ', $productsNotAllowed).'.');
+                }
+            }
+
+            $posMachine = $request->filled('pos_machine_id')
+                ? PosMachine::find($request->input('pos_machine_id'))
+                : null;
+            $bankAccount = $request->filled('bank_account_id')
+                ? Bank::find($request->input('bank_account_id'))
+                : null;
+
+            $paymentBreakdown = [
+                'wallet' => $walletAmt,
+                'kd_credit' => $kdAmt,
+                'dpbv' => $dpbvAmt,
+                'cash' => $cashAmt,
+                'cheque' => $chequeAmt,
+                'pos' => $posAmt,
+                'bank' => $bankAmt,
+                'pos_machine' => $posMachine ? trim(($posMachine->bank_name ?: 'POS').($posMachine->account_number ? ' • '.$posMachine->account_number : '')) : null,
+                'bank_account' => $bankAccount ? trim(($bankAccount->name ?: 'Bank').($bankAccount->account_number ? ' • '.$bankAccount->account_number : '')) : null,
+                'total' => round((float) $data['cartTotal'], 2),
+            ];
+        } elseif ($paymentMethod === 'wallet') {
             $walletBalance = $walletOwner ? (float) ($walletOwner->wallet_balance ?? 0) : 0;
             if ($walletBalance < $data['cartTotal']) {
                 return back()->with('error', 'Insufficient wallet balance.');
@@ -374,7 +511,8 @@ class CheckoutController extends Controller
             );
         }
         $order = null;
-        DB::transaction(function () use ($user, $walletOwner, $data, $paymentMethod, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, $serviceCenterForDistributor, $scReferralCode, &$order) {
+        $paymentCompleted = $splitPayment || in_array($paymentMethod, [Order::PAYMENT_WALLET, Order::PAYMENT_DPBV, 'kd_credit'], true);
+        DB::transaction(function () use ($user, $walletOwner, $data, $paymentMethod, $paymentBreakdown, $splitPayment, $walletAmt, $kdAmt, $dpbvAmt, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, $stockOwner, $stockUserId, $roleName, $paymentCompleted, $serviceCenterForDistributor, $scReferralCode, &$order) {
             if (! $orderKdId || ! $orderCustomerName) {
                 Guest::firstOrCreate(
                     ['session_id' => $request->session()->getId(), 'user_id' => $user->id],
@@ -391,8 +529,10 @@ class CheckoutController extends Controller
                 'subtotal' => $data['cartSubtotal'],
                 'total_bv' => $data['cartBv'],
                 'total_pv' => $data['cartPv'],
-                'payment_method' => $paymentMethod === 'dpbv' ? Order::PAYMENT_DPBV : ($paymentMethod === 'kd_credit' ? 'kd_credit' : $paymentMethod),
-                'status' => ($paymentMethod === Order::PAYMENT_WALLET || $paymentMethod === Order::PAYMENT_DPBV || $paymentMethod === 'kd_credit') ? Order::STATUS_PAID : Order::STATUS_PENDING,
+                'payment_method' => $paymentMethod === 'dpbv' ? Order::PAYMENT_DPBV : $paymentMethod,
+                'pos_amount_paid' => $splitPayment && (float) ($paymentBreakdown['pos'] ?? 0) > 0 ? $paymentBreakdown['pos'] : null,
+                'payment_breakdown' => $paymentBreakdown,
+                'status' => ($splitPayment || $paymentMethod === Order::PAYMENT_WALLET || $paymentMethod === Order::PAYMENT_DPBV || $paymentMethod === 'kd_credit') ? Order::STATUS_PAID : Order::STATUS_PENDING,
                 'shipping_address' => $shippingAddress,
                 'shipping_city' => $shippingCity,
                 'shipping_state' => $shippingState,
@@ -417,15 +557,16 @@ class CheckoutController extends Controller
                     'pv' => $item->product->pv,
                 ]);
 
-                // For Headquarters stock owner with paid orders, deduct stock immediately
-                if ($isHeadquarters && ($paymentMethod === Order::PAYMENT_WALLET || $paymentMethod === Order::PAYMENT_DPBV)) {
-                    HeadquartersStock::decrementStock($stockOwner->id, $item->product->id, $item->quantity);
-                }
-                // For other users, stock will be deducted when order is marked as completed
             }
 
-            if ($paymentMethod === Order::PAYMENT_WALLET) {
-                $debitAmount = (float) $data['cartTotal'];
+            if ($paymentCompleted) {
+                $this->deductStockForCompletedPayment($data['cartItems'], $isHeadquarters, $stockUserId, $roleName, (int) $stockOwner->id);
+                $order->update(['stock_deducted_at' => now()]);
+            }
+
+            $walletDebit = $splitPayment ? (float) $walletAmt : ($paymentMethod === Order::PAYMENT_WALLET ? (float) $data['cartTotal'] : 0);
+            if ($walletDebit > 0 && $walletOwner) {
+                $debitAmount = $walletDebit;
 
                 // Distributor special case:
                 // - Debit distributor wallet
@@ -457,7 +598,7 @@ class CheckoutController extends Controller
                     WalletTransaction::create([
                         'user_id' => $walletOwner->id,
                         'type' => WalletTransaction::TYPE_DEBIT,
-                        'amount' => $data['cartTotal'],
+                        'amount' => $debitAmount,
                         'balance_after' => $balanceAfter,
                         'reference' => 'Order #'.$order->id,
                     ]);
@@ -503,16 +644,17 @@ class CheckoutController extends Controller
             }
 
             // Deduct KD Registration credit if paying with credit
-            if ($paymentMethod === 'kd_credit' && $orderKdId) {
+            $creditDebit = $splitPayment ? (float) $kdAmt : ($paymentMethod === 'kd_credit' ? (float) $data['cartTotal'] : 0);
+            if ($creditDebit > 0 && $orderKdId) {
                 $kdRegistration = KdRegistration::where('kd_no', $orderKdId)->first();
                 if ($kdRegistration) {
                     $currentBalance = $kdRegistration->credits()->sum(DB::raw("CASE WHEN type = 'credit' THEN amount ELSE -amount END"));
-                    $newBalance = $currentBalance - $data['cartTotal'];
+                    $newBalance = $currentBalance - $creditDebit;
 
                     KdRegistrationCredit::create([
                         'kd_registration_id' => $kdRegistration->id,
                         'type' => KdRegistrationCredit::TYPE_DEBIT,
-                        'amount' => $data['cartTotal'],
+                        'amount' => $creditDebit,
                         'balance_after' => $newBalance,
                         'reference' => 'Order #'.$order->invoice_number,
                         'notes' => 'Payment for order',
@@ -522,10 +664,9 @@ class CheckoutController extends Controller
             }
 
             // Deduct DPBV if paying with DPBV
-            if ($paymentMethod === Order::PAYMENT_DPBV) {
-                $totalDpbv = (float) $this->effectiveDpbvQuery($user)->sum('dpbv');
-                $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
-                $amountToDeduct = $data['cartTotal'];
+            $dpbvDebit = $splitPayment ? (float) $dpbvAmt : ($paymentMethod === Order::PAYMENT_DPBV ? (float) $data['cartTotal'] : 0);
+            if ($dpbvDebit > 0) {
+                $amountToDeduct = $dpbvDebit;
 
                 // Calculate how much DPBV to deduct (reverse calculation: naira / 990 / 0.95)
                 $dpbvToDeduct = $amountToDeduct / 990 / 0.95;
@@ -732,24 +873,16 @@ class CheckoutController extends Controller
             return redirect()->route('orders.index', ['status' => 'draft'])->with('error', 'Insufficient wallet balance. Need ₦'.number_format($subtotal, 0).' – you have ₦'.number_format($walletOwner->wallet_balance ?? 0, 0).'.');
         }
 
-        DB::transaction(function () use ($walletOwner, $order, $subtotal, $branchUserId, $isHeadquarters, $stockOwner) {
+        DB::transaction(function () use ($walletOwner, $order, $subtotal, $branchUserId, $isHeadquarters, $stockOwner, $stockUserId, $roleName) {
             $order->update([
                 'payment_method' => Order::PAYMENT_WALLET,
                 'status' => Order::STATUS_PAID,
                 'branch_user_id' => $branchUserId,
             ]);
 
-            // For Headquarters stock owner, deduct stock immediately when order is paid
-            if ($isHeadquarters) {
-                $order->load('items');
-                foreach ($order->items as $item) {
-                    $product = \App\Models\Product::where('item_code', $item->item_code)->first();
-                    if ($product) {
-                        HeadquartersStock::decrementStock($stockOwner->id, $product->id, $item->quantity);
-                    }
-                }
-            }
-            // For other users, stock will be deducted when order is marked as completed
+            $order->load('items');
+            $this->deductStockForCompletedPayment($order->items, $isHeadquarters, $stockUserId, $roleName, (int) $stockOwner->id);
+            $order->update(['stock_deducted_at' => now()]);
 
             $walletOwner->decrement('wallet_balance', $subtotal);
             $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
@@ -827,7 +960,7 @@ class CheckoutController extends Controller
             }
         }
 
-        DB::transaction(function () use ($user, $walletOwner, $drafts, $branchUserId, $isHeadquarters, $stockOwner) {
+        DB::transaction(function () use ($user, $walletOwner, $drafts, $branchUserId, $isHeadquarters, $stockOwner, $stockUserId, $roleName) {
             foreach ($drafts as $order) {
                 $subtotal = (float) $order->subtotal;
                 $order->update([
@@ -836,17 +969,9 @@ class CheckoutController extends Controller
                     'branch_user_id' => $branchUserId,
                 ]);
 
-                // For Headquarters stock owner, deduct stock immediately when order is paid
-                if ($isHeadquarters) {
-                    $order->load('items');
-                    foreach ($order->items as $item) {
-                        $product = \App\Models\Product::where('item_code', $item->item_code)->first();
-                        if ($product) {
-                            HeadquartersStock::decrementStock($stockOwner->id, $product->id, $item->quantity);
-                        }
-                    }
-                }
-                // For other users, stock will be deducted when order is marked as completed
+                $order->load('items');
+                $this->deductStockForCompletedPayment($order->items, $isHeadquarters, $stockUserId, $roleName, (int) $stockOwner->id);
+                $order->update(['stock_deducted_at' => now()]);
 
                 $walletOwner->decrement('wallet_balance', $subtotal);
                 $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
@@ -892,6 +1017,44 @@ class CheckoutController extends Controller
         }
 
         return BranchStock::getQuantity($userId, $productId);
+    }
+
+    /**
+     * Take stock as soon as checkout payment is completed.
+     *
+     * @param  iterable<int, object>  $items
+     */
+    private function deductStockForCompletedPayment(iterable $items, bool $isHeadquarters, ?int $stockUserId, string $roleName, int $stockOwnerId): void
+    {
+        foreach ($items as $item) {
+            $product = $item->product ?? Product::where('item_code', $item->item_code ?? '')->first();
+            if (! $product) {
+                continue;
+            }
+            $qty = (int) $item->quantity;
+            if ($qty < 1) {
+                continue;
+            }
+
+            if ($isHeadquarters) {
+                HeadquartersStock::decrementStock($stockOwnerId, $product->id, $qty);
+                continue;
+            }
+
+            if ($stockUserId) {
+                $product->decrement('stock', $qty);
+                if ($roleName === 'service_center') {
+                    ServiceCenterStock::decrementStock($stockUserId, $product->id, $qty);
+                } elseif ($roleName === 'annex') {
+                    AnnexStock::decrementStock($stockUserId, $product->id, $qty);
+                } else {
+                    BranchStock::decrementStock($stockUserId, $product->id, $qty);
+                }
+                continue;
+            }
+
+            $product->decrement('stock', $qty);
+        }
     }
 
     /**
@@ -1008,11 +1171,10 @@ class CheckoutController extends Controller
                     'pv' => $item->product->pv,
                 ]);
 
-                // Deduct stock for Headquarters users
-                if ($isHeadquarters) {
-                    HeadquartersStock::decrementStock($user->id, $item->product->id, $item->quantity);
-                }
             }
+
+            $this->deductStockForCompletedPayment($data['cartItems'], $isHeadquarters, $stockUserId, $user->role?->name ?? '', (int) $user->id);
+            $order->update(['stock_deducted_at' => now()]);
 
             // Deduct DPBV
             $amountToDeduct = $data['cartSubtotal'];

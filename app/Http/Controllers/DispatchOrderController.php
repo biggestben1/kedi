@@ -477,6 +477,10 @@ class DispatchOrderController extends Controller
      */
     private function deductStockFromOrder(Order $order): void
     {
+        if ($order->stock_deducted_at) {
+            return;
+        }
+
         $order->load('items', 'user.role');
         $branchUserId = $order->branch_user_id;
         $orderUser = $order->user;
@@ -514,6 +518,8 @@ class DispatchOrderController extends Controller
                     $product->decrement('stock', $item->quantity);
                 }
             }
+
+            $order->update(['stock_deducted_at' => now()]);
         });
     }
 
