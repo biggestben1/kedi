@@ -300,6 +300,16 @@
                                             @error('pos_amount_paid')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                             @error('split_payment')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                         </div>
+                                        <div class="col-12">
+                                            <div class="text-muted fw-semibold" style="font-size: 15px;">
+                                                DPBV Available: <strong><span id="split-dpbv-total">0.00</span> DPBV</strong> (₦<span id="split-dpbv-naira">0.00</span>)
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="text-muted fw-semibold" style="font-size: 15px;">
+                                                Total due: ₦<span id="split-total-due">0.00</span> • Split total: ₦<span id="split-total-entered">0.00</span> • Remaining: ₦<span id="split-remaining">0.00</span>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="row g-3 mb-3">
@@ -329,6 +339,7 @@
                                             <option value="kd_credit" {{ old('payment_method') === 'kd_credit' ? 'selected' : '' }}>KD Credit</option>
                                             <option value="cash" {{ old('payment_method') === 'cash' ? 'selected' : '' }}>Cash</option>
                                             <option value="transfer" {{ old('payment_method') === 'transfer' ? 'selected' : '' }}>Transfer</option>
+                                            <option value="cheque" {{ old('payment_method') === 'cheque' ? 'selected' : '' }}>Cheque</option>
                                             <option value="pay_on_delivery" {{ old('payment_method') === 'pay_on_delivery' ? 'selected' : '' }}>Pay on Delivery</option>
                                         </select>
                                         <input type="checkbox" id="split-payment-toggle" name="split_payment" value="1" {{ old('split_payment') ? 'checked' : '' }}>
@@ -354,16 +365,10 @@
                                             <input type="number" step="0.01" min="0" name="split_cash_amount" class="form-control @error('split_cash_amount') is-invalid @enderror" value="{{ old('split_cash_amount', 0) }}">
                                             @error('split_cash_amount')<div class="text-danger small">{{ $message }}</div>@enderror
                                         </div>
-                                        <div class="col-12">
-                                            <div class="text-muted fw-semibold" style="font-size: 15px;">
-                                                DPBV Available: <strong><span id="split-dpbv-total">0.00</span> DPBV</strong> (₦<span id="split-dpbv-naira">0.00</span>)
-                                            </div>
-                                        </div>
-                                        <div class="col-12">
-                                            <div class="text-muted fw-semibold" style="font-size: 15px;">
-                                                Total due: ₦<span id="split-total-due">0.00</span> • Split total: ₦<span id="split-total-entered">0.00</span> • Remaining: ₦<span id="split-remaining">0.00</span>
-                                            </div>
-                                            @error('split_payment')<div class="text-danger small">{{ $message }}</div>@enderror
+                                        <div class="col-md-3">
+                                            <label class="form-label">Cheque Amount</label>
+                                            <input type="number" step="0.01" min="0" name="split_cheque_amount" class="form-control @error('split_cheque_amount') is-invalid @enderror" value="{{ old('split_cheque_amount', 0) }}">
+                                            @error('split_cheque_amount')<div class="text-danger small">{{ $message }}</div>@enderror
                                         </div>
                                     </div>
 
@@ -439,14 +444,16 @@
                                             <label class="form-label mb-0">Products — enter quantity needed</label>
                                             <input type="search" id="product-search" class="form-control form-control-sm" placeholder="Search products..." style="max-width: 240px;" autocomplete="off">
                                         </div>
+                                        <div id="product-stock-summary" class="alert alert-warning py-2 px-3 mb-2" style="display:none;" role="alert"></div>
                                         <div class="table-responsive mb-2">
                                             <table class="table table-bordered" id="product-quantities-table">
                                                 <thead>
                                                     <tr>
                                                         <th>Product</th>
                                                         <th style="width:80px">Unit</th>
+                                                        <th style="width:100px" class="text-end">In Stock</th>
                                                         <th style="width:120px" class="text-end">Unit Price</th>
-                                                        <th style="width:120px">Quantity</th>
+                                                        <th style="width:140px">Quantity</th>
                                                         <th style="width:100px" class="text-end">PV</th>
                                                         <th style="width:100px" class="text-end">BV</th>
                                                         <th style="width:120px" class="text-end">Line Total</th>
@@ -458,13 +465,23 @@
                                                             $unitPrice = $product->getPriceForUser($user);
                                                             $pv = (float) ($product->pv ?? 0);
                                                             $bv = (float) ($product->bv ?? 0);
+                                                            $stockQty = (int) ($productStocks[$product->id] ?? 0);
                                                         ?>
-                                                        <tr class="product-row" data-unit-price="{{ $unitPrice }}" data-pv="{{ $pv }}" data-bv="{{ $bv }}" data-search="{{ strtolower($product->name . ' ' . ($product->pack_size ?? '') . ' ' . ($product->item_code ?? '')) }}">
-                                                            <td>{{ $product->display_name }}</td>
+                                                        <tr class="product-row {{ $stockQty <= 0 ? 'table-secondary' : '' }}" data-unit-price="{{ $unitPrice }}" data-pv="{{ $pv }}" data-bv="{{ $bv }}" data-stock="{{ $stockQty }}" data-search="{{ strtolower($product->name . ' ' . ($product->pack_size ?? '') . ' ' . ($product->item_code ?? '')) }}">
+                                                            <td>
+                                                                {{ $product->display_name }}
+                                                                @if($stockQty <= 0)
+                                                                    <span class="badge bg-danger ms-1">Out of stock</span>
+                                                                @endif
+                                                            </td>
                                                             <td>{{ $product->pack_size ?? 'pcs' }}</td>
+                                                            <td class="text-end">
+                                                                <span class="product-stock-qty {{ $stockQty <= 0 ? 'text-danger fw-semibold' : 'text-success' }}">{{ $stockQty }}</span>
+                                                            </td>
                                                             <td class="text-end">₦{{ number_format($unitPrice, 2) }}</td>
                                                             <td>
-                                                                <input type="number" name="product_quantities[{{ $product->id }}]" class="form-control form-control-sm product-qty" value="{{ old('product_quantities.'.$product->id, $prefillQuantities[$product->id] ?? 0) }}" min="0" step="1" data-unit-price="{{ $unitPrice }}">
+                                                                <input type="number" name="product_quantities[{{ $product->id }}]" class="form-control form-control-sm product-qty" value="{{ old('product_quantities.'.$product->id, $prefillQuantities[$product->id] ?? 0) }}" min="0" step="1" max="{{ max($stockQty, 0) }}" data-unit-price="{{ $unitPrice }}" data-stock="{{ $stockQty }}" @if($stockQty <= 0) title="Out of stock" @endif>
+                                                                <div class="product-stock-feedback small mt-1" aria-live="polite"></div>
                                                             </td>
                                                             <td class="text-end">
                                                                 <small class="text-muted d-block">Unit: {{ number_format($pv, 1) }}</small>
@@ -480,31 +497,31 @@
                                                 </tbody>
                                                 <tfoot>
                                                     <tr>
-                                                        <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
+                                                        <td colspan="5" class="text-end"><strong>Subtotal:</strong></td>
                                                         <td class="text-end"><strong id="product-subtotal-pv">0</strong></td>
                                                         <td class="text-end"><strong id="product-subtotal-bv">0</strong></td>
                                                         <td class="text-end"><strong id="product-subtotal">0.00</strong></td>
                                                     </tr>
                                                     <tr>
-                                                        <td colspan="4" class="text-end"><label class="mb-0">Tax:</label></td>
+                                                        <td colspan="5" class="text-end"><label class="mb-0">Tax:</label></td>
                                                         <td></td>
                                                         <td></td>
                                                         <td><input type="number" name="tax" class="form-control form-control-sm" step="0.01" min="0" value="{{ old('tax', 0) }}" id="tax-input" style="width:100px; margin-left: auto;"></td>
                                                     </tr>
                                                     <tr>
-                                                        <td colspan="4" class="text-end"><label class="mb-0">Extra Discount:</label></td>
+                                                        <td colspan="5" class="text-end"><label class="mb-0">Extra Discount:</label></td>
                                                         <td></td>
                                                         <td></td>
                                                         <td><input type="number" name="discount" class="form-control form-control-sm" step="0.01" min="0" value="{{ old('discount', 0) }}" id="discount-input" style="width:100px; margin-left: auto;"></td>
                                                     </tr>
                                                     <tr id="coupon-discount-row" style="display:none;">
-                                                        <td colspan="4" class="text-end"><strong>Coupon Discount:</strong></td>
+                                                        <td colspan="5" class="text-end"><strong>Coupon Discount:</strong></td>
                                                         <td></td>
                                                         <td></td>
                                                         <td class="text-end"><strong>-<span id="coupon-discount-amount">0.00</span></strong></td>
                                                     </tr>
                                                     <tr>
-                                                        <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                                                        <td colspan="5" class="text-end"><strong>Total:</strong></td>
                                                         <td class="text-end"><strong id="product-total-pv">0</strong></td>
                                                         <td class="text-end"><strong id="product-total-bv">0</strong></td>
                                                         <td class="text-end"><strong id="product-total">0.00</strong></td>
@@ -513,6 +530,7 @@
                                             </table>
                                         </div>
                                         @error('product_quantities')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        @error('status')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
                                     </div>
 
                                     <div id="manual-items-section" style="{{ old('use_product_quantities', 0) ? 'display:none;' : '' }}">
@@ -539,7 +557,10 @@
                                                 <tbody id="invoice-items-tbody">
                                                     <tr class="invoice-item-row">
                                                         <td><input type="text" name="items[0][item_name]" class="form-control form-control-sm" list="invoice-products-datalist" autocomplete="off"></td>
-                                                        <td><input type="number" name="items[0][quantity]" class="form-control form-control-sm item-qty" step="1" min="1" value="1" required></td>
+                                                        <td>
+                                                        <input type="number" name="items[0][quantity]" class="form-control form-control-sm item-qty" step="1" min="1" value="1" required>
+                                                        <div class="manual-stock-feedback small mt-1" aria-live="polite"></div>
+                                                    </td>
                                                         <td><input type="text" name="items[0][unit]" class="form-control form-control-sm" placeholder="pcs"></td>
                                                         <td><input type="number" name="items[0][unit_price]" class="form-control form-control-sm item-price" step="0.01" min="0" value="0" required></td>
                                                         <td class="text-end">
@@ -614,6 +635,16 @@
                                     <div class="modal-body">
                                         <div class="row g-3">
                                             <div class="col-12">
+                                                <div class="text-muted fw-semibold" style="font-size: 15px;">
+                                                    DPBV Available: <strong><span id="split-dpbv-total-modal">0.00</span> DPBV</strong> (₦<span id="split-dpbv-naira-modal">0.00</span>)
+                                                </div>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="text-muted fw-semibold" style="font-size: 15px;">
+                                                    Total due: ₦<span id="split-total-due-modal">0.00</span> • Split total: ₦<span id="split-total-entered-modal">0.00</span> • Remaining: ₦<span id="split-remaining-modal">0.00</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-12">
                                                 <label class="form-label">Coupon Code</label>
                                                 <div class="input-group">
                                                     <input type="text" id="payment_coupon_code" class="form-control" placeholder="Enter coupon code (optional)">
@@ -670,7 +701,7 @@
                                             <div class="col-12">
                                                 <div class="form-check">
                                                     <input class="form-check-input" type="checkbox" id="split_payment_modal">
-                                                    <label class="form-check-label" for="split_payment_modal">Split payment (Wallet + Credit + Cash)</label>
+                                                    <label class="form-check-label" for="split_payment_modal">Split payment (Wallet + Credit + Cash + Cheque)</label>
                                                 </div>
                                             </div>
                                             <div class="col-12" id="split_fields_modal" style="display:none;">
@@ -687,17 +718,11 @@
                                                     </div>
                                                     <div class="col-md-3">
                                                         <label class="form-label">Cash Amount</label>
-                                                    <input type="text" inputmode="decimal" id="split_cash_amount_modal" class="form-control" value="" placeholder="0.00">
+                                                        <input type="text" inputmode="decimal" id="split_cash_amount_modal" class="form-control" value="" placeholder="0.00">
                                                     </div>
-                                                    <div class="col-12">
-                                                        <div class="text-muted fw-semibold" style="font-size: 15px;">
-                                                            DPBV Available: <strong><span id="split-dpbv-total-modal">0.00</span> DPBV</strong> (₦<span id="split-dpbv-naira-modal">0.00</span>)
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-12">
-                                                        <div class="text-muted fw-semibold" style="font-size: 15px;">
-                                                            Total due: ₦<span id="split-total-due-modal">0.00</span> • Split total: ₦<span id="split-total-entered-modal">0.00</span> • Remaining: ₦<span id="split-remaining-modal">0.00</span>
-                                                        </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label">Cheque Amount</label>
+                                                        <input type="text" inputmode="decimal" id="split_cheque_amount_modal" class="form-control" value="" placeholder="0.00">
                                                     </div>
                                                 </div>
                                             </div>
@@ -843,6 +868,56 @@
         // Products section calculations
         var productTable = document.getElementById('product-quantities-table');
         if (productTable) {
+            function checkProductStock(row) {
+                var input = row.querySelector('.product-qty');
+                var feedback = row.querySelector('.product-stock-feedback');
+                if (!input) return true;
+                var qty = parseFloat(input.value) || 0;
+                var stock = parseInt(input.getAttribute('data-stock') || row.getAttribute('data-stock') || '0', 10) || 0;
+                var ok = true;
+                var msg = '';
+
+                if (qty > 0 && stock <= 0) {
+                    ok = false;
+                    msg = 'Out of stock — not available.';
+                } else if (qty > stock) {
+                    ok = false;
+                    msg = 'Only ' + stock + ' in stock. Reduce quantity.';
+                }
+
+                input.classList.toggle('is-invalid', !ok);
+                row.classList.toggle('table-danger', !ok && qty > 0);
+                if (feedback) {
+                    feedback.textContent = msg;
+                    feedback.className = 'product-stock-feedback small mt-1 ' + (ok ? '' : 'text-danger fw-semibold');
+                }
+                return ok;
+            }
+
+            function updateProductStockSummary() {
+                var bad = [];
+                productTable.querySelectorAll('.product-row').forEach(function(row) {
+                    var input = row.querySelector('.product-qty');
+                    var qty = parseFloat(input?.value) || 0;
+                    if (qty <= 0) return;
+                    var stock = parseInt(input.getAttribute('data-stock') || row.getAttribute('data-stock') || '0', 10) || 0;
+                    if (qty > stock) {
+                        var nameCell = row.querySelector('td');
+                        var name = nameCell ? nameCell.childNodes[0].textContent.trim() : 'Product';
+                        bad.push(name + ' (need ' + qty + ', have ' + stock + ')');
+                    }
+                });
+                var summary = document.getElementById('product-stock-summary');
+                if (!summary) return;
+                if (bad.length) {
+                    summary.style.display = '';
+                    summary.textContent = 'Stock issue: ' + bad.join('; ');
+                } else {
+                    summary.style.display = 'none';
+                    summary.textContent = '';
+                }
+            }
+
             function updateProductTotals() {
                 var subtotal = 0, subtotalPv = 0, subtotalBv = 0;
                 productTable.querySelectorAll('.product-row').forEach(function(row) {
@@ -856,10 +931,12 @@
                     row.querySelector('.product-line-total').textContent = formatPrice(lineTotal);
                     row.querySelector('.product-line-pv').textContent = formatPvBv(linePv);
                     row.querySelector('.product-line-bv').textContent = formatPvBv(lineBv);
+                    checkProductStock(row);
                     subtotal += lineTotal;
                     subtotalPv += linePv;
                     subtotalBv += lineBv;
                 });
+                updateProductStockSummary();
                 var tax = parseFloat(document.getElementById('tax-input').value) || 0;
                 var discount = parseFloat(document.getElementById('discount-input').value) || 0;
                 setCoupon(coupon.percentage, subtotal);
@@ -895,6 +972,7 @@
             }
             productTable.querySelectorAll('.product-qty').forEach(function(input) {
                 input.addEventListener('input', updateProductTotals);
+                input.addEventListener('change', updateProductTotals);
             });
             document.getElementById('tax-input').addEventListener('input', updateProductTotals);
             document.getElementById('discount-input').addEventListener('input', updateProductTotals);
@@ -910,6 +988,24 @@
                 });
             }
 
+            var invoiceForm = document.getElementById('invoice-form');
+            if (invoiceForm) {
+                invoiceForm.addEventListener('submit', function(e) {
+                    if (!useProductsToggle || !useProductsToggle.checked) return;
+                    var hasError = false;
+                    productTable.querySelectorAll('.product-row').forEach(function(row) {
+                        if (!checkProductStock(row)) hasError = true;
+                    });
+                    updateProductStockSummary();
+                    if (hasError) {
+                        e.preventDefault();
+                        var summary = document.getElementById('product-stock-summary');
+                        if (summary) summary.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        alert('Some products are out of stock or over available quantity. Please fix quantities before saving.');
+                    }
+                });
+            }
+
             updateProductTotals();
         }
 
@@ -921,7 +1017,10 @@
             template.innerHTML = `
                 <tr class="invoice-item-row">
                     <td><input type="text" name="items[__INDEX__][item_name]" class="form-control form-control-sm" list="invoice-products-datalist" autocomplete="off"></td>
-                    <td><input type="number" name="items[__INDEX__][quantity]" class="form-control form-control-sm item-qty" step="1" min="1" value="1" required></td>
+                    <td>
+                        <input type="number" name="items[__INDEX__][quantity]" class="form-control form-control-sm item-qty" step="1" min="1" value="1" required>
+                        <div class="manual-stock-feedback small mt-1" aria-live="polite"></div>
+                    </td>
                     <td><input type="text" name="items[__INDEX__][unit]" class="form-control form-control-sm" placeholder="pcs"></td>
                     <td><input type="number" name="items[__INDEX__][unit_price]" class="form-control form-control-sm item-price" step="0.01" min="0" value="0" required></td>
                     <td class="text-end">
@@ -936,6 +1035,36 @@
                     <td><button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove row">×</button></td>
                 </tr>
             `;
+
+            function checkManualRowStock(row) {
+                var qtyInput = row.querySelector('.item-qty');
+                var feedback = row.querySelector('.manual-stock-feedback');
+                var stockAttr = row.getAttribute('data-stock');
+                if (stockAttr === null || stockAttr === '') {
+                    if (qtyInput) qtyInput.classList.remove('is-invalid');
+                    if (feedback) feedback.textContent = '';
+                    return true;
+                }
+                var stock = parseInt(stockAttr, 10) || 0;
+                var qty = parseFloat(qtyInput?.value) || 0;
+                var ok = true;
+                var msg = '';
+                if (qty > 0 && stock <= 0) {
+                    ok = false;
+                    msg = 'Out of stock — not available.';
+                } else if (qty > stock) {
+                    ok = false;
+                    msg = 'Only ' + stock + ' in stock.';
+                } else if (qty > 0) {
+                    msg = stock + ' in stock';
+                }
+                if (qtyInput) qtyInput.classList.toggle('is-invalid', !ok);
+                if (feedback) {
+                    feedback.textContent = msg;
+                    feedback.className = 'manual-stock-feedback small mt-1 ' + (ok ? 'text-muted' : 'text-danger fw-semibold');
+                }
+                return ok;
+            }
 
             function updateTotals() {
                 var subtotal = 0, subtotalPv = 0, subtotalBv = 0;
@@ -956,6 +1085,7 @@
                     if (unitBvEl) unitBvEl.textContent = formatPvBv(bvUnit);
                     if (linePvEl) linePvEl.textContent = formatPvBv(linePv);
                     if (lineBvEl) lineBvEl.textContent = formatPvBv(lineBv);
+                    checkManualRowStock(row);
                     subtotal += lineTotal;
                     subtotalPv += linePv;
                     subtotalBv += lineBv;
@@ -1084,6 +1214,8 @@
                     }
                     var p = productIndex[key];
                     if (!p) {
+                        row.removeAttribute('data-stock');
+                        checkManualRowStock(row);
                         mergeDuplicateRows(row);
                         return updateTotals();
                     }
@@ -1095,6 +1227,8 @@
                     if (priceInput) priceInput.value = p.price || 0;
                     row.setAttribute('data-pv-unit', String(p.pv || 0));
                     row.setAttribute('data-bv-unit', String(p.bv || 0));
+                    row.setAttribute('data-stock', String(p.stock != null ? p.stock : ''));
+                    checkManualRowStock(row);
                     updateTotals();
                     mergeDuplicateRows(row);
                     maybeAutoAddRow(row);
@@ -1412,12 +1546,14 @@
             var modalWallet = document.getElementById('split_wallet_amount_modal');
             var modalKd = document.getElementById('split_kd_credit_amount_modal');
             var modalCash = document.getElementById('split_cash_amount_modal');
+            var modalCheque = document.getElementById('split_cheque_amount_modal');
             var modalWalletWrap = document.getElementById('split_wallet_amount_modal_wrap');
             var modalKdWrap = document.getElementById('split_kd_credit_amount_modal_wrap');
 
             var hiddenWallet = document.querySelector('input[name="split_wallet_amount"]');
             var hiddenKd = document.querySelector('input[name="split_kd_credit_amount"]');
             var hiddenCash = document.querySelector('input[name="split_cash_amount"]');
+            var hiddenCheque = document.querySelector('input[name="split_cheque_amount"]');
 
             var sumMethod = document.getElementById('payment-summary-method');
             var sumPos = document.getElementById('payment-summary-pos');
@@ -1450,10 +1586,11 @@
                 var walletAmt = parseMoney(modalWallet?.value);
                 var kdAmt = parseMoney(modalKd?.value);
                 var cashAmt = parseMoney(modalCash?.value);
+                var chequeAmt = parseMoney(modalCheque?.value);
                 var posAmt = parseMoney(modalPos?.value);
                 var bankAmt = parseMoney(modalBankAmount?.value);
 
-                var sum = walletAmt + kdAmt + cashAmt + posAmt + bankAmt;
+                var sum = walletAmt + kdAmt + cashAmt + chequeAmt + posAmt + bankAmt;
                 var rem = due - sum;
                 enteredEl.textContent = fmt(sum);
                 remainingEl.textContent = fmt(rem);
@@ -1466,6 +1603,7 @@
                     kd_credit: 'KD Credit',
                     cash: 'Cash',
                     transfer: 'Transfer',
+                    cheque: 'Cheque',
                     pay_on_delivery: 'Pay on Delivery'
                 })[method] || '—';
             }
@@ -1483,6 +1621,7 @@
                 if (modalWallet && hiddenWallet) modalWallet.value = (parseFloat(hiddenWallet.value || 0) > 0) ? fmt(hiddenWallet.value) : '';
                 if (modalKd && hiddenKd) modalKd.value = (parseFloat(hiddenKd.value || 0) > 0) ? fmt(hiddenKd.value) : '';
                 if (modalCash && hiddenCash) modalCash.value = (parseFloat(hiddenCash.value || 0) > 0) ? fmt(hiddenCash.value) : '';
+                if (modalCheque && hiddenCheque) modalCheque.value = (parseFloat(hiddenCheque.value || 0) > 0) ? fmt(hiddenCheque.value) : '';
 
                 // Coupon
                 if (modalCoupon && mainCoupon) modalCoupon.value = mainCoupon.value || '';
@@ -1515,9 +1654,11 @@
                 if (hiddenWallet && modalWallet) hiddenWallet.value = parseMoney(modalWallet.value || '0').toFixed(2);
                 if (hiddenKd && modalKd) hiddenKd.value = parseMoney(modalKd.value || '0').toFixed(2);
                 if (hiddenCash && modalCash) hiddenCash.value = parseMoney(modalCash.value || '0').toFixed(2);
+                if (hiddenCheque && modalCheque) hiddenCheque.value = parseMoney(modalCheque.value || '0').toFixed(2);
                 if (hiddenWallet) hiddenWallet.dispatchEvent(new Event('input', { bubbles: true }));
                 if (hiddenKd) hiddenKd.dispatchEvent(new Event('input', { bubbles: true }));
                 if (hiddenCash) hiddenCash.dispatchEvent(new Event('input', { bubbles: true }));
+                if (hiddenCheque) hiddenCheque.dispatchEvent(new Event('input', { bubbles: true }));
 
                 updateSummary();
                 updateModalSplitTotals();
@@ -1543,9 +1684,11 @@
                 if (hiddenWallet && modalWallet) hiddenWallet.value = parseMoney(modalWallet.value || '0').toFixed(2);
                 if (hiddenKd && modalKd) hiddenKd.value = parseMoney(modalKd.value || '0').toFixed(2);
                 if (hiddenCash && modalCash) hiddenCash.value = parseMoney(modalCash.value || '0').toFixed(2);
+                if (hiddenCheque && modalCheque) hiddenCheque.value = parseMoney(modalCheque.value || '0').toFixed(2);
                 if (hiddenWallet) hiddenWallet.dispatchEvent(new Event('input', { bubbles: true }));
                 if (hiddenKd) hiddenKd.dispatchEvent(new Event('input', { bubbles: true }));
                 if (hiddenCash) hiddenCash.dispatchEvent(new Event('input', { bubbles: true }));
+                if (hiddenCheque) hiddenCheque.dispatchEvent(new Event('input', { bubbles: true }));
 
                 updateSummary();
                 updateModalSplitTotals();
@@ -1569,6 +1712,7 @@
             wireMoneyInput(modalWallet);
             wireMoneyInput(modalKd);
             wireMoneyInput(modalCash);
+            wireMoneyInput(modalCheque);
 
             function applySplitPosBankVisibility() {
                 if (!modalSplitPosBankWrap) return;
@@ -2081,6 +2225,7 @@
             var wallet = document.querySelector('input[name="split_wallet_amount"]');
             var kd = document.querySelector('input[name="split_kd_credit_amount"]');
             var cash = document.querySelector('input[name="split_cash_amount"]');
+            var cheque = document.querySelector('input[name="split_cheque_amount"]');
 
             var dueEl = document.getElementById('split-total-due');
             var enteredEl = document.getElementById('split-total-entered');
@@ -2134,12 +2279,14 @@
                 var modalWallet = document.getElementById('split_wallet_amount_modal');
                 var modalKd = document.getElementById('split_kd_credit_amount_modal');
                 var modalCash = document.getElementById('split_cash_amount_modal');
+                var modalCheque = document.getElementById('split_cheque_amount_modal');
 
                 var walletAmt = (modalWallet && (modalWallet.value || '').trim() !== '') ? parseMoneyText(modalWallet.value) : parseNum(wallet?.value);
                 var kdAmt = (modalKd && (modalKd.value || '').trim() !== '') ? parseMoneyText(modalKd.value) : parseNum(kd?.value);
                 var cashAmt = (modalCash && (modalCash.value || '').trim() !== '') ? parseMoneyText(modalCash.value) : parseNum(cash?.value);
+                var chequeAmt = (modalCheque && (modalCheque.value || '').trim() !== '') ? parseMoneyText(modalCheque.value) : parseNum(cheque?.value);
 
-                var sum = walletAmt + kdAmt + cashAmt + posAmt + bankAmt;
+                var sum = walletAmt + kdAmt + cashAmt + chequeAmt + posAmt + bankAmt;
                 var rem = due - sum;
                 if (dueEl) dueEl.textContent = fmt(due);
                 if (enteredEl) enteredEl.textContent = fmt(sum);
@@ -2149,23 +2296,22 @@
                 if (remainingModalEl) remainingModalEl.textContent = fmt(rem);
             }
 
-            [wallet, kd, cash].forEach(function(inp) {
+            [wallet, kd, cash, cheque].forEach(function(inp) {
                 if (inp) inp.addEventListener('input', recalc);
             });
             ['pos_amount_paid_modal', 'bank_amount_paid_modal'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.addEventListener('input', recalc);
             });
-            ['split_wallet_amount_modal', 'split_kd_credit_amount_modal', 'split_cash_amount_modal'].forEach(function(id) {
+            ['split_wallet_amount_modal', 'split_kd_credit_amount_modal', 'split_cash_amount_modal', 'split_cheque_amount_modal'].forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.addEventListener('input', recalc);
             });
 
-            // when totals change
+            // when totals change (totals shown above coupon always)
             document.addEventListener('input', function(e) {
-                if (!splitToggle.checked) return;
                 if (!e.target) return;
-                if (e.target.id === 'tax-input' || e.target.id === 'discount-input' || e.target.classList?.contains('product-qty') || e.target.id === 'tax-input-manual' || e.target.id === 'discount-input-manual') {
+                if (e.target.id === 'tax-input' || e.target.id === 'discount-input' || e.target.classList?.contains('product-qty') || e.target.id === 'tax-input-manual' || e.target.id === 'discount-input-manual' || e.target.classList?.contains('item-qty') || e.target.classList?.contains('item-price')) {
                     recalc();
                 }
             });
@@ -2173,7 +2319,7 @@
             // initial
             setTimeout(recalc, 50);
             splitToggle.addEventListener('change', function() {
-                if (splitToggle.checked) setTimeout(recalc, 50);
+                setTimeout(recalc, 50);
             });
         })();
     })();

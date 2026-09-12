@@ -50,6 +50,22 @@
             min-height: 0;
             overflow-y: auto !important;
             overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(80, 90, 120, 0.45) rgba(0, 0, 0, 0.06);
+        }
+        .app-sidebar .main-sidemenu::-webkit-scrollbar {
+            width: 8px;
+        }
+        .app-sidebar .main-sidemenu::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+        }
+        .app-sidebar .main-sidemenu::-webkit-scrollbar-thumb {
+            background: rgba(80, 90, 120, 0.4);
+            border-radius: 4px;
+        }
+        .app-sidebar .main-sidemenu::-webkit-scrollbar-thumb:hover {
+            background: rgba(80, 90, 120, 0.6);
         }
         /* Prevent header hamburger from overlapping sidebar menu on small screens */
         @media (max-width: 991px) {
@@ -138,6 +154,7 @@
                                                 @elseif(auth()->user()->role?->name === 'branch')
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Branch</a>
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
+                                                <a class="dropdown-item" href="{{ route('admin.pharmacy.financial') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Financial Report</a>
                                                 <a class="dropdown-item" href="{{ route('admin.branch.stock.index') }}"><i class="dropdown-icon fe fe-package"></i> My Stock</a>
                                                 <a class="dropdown-item" href="{{ route('admin.users.index') }}"><i class="dropdown-icon fe fe-users"></i> My Users</a>
                                                 <a class="dropdown-item" href="{{ route('admin.invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> Invoices</a>
@@ -145,6 +162,7 @@
                                                 @elseif(auth()->user()->role?->name === 'service_center')
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.reports') }}"><i class="dropdown-icon fe fe-bar-chart-2"></i> Reports</a>
+                                                <a class="dropdown-item" href="{{ route('admin.pharmacy.financial') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Financial Report</a>
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Admin</a>
                                                 <a class="dropdown-item" href="{{ route('admin.invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> Invoices</a>
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="dropdown-icon fe fe-users"></i> Referred Orders</a>
@@ -152,11 +170,16 @@
                                                 @elseif(auth()->user()->role?->name === 'annex')
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.reports') }}"><i class="dropdown-icon fe fe-bar-chart-2"></i> Reports</a>
+                                                <a class="dropdown-item" href="{{ route('admin.pharmacy.financial') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Financial Report</a>
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Admin</a>
                                                 <a class="dropdown-item" href="{{ route('admin.invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
                                                 <a class="dropdown-item" href="{{ route('admin.products.index') }}"><i class="dropdown-icon fe fe-grid"></i> Products</a>
                                                 @elseif(auth()->user()->role?->name === 'accountant')
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Admin</a>
+                                                <a class="dropdown-item" href="{{ route('admin.accountant.office-reports') }}"><i class="dropdown-icon fe fe-layers"></i> Office Reports</a>
+                                                <a class="dropdown-item" href="{{ route('admin.pharmacy.reports') }}"><i class="dropdown-icon fe fe-bar-chart-2"></i> Reports</a>
+                                                <a class="dropdown-item" href="{{ route('admin.pharmacy.financial') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Financial Report</a>
+                                                <a class="dropdown-item" href="{{ route('admin.users.create', ['role' => 'cashier']) }}"><i class="dropdown-icon fe fe-user-plus"></i> Create Cashier</a>
                                                 <a class="dropdown-item" href="{{ route('admin.banks.index') }}"><i class="dropdown-icon fe fe-credit-card"></i> Banks</a>
                                                 <a class="dropdown-item" href="{{ route('admin.accountant.wallet.index') }}"><i class="dropdown-icon fe fe-wallet"></i> Wallet Management</a>
                                                 @else
@@ -325,6 +348,9 @@
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Invoices</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.back_orders*') ? 'active' : '' }}" href="{{ route('admin.back_orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">Back Orders</span></a>
                             </li>
                             <li class="slide">
@@ -371,8 +397,10 @@
                                     <li><a href="{{ route('admin.users.index', ['role' => 'annex']) }}" class="slide-item {{ request()->query('role') === 'annex' ? 'active' : '' }}">Annex</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'service_center']) }}" class="slide-item {{ request()->query('role') === 'service_center' ? 'active' : '' }}">Service Center</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'accountant']) }}" class="slide-item {{ request()->query('role') === 'accountant' ? 'active' : '' }}">Accountant</a></li>
+                                    <li><a href="{{ route('admin.users.index', ['role' => 'cashier']) }}" class="slide-item {{ request()->query('role') === 'cashier' ? 'active' : '' }}">Cashier</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'dispatch']) }}" class="slide-item {{ request()->query('role') === 'dispatch' ? 'active' : '' }}">Dispatch</a></li>
-                                    <li><a href="{{ route('admin.users.create') }}" class="slide-item {{ request()->routeIs('admin.users.create') ? 'active' : '' }}">Create User</a></li>
+                                    <li><a href="{{ route('admin.users.create', ['role' => 'cashier']) }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') === 'cashier' ? 'active' : '' }}">Create Cashier</a></li>
+                                    <li><a href="{{ route('admin.users.create') }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') !== 'cashier' ? 'active' : '' }}">Create User</a></li>
                                 </ul>
                             </li>
                             <li class="slide {{ (request()->routeIs('admin.categories*') || request()->routeIs('admin.products*')) ? 'is-expanded' : '' }}">
@@ -418,6 +446,9 @@
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Invoices</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.back_orders*') ? 'active' : '' }}" href="{{ route('admin.back_orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">Back Orders</span></a>
                             </li>
                             <li class="slide">
@@ -431,6 +462,8 @@
                                     <li><a href="{{ route('admin.users.index', ['role' => 'service_center']) }}" class="slide-item {{ request()->query('role') === 'service_center' ? 'active' : '' }}">Service Center</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'accountant']) }}" class="slide-item {{ request()->query('role') === 'accountant' ? 'active' : '' }}">Accountant</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'dispatch']) }}" class="slide-item {{ request()->query('role') === 'dispatch' ? 'active' : '' }}">Dispatch</a></li>
+                                    <li><a href="{{ route('admin.users.index', ['role' => 'cashier']) }}" class="slide-item {{ request()->query('role') === 'cashier' ? 'active' : '' }}">Cashier</a></li>
+                                    <li><a href="{{ route('admin.users.create', ['role' => 'cashier']) }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') === 'cashier' ? 'active' : '' }}">Create Cashier</a></li>
                                 </ul>
                             </li>
                             <li class="slide {{ (request()->routeIs('admin.categories*') || request()->routeIs('admin.products*')) ? 'is-expanded' : '' }}">
@@ -494,7 +527,10 @@
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.dashboard') ? 'active' : '' }}" href="{{ route('admin.pharmacy.dashboard') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Dashboard</span></a>
                             </li>
                             <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.reports*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.reports') }}"><i class="side-menu__icon fe fe-bar-chart-2"></i><span class="side-menu__label">Reports</span></a>
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.reports') ? 'active' : '' }}" href="{{ route('admin.pharmacy.reports') }}"><i class="side-menu__icon fe fe-bar-chart-2"></i><span class="side-menu__label">Reports</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Invoices</span></a>
@@ -515,6 +551,8 @@
                                     <li><a href="{{ route('admin.users.index', ['role' => 'annex']) }}" class="slide-item {{ request()->query('role') === 'annex' ? 'active' : '' }}">Annex</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'dispatch']) }}" class="slide-item {{ request()->query('role') === 'dispatch' ? 'active' : '' }}">Dispatch</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'accountant']) }}" class="slide-item {{ request()->query('role') === 'accountant' ? 'active' : '' }}">Accountant</a></li>
+                                    <li><a href="{{ route('admin.users.index', ['role' => 'cashier']) }}" class="slide-item {{ request()->query('role') === 'cashier' ? 'active' : '' }}">Cashier</a></li>
+                                    <li><a href="{{ route('admin.users.create', ['role' => 'cashier']) }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') === 'cashier' ? 'active' : '' }}">Create Cashier</a></li>
                                 </ul>
                             </li>
                             <li class="slide">
@@ -558,7 +596,10 @@
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.dashboard') ? 'active' : '' }}" href="{{ route('admin.pharmacy.dashboard') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Dashboard</span></a>
                             </li>
                             <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.reports*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.reports') }}"><i class="side-menu__icon fe fe-bar-chart-2"></i><span class="side-menu__label">Reports</span></a>
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.reports') ? 'active' : '' }}" href="{{ route('admin.pharmacy.reports') }}"><i class="side-menu__icon fe fe-bar-chart-2"></i><span class="side-menu__label">Reports</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
@@ -575,6 +616,8 @@
                                     <li><a href="{{ route('admin.users.index') }}" class="slide-item {{ request()->routeIs('admin.users.index') && empty(request('role')) ? 'active' : '' }}">My Users</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'accountant']) }}" class="slide-item {{ request()->query('role') === 'accountant' ? 'active' : '' }}">Accountant</a></li>
                                     <li><a href="{{ route('admin.users.index', ['role' => 'dispatch']) }}" class="slide-item {{ request()->query('role') === 'dispatch' ? 'active' : '' }}">Dispatch</a></li>
+                                    <li><a href="{{ route('admin.users.index', ['role' => 'cashier']) }}" class="slide-item {{ request()->query('role') === 'cashier' ? 'active' : '' }}">Cashier</a></li>
+                                    <li><a href="{{ route('admin.users.create', ['role' => 'cashier']) }}" class="slide-item {{ request()->routeIs('admin.users.create') && request()->query('role') === 'cashier' ? 'active' : '' }}">Create Cashier</a></li>
                                 </ul>
                             </li>
                             
@@ -593,7 +636,45 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kedi-kits.purchase*') ? 'active' : '' }}" href="{{ route('admin.kedi-kits.purchase.index') }}"><i class="side-menu__icon fe fe-shopping-cart"></i><span class="side-menu__label">Purchase Kits</span></a>
                             </li>
+                            @elseif(auth()->user()->role?->name === 'accountant')
+                            {{-- Accountant menu: reports, financial report, cashiers, wallet --}}
+                            <li class="sub-category"><h3>Main</h3></li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
+                            </li>
+                            <li class="sub-category"><h3>Accountant</h3></li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.accountant.office-reports') ? 'active' : '' }}" href="{{ route('admin.accountant.office-reports') }}"><i class="side-menu__icon fe fe-layers"></i><span class="side-menu__label">Office Reports</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.reports*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.reports') }}"><i class="side-menu__icon fe fe-bar-chart-2"></i><span class="side-menu__label">Reports</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
+                            </li>
+                            <li class="slide {{ request()->routeIs('admin.users*') ? 'is-expanded' : '' }}">
+                                <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Cashiers</span><i class="angle fe fe-chevron-right"></i></a>
+                                <ul class="slide-menu {{ request()->routeIs('admin.users*') ? 'open' : '' }}" style="{{ request()->routeIs('admin.users*') ? 'display: block;' : '' }}">
+                                    <li><a href="{{ route('admin.users.index', ['role' => 'cashier']) }}" class="slide-item {{ request()->query('role') === 'cashier' ? 'active' : '' }}">All Cashiers</a></li>
+                                    <li><a href="{{ route('admin.users.create', ['role' => 'cashier']) }}" class="slide-item {{ request()->routeIs('admin.users.create') ? 'active' : '' }}">Create Cashier</a></li>
+                                </ul>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.banks*') ? 'active' : '' }}" href="{{ route('admin.banks.index') }}"><i class="side-menu__icon fe fe-credit-card"></i><span class="side-menu__label">Banks</span></a>
+                            </li>
+                            <li class="slide {{ request()->routeIs('admin.accountant.wallet*') || request()->routeIs('admin.wallet_topups*') ? 'is-expanded' : '' }}">
+                                <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon fe fe-wallet"></i><span class="side-menu__label">Wallet Management</span><i class="angle fe fe-chevron-right"></i></a>
+                                <ul class="slide-menu {{ request()->routeIs('admin.accountant.wallet*') || request()->routeIs('admin.wallet_topups*') ? 'open' : '' }}" style="{{ request()->routeIs('admin.accountant.wallet*') || request()->routeIs('admin.wallet_topups*') ? 'display: block;' : '' }}">
+                                    <li><a href="{{ route('admin.accountant.wallet.index') }}" class="slide-item {{ request()->routeIs('admin.accountant.wallet.index') ? 'active' : '' }}">All Transactions</a></li>
+                                    <li><a href="{{ route('admin.accountant.wallet.users') }}" class="slide-item {{ request()->routeIs('admin.accountant.wallet.users') ? 'active' : '' }}">User Balances</a></li>
+                                    <li><a href="{{ route('admin.wallet_topups') }}" class="slide-item {{ request()->routeIs('admin.wallet_topups*') ? 'active' : '' }}">Pending Top-ups</a></li>
+                                </ul>
+                            </li>
                             @else
+                            {{-- Super Admin, Wholesale Staff, and other roles --}}
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
@@ -605,9 +686,11 @@
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.dashboard') ? 'active' : '' }}" href="{{ route('admin.pharmacy.dashboard') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Dashboard</span></a>
                             </li>
                             <li class="sub-category"><h3>Admin</h3></li>
-                            @if(auth()->user()->role?->name !== 'accountant')
                             <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.reports*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.reports') }}"><i class="side-menu__icon fe fe-bar-chart-2"></i><span class="side-menu__label">Report</span></a>
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.reports') ? 'active' : '' }}" href="{{ route('admin.pharmacy.reports') }}"><i class="side-menu__icon fe fe-bar-chart-2"></i><span class="side-menu__label">Report</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.journal*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.journal.index') }}"><i class="side-menu__icon fe fe-book-open"></i><span class="side-menu__label">Journal</span></a>
@@ -699,13 +782,7 @@
                                 <a class="side-menu__item {{ request()->routeIs('admin.dispatch.orders.index') && request()->query('status') !== 'completed' ? 'active' : '' }}" href="{{ route('admin.dispatch.orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">All Orders</span></a>
                             </li>
                             <li class="slide">
-                                <form method="POST" action="{{ route('admin.system.clear-orders-wallet') }}" onsubmit="return confirm('This will delete ALL orders and wallet transactions and reset every user\\'s wallet balance to ₦0.00. Are you sure?');">
-                                    @csrf
-                                    <button type="submit" class="side-menu__item border-0 bg-transparent w-100 text-start text-danger">
-                                        <i class="side-menu__icon fe fe-alert-triangle"></i>
-                                        <span class="side-menu__label">Clear Orders &amp; Wallet</span>
-                                    </button>
-                                </form>
+                                <a class="side-menu__item {{ request()->routeIs('admin.system.go-live') ? 'active' : '' }}" href="{{ route('admin.system.go-live') }}"><i class="side-menu__icon fe fe-rocket"></i><span class="side-menu__label">Go Live Reset</span></a>
                             </li>
                             @endif
                             @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff')
@@ -780,7 +857,6 @@
                                     <li><a href="{{ route('admin.wallet_topups.rejected') }}" class="slide-item {{ request()->routeIs('admin.wallet_topups.rejected') ? 'active' : '' }}">Rejected Top-ups</a></li>
                                 </ul>
                             </li>
-                            @endif
                             @endif
                             <li class="sub-category"><h3>Account</h3></li>
                             <li class="slide">

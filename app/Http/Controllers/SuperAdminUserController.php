@@ -11,6 +11,7 @@ use App\Mail\HeadquartersWelcomeMail;
 use App\Mail\ServiceCenterWelcomeMail;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\OrgUserScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -30,19 +31,28 @@ class SuperAdminUserController extends Controller
         $branchOnly = $request->user()?->role?->name === 'branch';
         $serviceCenterOnly = $request->user()?->role?->name === 'service_center';
         $annexOnly = $request->user()?->role?->name === 'annex';
+        $accountantOnly = $request->user()?->role?->name === 'accountant';
+
+        // Accountant: cashiers/distributors under their organisation
+        if ($accountantOnly) {
+            if ($roleName && ! in_array($roleName, ['cashier', 'distributor'], true)) {
+                return redirect()->route('admin.users.index', ['role' => $roleName, 'q' => $q])->with('error', 'Access denied.');
+            }
+            $roleName = $roleName ?: null;
+        }
 
         // Branch: can see users they created (Annex, Service Center, Accountant, Dispatch)
         if ($branchOnly) {
-            if ($roleName && ! in_array($roleName, ['annex', 'service_center', 'accountant', 'dispatch'], true)) {
+            if ($roleName && ! in_array($roleName, ['annex', 'service_center', 'accountant', 'dispatch', 'cashier', 'distributor'], true)) {
                 return redirect()->route('admin.users.index', ['role' => $roleName, 'q' => $q])->with('error', 'Access denied.');
             }
             $roleName = $roleName ?: null;
             $createdBy = $request->user()->id;
         }
 
-        // Service Center: can see users they created (Annex, Dispatch, Accountant)
+        // Service Center: can see users they created (Annex, Dispatch, Accountant, Cashier)
         if ($serviceCenterOnly) {
-            if ($roleName && ! in_array($roleName, ['annex', 'dispatch', 'accountant'], true)) {
+            if ($roleName && ! in_array($roleName, ['annex', 'dispatch', 'accountant', 'cashier', 'distributor'], true)) {
                 return redirect()->route('admin.users.index', ['role' => $roleName, 'q' => $q])->with('error', 'Access denied.');
             }
             $roleName = $roleName ?: null;
@@ -165,6 +175,17 @@ class SuperAdminUserController extends Controller
                         }
                     });
             })
+            ->when($accountantOnly, function ($query) use ($request, $roleName) {
+                $orgOwnerIds = OrgUserScope::orgOwnerIds($request->user());
+                $query->whereIn('created_by_user_id', $orgOwnerIds)
+                    ->whereHas('role', function ($r) use ($roleName) {
+                        if ($roleName && in_array($roleName, ['cashier', 'distributor'], true)) {
+                            $r->where('name', $roleName);
+                        } else {
+                            $r->whereIn('name', ['cashier', 'distributor']);
+                        }
+                    });
+            })
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();
@@ -184,19 +205,21 @@ class SuperAdminUserController extends Controller
 
     public function create(Request $request)
     {
-        $isSuperAdmin = $request->user()?->isSuperAdmin();
-        $isHeadquarters = $request->user()?->isHeadquarters();
+        $currentUser = $request->user();
+        $isSuperAdmin = $currentUser?->isSuperAdmin();
+        $isHeadquarters = $currentUser?->isHeadquarters();
+        $branchOnly = $currentUser?->role?->name === 'branch';
+        $serviceCenterOnly = $currentUser?->role?->name === 'service_center';
+        $annexOnly = $currentUser?->role?->name === 'annex';
+        $accountantOnly = $currentUser?->role?->name === 'accountant';
 
-        if (! $isSuperAdmin && ! $isHeadquarters) {
-            abort(403, 'Access denied. Only Super Admin and Headquarters can create users.');
+        if (! $isSuperAdmin && ! $isHeadquarters && ! $branchOnly && ! $serviceCenterOnly && ! $annexOnly && ! $accountantOnly) {
+            abort(403, 'Access denied.');
         }
 
         $wholesaleOnly = false; // Restricted
         $resellerOnly = false; // Restricted
         $headquartersOnly = $isHeadquarters;
-        $branchOnly = false; // Restricted
-        $serviceCenterOnly = false; // Restricted
-        $annexOnly = false; // Restricted
 
         // Ensure cashier role exists in DB so all allowed creators can use it
         if (! Role::where('name', Role::CASHIER)->exists()) {
@@ -239,6 +262,9 @@ class SuperAdminUserController extends Controller
         if ($annexOnly) {
             $roles->whereIn('name', ['accountant', 'dispatch', 'cashier', 'distributor']);
         }
+        if ($accountantOnly) {
+            $roles->whereIn('name', ['cashier', 'distributor']);
+        }
         $roles = $roles->get();
 
         // Pre-select role from query (e.g. ?role=annex for "Create Annex" shortcut)
@@ -256,19 +282,21 @@ class SuperAdminUserController extends Controller
 
     public function store(Request $request)
     {
-        $isSuperAdmin = $request->user()?->isSuperAdmin();
-        $isHeadquarters = $request->user()?->isHeadquarters();
+        $currentUser = $request->user();
+        $isSuperAdmin = $currentUser?->isSuperAdmin();
+        $isHeadquarters = $currentUser?->isHeadquarters();
+        $branchOnly = $currentUser?->role?->name === 'branch';
+        $serviceCenterOnly = $currentUser?->role?->name === 'service_center';
+        $annexOnly = $currentUser?->role?->name === 'annex';
+        $accountantOnly = $currentUser?->role?->name === 'accountant';
 
-        if (! $isSuperAdmin && ! $isHeadquarters) {
-            abort(403, 'Access denied. Only Super Admin and Headquarters can create users.');
+        if (! $isSuperAdmin && ! $isHeadquarters && ! $branchOnly && ! $serviceCenterOnly && ! $annexOnly && ! $accountantOnly) {
+            abort(403, 'Access denied.');
         }
 
         $wholesaleOnly = false; // Restricted
         $resellerOnly = false; // Restricted
         $headquartersOnly = $isHeadquarters;
-        $branchOnly = false; // Restricted
-        $serviceCenterOnly = false; // Restricted
-        $annexOnly = false; // Restricted
         $roles = Role::query();
         if ($isSuperAdmin) {
             // Super admin: exclude wholesale_staff, reseller, customer
@@ -295,6 +323,9 @@ class SuperAdminUserController extends Controller
         if ($annexOnly) {
             // Annex can create: Accountant, Dispatch, Cashier, Distributor
             $roles->whereIn('name', ['accountant', 'dispatch', 'cashier', 'distributor']);
+        }
+        if ($accountantOnly) {
+            $roles->whereIn('name', ['cashier', 'distributor']);
         }
         $allowedRoleIds = $roles->pluck('id')->all();
 
@@ -410,10 +441,14 @@ class SuperAdminUserController extends Controller
         if ($resellerOnly) {
             return redirect()->route('admin.users.index', ['role' => 'customer', 'created_by' => $request->user()->id])->with('success', 'Customer created successfully.');
         }
-        if ($headquartersOnly || $branchOnly || $serviceCenterOnly || $annexOnly) {
-            $redirectParams = ['created_by' => $request->user()->id];
-            if ($branchOnly || $serviceCenterOnly) {
+        if ($headquartersOnly || $branchOnly || $serviceCenterOnly || $annexOnly || $accountantOnly) {
+            $redirectParams = [];
+            if ($accountantOnly) {
+                $redirectParams['role'] = $userRole?->name === 'distributor' ? 'distributor' : 'cashier';
+            } elseif ($branchOnly || $serviceCenterOnly) {
                 $redirectParams['role'] = 'annex';
+            } elseif ($headquartersOnly || $annexOnly) {
+                $redirectParams['created_by'] = $request->user()->id;
             }
 
             return redirect()->route('admin.users.index', $redirectParams)->with('success', 'User created successfully.');
@@ -430,6 +465,7 @@ class SuperAdminUserController extends Controller
         $branchOnly = $request->user()?->role?->name === 'branch';
         $serviceCenterOnly = $request->user()?->role?->name === 'service_center';
         $annexOnly = $request->user()?->role?->name === 'annex';
+        $accountantOnly = $request->user()?->role?->name === 'accountant';
         $isSuperAdmin = $request->user()?->isSuperAdmin();
 
         // Super admin, headquarters, and branch can edit any user (not just those they created)
@@ -437,6 +473,14 @@ class SuperAdminUserController extends Controller
         if (! $canEditAny && ($wholesaleOnly || $resellerOnly || $serviceCenterOnly || $annexOnly)) {
             if ($user->created_by_user_id != $request->user()->id) {
                 abort(403, 'Access denied. You can only edit users you created.');
+            }
+        }
+        if ($accountantOnly) {
+            $orgOwnerIds = OrgUserScope::orgOwnerIds($request->user());
+            $user->loadMissing('role');
+            if (! in_array($user->role?->name, ['cashier', 'distributor'], true)
+                || ! in_array((int) $user->created_by_user_id, $orgOwnerIds, true)) {
+                abort(403, 'Access denied. Accountants can only edit cashiers in their organisation.');
             }
         }
 
@@ -462,6 +506,9 @@ class SuperAdminUserController extends Controller
         }
         if ($annexOnly) {
             $roles->whereIn('name', ['accountant', 'dispatch', 'cashier', 'distributor']);
+        }
+        if ($accountantOnly) {
+            $roles->whereIn('name', ['cashier', 'distributor']);
         }
         $roles = $roles->get();
 

@@ -64,20 +64,17 @@
         @endif
         @if(auth()->user()->isSuperAdmin())
         <div class="col-lg-12 mt-4">
-            <div class="card border-danger">
-                <div class="card-header bg-danger text-white">
-                    <h3 class="card-title mb-0">Danger Zone</h3>
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h3 class="card-title mb-0">Go Live</h3>
                 </div>
                 <div class="card-body">
                     <p class="text-muted mb-3">
-                        This will delete <strong>ALL orders</strong>, <strong>ALL wallet transactions</strong>, and reset <strong>every user&apos;s wallet balance</strong> to ₦0.00.
+                        Clear all test <strong>orders</strong>, <strong>invoices</strong>, back orders, and wallet history before going live.
                     </p>
-                    <form method="POST" action="{{ route('admin.system.clear-orders-wallet') }}" onsubmit="return confirm('This will delete ALL orders and wallet transactions and reset every user\\'s wallet balance to ₦0.00. Are you absolutely sure?');">
-                        @csrf
-                        <button type="submit" class="btn btn-danger">
-                            <i class="fe fe-alert-triangle me-2"></i>Clear Orders &amp; Wallet
-                        </button>
-                    </form>
+                    <a href="{{ route('admin.system.go-live') }}" class="btn btn-warning">
+                        <i class="fe fe-rocket me-2"></i>Go Live — Clear Test Data
+                    </a>
                 </div>
             </div>
         </div>

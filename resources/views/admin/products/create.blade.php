@@ -97,8 +97,14 @@
                 </div>
 
                 <div class="col-md-4">
-                    <label class="form-label">Stock (add to stock)</label>
-                    <input type="number" name="stock" class="form-control" value="{{ old('stock', 0) }}" min="0">
+                    @if(!empty($usesRoleInventory))
+                        <label class="form-label">{{ $inventoryStockLabel ?? 'Your stock' }}</label>
+                        <input type="number" name="stock" class="form-control" value="{{ old('stock', 0) }}" min="0">
+                        <small class="text-muted">Saved to your account inventory.</small>
+                    @else
+                        <label class="form-label">Stock (add to stock)</label>
+                        <input type="number" name="stock" class="form-control" value="{{ old('stock', 0) }}" min="0">
+                    @endif
                     @error('stock')<div class="text-danger small">{{ $message }}</div>@enderror
                 </div>
 

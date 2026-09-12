@@ -77,4 +77,24 @@ class BranchStock extends Model
 
         return true;
     }
+
+    /** Set absolute branch stock quantity (creates row if missing). */
+    public static function setQuantity(int $branchUserId, int $productId, int $qty): void
+    {
+        $qty = max(0, $qty);
+        $bs = self::where('branch_user_id', $branchUserId)
+            ->where('product_id', $productId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($bs) {
+            $bs->update(['quantity' => $qty]);
+        } else {
+            self::create([
+                'branch_user_id' => $branchUserId,
+                'product_id' => $productId,
+                'quantity' => $qty,
+            ]);
+        }
+    }
 }

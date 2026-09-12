@@ -239,6 +239,12 @@
                                                 <td class="border-0 text-end">-₦{{ preg_replace('/\.00$/', '', number_format($invoice->discount, 2)) }}</td>
                                             </tr>
                                         @endif
+                                        @if((float) ($invoice->coupon_discount_amount ?? 0) > 0)
+                                            <tr>
+                                                <td class="border-0 text-muted">Coupon Discount</td>
+                                                <td class="border-0 text-end">-₦{{ preg_replace('/\.00$/', '', number_format($invoice->coupon_discount_amount, 2)) }}</td>
+                                            </tr>
+                                        @endif
                                         <tr>
                                             <td class="border-0 fw-bold">Total</td>
                                             <td class="border-0 text-end fw-bold">₦{{ preg_replace('/\.00$/', '', number_format($invoice->total ?? 0, 2)) }}</td>
@@ -246,6 +252,92 @@
                                     </table>
                                 </div>
                             </div>
+
+                            @php
+                                $breakdown = is_array($invoice->payment_breakdown) ? $invoice->payment_breakdown : [];
+                                $splitLabels = [
+                                    'wallet' => 'Wallet',
+                                    'kd_credit' => 'Kedi Credit',
+                                    'cash' => 'Cash',
+                                    'transfer' => 'Bank Transfer',
+                                    'cheque' => 'Cheque',
+                                    'pos' => 'POS',
+                                    'bank' => 'Bank',
+                                    'dpbv' => 'DPBV',
+                                ];
+                                $splitRows = [];
+                                foreach ($splitLabels as $key => $label) {
+                                    $amount = (float) ($breakdown[$key] ?? 0);
+                                    if ($amount > 0) {
+                                        $splitRows[$label] = $amount;
+                                    }
+                                }
+                                // Fallback: POS amount stored separately when not in breakdown
+                                if ($splitRows === [] && (float) ($invoice->pos_amount_paid ?? 0) > 0) {
+                                    $splitRows['POS'] = (float) $invoice->pos_amount_paid;
+                                }
+                                $paymentMethodLabel = $invoice->payment_method
+                                    ? str_replace('_', ' ', ucfirst($invoice->payment_method))
+                                    : null;
+                            @endphp
+
+                            @if($paymentMethodLabel || $splitRows !== [])
+                                <div class="mt-4">
+                                    <label class="form-label text-muted small">Payment</label>
+                                    <div class="border rounded p-3 bg-light">
+                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                            <div>
+                                                <span class="text-muted">Method:</span>
+                                                <strong class="ms-1">{{ $paymentMethodLabel ?? '—' }}</strong>
+                                                @if($invoice->payment_method === 'split' || count($splitRows) > 1)
+                                                    <span class="badge bg-info ms-2">Split</span>
+                                                @endif
+                                            </div>
+                                            <div>
+                                                <span class="text-muted">Invoice total:</span>
+                                                <strong class="ms-1">₦{{ preg_replace('/\.00$/', '', number_format($invoice->total ?? 0, 2)) }}</strong>
+                                            </div>
+                                        </div>
+
+                                        @if($splitRows !== [])
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-bordered mb-0 bg-white">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Paid with</th>
+                                                            <th class="text-end">Amount</th>
+                                                            <th class="text-end" style="width:100px;">Share</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach($splitRows as $label => $amount)
+                                                            @php
+                                                                $share = ((float) $invoice->total > 0)
+                                                                    ? round(($amount / (float) $invoice->total) * 100, 1)
+                                                                    : 0;
+                                                            @endphp
+                                                            <tr>
+                                                                <td>{{ $label }}</td>
+                                                                <td class="text-end">₦{{ preg_replace('/\.00$/', '', number_format($amount, 2)) }}</td>
+                                                                <td class="text-end text-muted">{{ $share }}%</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                    <tfoot>
+                                                        <tr>
+                                                            <th>Split total</th>
+                                                            <th class="text-end">₦{{ preg_replace('/\.00$/', '', number_format(array_sum($splitRows), 2)) }}</th>
+                                                            <th></th>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        @elseif($paymentMethodLabel)
+                                            <p class="mb-0 small text-muted">Full amount paid via {{ $paymentMethodLabel }}.</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
 
                             @if($invoice->notes)
                                 <div class="mt-4">

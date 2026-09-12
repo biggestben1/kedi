@@ -8,13 +8,21 @@
             <h1 class="page-title">Reports</h1>
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('admin') }}">Admin</a></li>
-                <li class="breadcrumb-item"><a href="{{ route('admin.pharmacy.dashboard') }}">Dashboard</a></li>
+                @if(auth()->user()->role?->name === 'accountant')
+                    <li class="breadcrumb-item"><a href="{{ route('admin.pharmacy.reports') }}">Reports</a></li>
+                @else
+                    <li class="breadcrumb-item"><a href="{{ route('admin.pharmacy.dashboard') }}">Dashboard</a></li>
+                @endif
                 <li class="breadcrumb-item active" aria-current="page">Reports</li>
             </ol>
         </div>
         <div class="d-flex gap-2">
+            @if(auth()->user()->role?->name === 'accountant')
+                <a href="{{ route('admin.accountant.office-reports', ['from' => $from, 'to' => $to]) }}" class="btn btn-outline-secondary"><i class="fe fe-layers me-1"></i>Office Reports</a>
+            @endif
             <a href="{{ route('admin.pharmacy.reports') }}" class="btn btn-outline-primary"><i class="fe fe-plus me-1"></i>Create new report</a>
-            @php $exportQuery = request()->only(['from','to','category_id','product_id','customer_id','payment_method']); @endphp
+            <a href="{{ route('admin.pharmacy.financial') }}" class="btn btn-outline-success"><i class="fe fe-dollar-sign me-1"></i>Financial Report</a>
+            @php $exportQuery = request()->only(['from','to','category_id','product_id','customer_id','payment_method','office_id']); @endphp
             <a href="{{ route('admin.pharmacy.reports.export.pdf', $exportQuery) }}" class="btn btn-danger" target="_blank"><i class="fe fe-file-text me-1"></i>Export PDF</a>
             <a href="{{ route('admin.pharmacy.reports.export.excel', $exportQuery) }}" class="btn btn-success"><i class="fe fe-download me-1"></i>Export Excel (CSV)</a>
         </div>
@@ -28,6 +36,8 @@
         <div class="card-body">
             <form method="GET" action="{{ route('admin.pharmacy.reports') }}" class="row g-3">
                 <input type="hidden" name="sales_page" value="1">
+                <input type="hidden" name="invoice_page" value="1">
+                <input type="hidden" name="tab" id="report-active-tab" value="{{ $activeTab ?? 'sales' }}">
                 <div class="col-md-2">
                     <label class="form-label">From Date</label>
                     <input type="date" name="from" class="form-control" value="{{ $from }}">
@@ -72,6 +82,28 @@
                         @endforeach
                     </select>
                 </div>
+                @if(!empty($offices) && $offices->isNotEmpty())
+                <div class="col-md-2">
+                    <label class="form-label">Office</label>
+                    <select name="office_id" class="form-select">
+                        <option value="">All offices</option>
+                        @foreach($offices as $office)
+                            <option value="{{ $office->id }}" {{ (int) ($officeId ?? 0) === (int) $office->id ? 'selected' : '' }}>
+                                {{ \App\Support\OrgUserScope::orgUnitLabel($office) }} — {{ $office->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                @endif
+                <div class="col-md-2">
+                    <label class="form-label">Invoice Status</label>
+                    <select name="invoice_status" class="form-select">
+                        <option value="">All</option>
+                        @foreach(['draft' => 'Draft', 'sent' => 'Sent', 'paid' => 'Paid', 'overdue' => 'Overdue', 'cancelled' => 'Cancelled'] as $value => $label)
+                            <option value="{{ $value }}" {{ (string)($invoiceStatus ?? '') === (string)$value ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 <div class="col-12 d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Apply</button>
                     <a href="{{ route('admin.pharmacy.reports') }}" class="btn btn-outline-secondary">Reset</a>
@@ -80,13 +112,20 @@
         </div>
     </div>
 
-    {{-- Tabs: Sales | Inventory | Purchase | Costs | Journal | Assets | Payment | P&L | Product Performance | Customer | Batch --}}
+    @php $tab = $activeTab ?? 'sales'; @endphp
+    {{-- Tabs: Sales | Invoices | Inventory | Purchase | Costs | Journal | Assets | Payment | P&L | Product Performance | Customer | Batch --}}
     <ul class="nav nav-tabs mb-3" id="reportTabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales" type="button" role="tab">Sales</button>
+            <button class="nav-link {{ $tab === 'sales' ? 'active' : '' }}" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales" type="button" role="tab">Sales</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button" role="tab">Inventory</button>
+            <button class="nav-link {{ $tab === 'invoices' ? 'active' : '' }}" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices" type="button" role="tab">
+                Invoices
+                <span class="badge bg-primary ms-1">{{ $invoices->total() }}</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {{ $tab === 'inventory' ? 'active' : '' }}" id="inventory-tab" data-bs-toggle="tab" data-bs-target="#inventory" type="button" role="tab">Inventory</button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="purchase-tab" data-bs-toggle="tab" data-bs-target="#purchase" type="button" role="tab">Purchase</button>
@@ -119,7 +158,7 @@
 
     <div class="tab-content" id="reportTabsContent">
         {{-- A. Sales Report (line-level: Invoice, Product, Qty, Selling Price, Discount, Profit, Payment Status) --}}
-        <div class="tab-pane fade show active" id="sales" role="tabpanel">
+        <div class="tab-pane fade {{ $tab === 'sales' ? 'show active' : '' }}" id="sales" role="tabpanel">
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Sales Report</h3>
@@ -166,8 +205,98 @@
             </div>
         </div>
 
+        {{-- A2. Invoices Report (all invoices made) --}}
+        <div class="tab-pane fade {{ $tab === 'invoices' ? 'show active' : '' }}" id="invoices" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <h3 class="card-title mb-0">Invoices</h3>
+                        <div class="small text-muted mt-1">All invoices in the selected date range.</div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach(['draft' => 'secondary', 'sent' => 'info', 'paid' => 'success', 'overdue' => 'warning', 'cancelled' => 'danger'] as $statusKey => $badge)
+                            <span class="badge bg-{{ $badge }}">
+                                {{ ucfirst($statusKey) }}: {{ (int) ($invoiceStatusCounts[$statusKey] ?? 0) }}
+                            </span>
+                        @endforeach
+                        @if(auth()->user()->role?->name !== 'accountant')
+                        <a href="{{ route('admin.invoices.index') }}" class="btn btn-sm btn-outline-primary">Manage invoices</a>
+                        @endif
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Invoice #</th>
+                                    <th>Date</th>
+                                    <th>Customer</th>
+                                    <th>Created by</th>
+                                    <th class="text-end">Items</th>
+                                    <th class="text-end">Subtotal</th>
+                                    <th class="text-end">Tax</th>
+                                    <th class="text-end">Discount</th>
+                                    <th class="text-end">Total</th>
+                                    <th>Payment</th>
+                                    <th>Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($invoices as $invoice)
+                                    @php
+                                        $statusBadge = match ($invoice->status) {
+                                            'paid' => 'success',
+                                            'sent' => 'info',
+                                            'overdue' => 'warning',
+                                            'cancelled' => 'danger',
+                                            default => 'secondary',
+                                        };
+                                    @endphp
+                                    <tr>
+                                        <td>{{ $invoice->invoice_number }}</td>
+                                        <td>{{ $invoice->invoice_date?->format('M d, Y') ?? '—' }}</td>
+                                        <td>
+                                            {{ $invoice->customer_name ?: ($invoice->user?->name ?? '—') }}
+                                            @if($invoice->customer_email)
+                                                <div class="small text-muted">{{ $invoice->customer_email }}</div>
+                                            @endif
+                                        </td>
+                                        <td>{{ $invoice->user?->name ?? '—' }}</td>
+                                        <td class="text-end">{{ $invoice->items->count() }}</td>
+                                        <td class="text-end">₦{{ number_format((float) $invoice->subtotal, 0) }}</td>
+                                        <td class="text-end">₦{{ number_format((float) $invoice->tax, 0) }}</td>
+                                        <td class="text-end">₦{{ number_format((float) $invoice->discount + (float) ($invoice->coupon_discount_amount ?? 0), 0) }}</td>
+                                        <td class="text-end fw-semibold">₦{{ number_format((float) $invoice->total, 0) }}</td>
+                                        <td>{{ $invoice->payment_method ? str_replace('_', ' ', ucfirst($invoice->payment_method)) : '—' }}</td>
+                                        <td><span class="badge bg-{{ $statusBadge }}">{{ ucfirst($invoice->status) }}</span></td>
+                                        <td class="text-end">
+                                            <a href="{{ route('admin.invoices.show', $invoice) }}" class="btn btn-sm btn-outline-primary">View</a>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="12" class="text-center text-muted p-4">
+                                            No invoices in date range.
+                                            @if(auth()->user()->role?->name !== 'accountant')
+                                            <a href="{{ route('admin.invoices.create') }}">Create an invoice</a>.
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                @if($invoices->hasPages())
+                    <div class="card-footer">{{ $invoices->appends(array_merge(request()->except('invoice_page'), ['tab' => 'invoices']))->links() }}</div>
+                @endif
+            </div>
+        </div>
+
         {{-- B. Inventory Reports --}}
-        <div class="tab-pane fade" id="inventory" role="tabpanel">
+        <div class="tab-pane fade {{ $tab === 'inventory' ? 'show active' : '' }}" id="inventory" role="tabpanel">
             <ul class="nav nav-pills mb-3">
                 <li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#stock-report">Stock Report</a></li>
                 <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#expiry-report">Expiry Report</a></li>
@@ -571,3 +700,20 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var tabInput = document.getElementById('report-active-tab');
+    var tabButtons = document.querySelectorAll('#reportTabs [data-bs-toggle="tab"]');
+    tabButtons.forEach(function (btn) {
+        btn.addEventListener('shown.bs.tab', function (e) {
+            var target = (e.target.getAttribute('data-bs-target') || '').replace('#', '');
+            if (tabInput && target) {
+                tabInput.value = target;
+            }
+        });
+    });
+});
+</script>
+@endpush

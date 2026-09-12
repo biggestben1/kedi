@@ -25,8 +25,7 @@ class RestrictHeadquartersAdmin
 
         $routeName = $request->route()?->getName() ?? '';
         $allowed = $routeName === 'admin'
-            || str_starts_with($routeName, 'admin.pharmacy.dashboard')
-            || str_starts_with($routeName, 'admin.pharmacy.reports')
+            || str_starts_with($routeName, 'admin.pharmacy')
             || str_starts_with($routeName, 'admin.questionnaires')
             || str_starts_with($routeName, 'admin.invoices')
             || str_starts_with($routeName, 'admin.in-stock')

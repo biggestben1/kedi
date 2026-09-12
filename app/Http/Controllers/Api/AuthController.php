@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\OrgUserScope;
+use App\Support\ShoppingContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -81,13 +83,38 @@ class AuthController extends Controller
 
     private function userResource(User $user): array
     {
+        $user->loadMissing(['role', 'createdBy.role']);
+        $context = new ShoppingContext($user);
+        $walletOwner = $context->walletOwner;
+
+        $parentOffice = null;
+        if ($user->isCashier() && $user->createdBy) {
+            $parentOffice = [
+                'id' => $user->createdBy->id,
+                'name' => $user->createdBy->name,
+                'role' => $user->createdBy->role?->name,
+                'role_label' => OrgUserScope::orgUnitLabel($user->createdBy),
+            ];
+        }
+
         return [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
             'phone' => $user->phone,
             'role' => $user->role?->name,
-            'wallet_balance' => (float) ($user->wallet_balance ?? 0),
+            'role_label' => match ($user->role?->name) {
+                'cashier' => 'Cashier',
+                'distributor' => 'Distributor',
+                default => ucfirst(str_replace('_', ' ', $user->role?->name ?? 'customer')),
+            },
+            'is_cashier' => $user->isCashier(),
+            'is_distributor' => $user->isDistributor(),
+            'wallet_balance' => (float) ($walletOwner->wallet_balance ?? 0),
+            'wallet_owner_id' => $walletOwner->id,
+            'uses_parent_wallet' => $walletOwner->id !== $user->id,
+            'parent_office' => $parentOffice,
+            'uses_org_stock' => $context->usesOrgStock(),
         ];
     }
 }

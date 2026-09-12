@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AccountantOfficeReportsController;
 use App\Http\Controllers\AccountantWalletController;
 use App\Http\Controllers\Admin\AnnouncementController;
 use App\Http\Controllers\Admin\QuestionnaireController;
@@ -32,6 +33,7 @@ use App\Http\Controllers\KdInfoController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PharmacyDashboardController;
+use App\Http\Controllers\PharmacyFinancialReportController;
 use App\Http\Controllers\PharmacyJournalController;
 use App\Http\Controllers\PharmacyReportsController;
 use App\Http\Controllers\PromoController;
@@ -56,6 +58,7 @@ use App\Http\Controllers\SuperAdminWalletTopupController;
 use App\Http\Controllers\UserBlogController;
 use App\Http\Controllers\WalletController;
 use App\Http\Middleware\RestrictAnnexAdmin;
+use App\Http\Middleware\RestrictAccountantAdmin;
 use App\Http\Middleware\RestrictBranchAdmin;
 use App\Http\Middleware\RestrictDispatchAdmin;
 use App\Http\Middleware\RestrictHeadquartersAdmin;
@@ -121,8 +124,10 @@ Route::post('/blog/{user}/{blog_post:slug}/comments', [BlogPostCommentController
 
 // KD ID & Customer Name (session)
 Route::post('/kd-info', [KdInfoController::class, 'store'])->name('kd-info.store')->middleware('auth');
+Route::post('/kd-info/clear', [KdInfoController::class, 'clear'])->name('kd-info.clear')->middleware('auth');
 Route::post('/kd-info/auto-generate', [KdInfoController::class, 'autoGenerate'])->name('kd-info.auto-generate')->middleware('auth');
 Route::post('/kd-info/search', [KdInfoController::class, 'search'])->name('kd-info.search')->middleware('auth');
+Route::post('/kd-info/use-existing', [KdInfoController::class, 'useExisting'])->name('kd-info.use-existing')->middleware('auth');
 
 // Cart JSON endpoint for AJAX cart UI
 Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
@@ -213,7 +218,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/service-center/balances', [ServiceCenterLookupController::class, 'balances'])->name('service-center.balances');
 
     // Admin area (super_admin: full; wholesale_staff: dashboard, reports, users, invoices; reseller: users + invoices; accountant: wallet; dispatch: orders only; cashier: limited kit purchase/admin access via parent)
-    Route::middleware(['role:super_admin,wholesale_staff,reseller,accountant,dispatch,headquarters,branch,service_center,annex,cashier,distributor', RestrictWholesaleStaffAdmin::class, RestrictResellerAdmin::class, RestrictDispatchAdmin::class, RestrictHeadquartersAdmin::class, RestrictBranchAdmin::class, RestrictServiceCenterAdmin::class, RestrictAnnexAdmin::class])->group(function () {
+    Route::middleware(['role:super_admin,wholesale_staff,reseller,accountant,dispatch,headquarters,branch,service_center,annex,cashier,distributor', RestrictWholesaleStaffAdmin::class, RestrictResellerAdmin::class, RestrictDispatchAdmin::class, RestrictHeadquartersAdmin::class, RestrictBranchAdmin::class, RestrictServiceCenterAdmin::class, RestrictAnnexAdmin::class, RestrictAccountantAdmin::class])->group(function () {
         Route::get('/admin', function () {
             $user = auth()->user();
 
@@ -262,6 +267,8 @@ Route::middleware('auth')->group(function () {
         // Pharmacy Dashboard & Reports
         Route::get('/admin/pharmacy', [PharmacyDashboardController::class, 'index'])->name('admin.pharmacy.dashboard');
         Route::get('/admin/pharmacy/reports', [PharmacyReportsController::class, 'index'])->name('admin.pharmacy.reports');
+        Route::get('/admin/pharmacy/financial', [PharmacyFinancialReportController::class, 'index'])->name('admin.pharmacy.financial');
+        Route::get('/admin/accountant/office-reports', [AccountantOfficeReportsController::class, 'index'])->name('admin.accountant.office-reports');
         Route::get('/admin/pharmacy/referred-orders', [PharmacyDashboardController::class, 'referredOrders'])->name('admin.pharmacy.referred-orders');
         Route::get('/admin/pharmacy/reports/export/pdf', [PharmacyReportsController::class, 'exportPdf'])->name('admin.pharmacy.reports.export.pdf');
         Route::get('/admin/pharmacy/reports/export/excel', [PharmacyReportsController::class, 'exportExcel'])->name('admin.pharmacy.reports.export.excel');
@@ -305,7 +312,9 @@ Route::middleware('auth')->group(function () {
             Route::put('/admin/roles/{role}', [SuperAdminRoleController::class, 'update'])->name('admin.roles.update');
             Route::delete('/admin/roles/{role}', [SuperAdminRoleController::class, 'destroy'])->name('admin.roles.destroy');
 
-            // Dangerous: clear all orders and wallet records
+            // Go-live: clear test orders, invoices, wallet data (Super Admin only)
+            Route::get('/admin/system/go-live', [SuperAdminController::class, 'showGoLivePrep'])->name('admin.system.go-live');
+            Route::post('/admin/system/clear-go-live', [SuperAdminController::class, 'clearGoLiveData'])->name('admin.system.clear-go-live');
             Route::post('/admin/system/clear-orders-wallet', [SuperAdminController::class, 'clearOrdersAndWallet'])->name('admin.system.clear-orders-wallet');
 
             // Coupons Management

@@ -24,12 +24,15 @@ class RestrictAnnexAdmin
         $allowed = $routeName === 'admin'
             || str_starts_with($routeName, 'admin.pharmacy.dashboard')
             || str_starts_with($routeName, 'admin.pharmacy.reports')
+            || str_starts_with($routeName, 'admin.pharmacy.financial')
             || $routeName === 'admin.invoices.index'
             || $routeName === 'admin.invoices.show'
             || $routeName === 'admin.invoices.pdf'
             || str_starts_with($routeName, 'admin.users')
             || str_starts_with($routeName, 'admin.back_orders')
             || $routeName === 'admin.products.index'
+            || in_array($routeName, ['admin.products.create', 'admin.products.store', 'admin.products.update'], true)
+            || (str_starts_with($routeName, 'admin.products.') && str_ends_with($routeName, '.edit'))
             || (str_starts_with($routeName, 'admin.kd') && !str_contains($routeName, 'dpbv'))
             || str_starts_with($routeName, 'admin.kedi-kits.purchase');
 

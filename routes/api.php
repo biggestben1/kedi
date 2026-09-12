@@ -6,8 +6,10 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DriverOrderController;
 use App\Http\Controllers\Api\BonusController;
 use App\Http\Controllers\Api\DpbvController;
-use App\Http\Controllers\Api\PromoController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\PromoController;
+use App\Http\Controllers\CustomerInvoiceController;
+use App\Http\Controllers\ServiceCenterLookupController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\KdInfoController as ApiKdInfoController;
 use App\Http\Controllers\Api\ProductController;
@@ -46,8 +48,12 @@ Route::prefix('v1')->group(function () {
         Route::get('wallet/transactions', [WalletController::class, 'transactions']);
         Route::post('wallet/topup', [WalletController::class, 'topUp']);
 
+        Route::get('invoices/create-form', [CustomerInvoiceController::class, 'createFormData']);
+        Route::post('invoices/validate-coupon', [CustomerInvoiceController::class, 'validateCoupon']);
+        Route::post('service-center/resolve', [ServiceCenterLookupController::class, 'resolve']);
+        Route::post('service-center/balances', [ServiceCenterLookupController::class, 'balances']);
         Route::get('invoices', [InvoiceController::class, 'index']);
-        Route::post('invoices', [InvoiceController::class, 'store']);
+        Route::post('invoices', [CustomerInvoiceController::class, 'store']);
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show']);
         Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf']);
 

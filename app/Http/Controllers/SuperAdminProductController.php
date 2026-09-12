@@ -11,6 +11,7 @@ use App\Models\ServiceCenterStock;
 use App\Models\Warehouse;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -18,6 +19,45 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class SuperAdminProductController extends Controller
 {
+    /** Roles that keep inventory in a separate table (not products.stock). */
+    protected function usesRoleInventory(?string $role): bool
+    {
+        return in_array($role, ['headquarters', 'branch', 'service_center', 'annex'], true);
+    }
+
+    protected function roleInventoryLabel(?string $role): ?string
+    {
+        return match ($role) {
+            'headquarters' => 'HQ stock',
+            'branch' => 'Branch stock',
+            'service_center' => 'SC stock',
+            'annex' => 'Annex stock',
+            default => null,
+        };
+    }
+
+    protected function getRoleInventoryStock(int $userId, string $role, int $productId): int
+    {
+        return match ($role) {
+            'headquarters' => HeadquartersStock::getQuantity($userId, $productId),
+            'branch' => BranchStock::getQuantity($userId, $productId),
+            'service_center' => ServiceCenterStock::getQuantity($userId, $productId),
+            'annex' => AnnexStock::getQuantity($userId, $productId),
+            default => 0,
+        };
+    }
+
+    protected function setRoleInventoryStock(int $userId, string $role, int $productId, int $qty): void
+    {
+        match ($role) {
+            'headquarters' => HeadquartersStock::setQuantity($userId, $productId, $qty),
+            'branch' => BranchStock::setQuantity($userId, $productId, $qty),
+            'service_center' => ServiceCenterStock::setQuantity($userId, $productId, $qty),
+            'annex' => AnnexStock::setQuantity($userId, $productId, $qty),
+            default => null,
+        };
+    }
+
     protected function exportQuery(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
@@ -351,10 +391,15 @@ class SuperAdminProductController extends Controller
     {
         $categories = Category::orderBy('sort_order')->orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
+        $user = auth()->user();
+        $role = $user?->role?->name;
+        $usesRoleInventory = $this->usesRoleInventory($role);
 
         return view('admin.products.create', [
             'categories' => $categories,
             'warehouses' => $warehouses,
+            'usesRoleInventory' => $usesRoleInventory,
+            'inventoryStockLabel' => $this->roleInventoryLabel($role),
         ]);
     }
 
@@ -384,7 +429,13 @@ class SuperAdminProductController extends Controller
             $imagePath = $request->file('image')->store('products', 'public');
         }
 
-        Product::create([
+        $user = $request->user();
+        $role = $user?->role?->name ?? '';
+        $usesRoleInventory = $this->usesRoleInventory($role);
+        $stockInput = (int) ($data['stock'] ?? 0);
+        $product = null;
+
+        $productPayload = [
             'category_id' => $data['category_id'] ?? null,
             'warehouse_id' => $data['warehouse_id'] ?? null,
             'item_code' => $data['item_code'],
@@ -394,7 +445,7 @@ class SuperAdminProductController extends Controller
             'pv' => $data['pv'],
             'price' => $data['price'],
             'cost_price' => $data['cost_price'] ?? null,
-            'stock' => (int) ($data['stock'] ?? 0),
+            'stock' => $usesRoleInventory ? 0 : $stockInput,
             'expiry_date' => $request->filled('expiry_date') ? $data['expiry_date'] : null,
             'batch_number' => $data['batch_number'] ?? null,
             'min_stock' => (int) ($data['min_stock'] ?? 0),
@@ -402,7 +453,18 @@ class SuperAdminProductController extends Controller
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'is_active' => $request->boolean('is_active'),
             'can_use_dpbv' => $request->boolean('can_use_dpbv'),
-        ]);
+        ];
+
+        if ($usesRoleInventory) {
+            DB::transaction(function () use ($productPayload, $user, $role, $stockInput, &$product) {
+                $product = Product::create($productPayload);
+                if ($stockInput > 0) {
+                    $this->setRoleInventoryStock((int) $user->id, $role, (int) $product->id, $stockInput);
+                }
+            });
+        } else {
+            $product = Product::create($productPayload);
+        }
 
         return redirect()->route('admin.products.index')->with('success', 'Product created successfully.');
     }
@@ -411,11 +473,20 @@ class SuperAdminProductController extends Controller
     {
         $categories = Category::orderBy('sort_order')->orderBy('name')->get();
         $warehouses = Warehouse::orderBy('name')->get();
+        $user = auth()->user();
+        $role = $user?->role?->name;
+        $usesRoleInventory = $this->usesRoleInventory($role);
+        $roleStock = $usesRoleInventory
+            ? $this->getRoleInventoryStock((int) $user->id, $role, (int) $product->id)
+            : null;
 
         return view('admin.products.edit', [
             'product' => $product,
             'categories' => $categories,
             'warehouses' => $warehouses,
+            'usesRoleInventory' => $usesRoleInventory,
+            'inventoryStockLabel' => $this->roleInventoryLabel($role),
+            'roleStock' => $roleStock,
         ]);
     }
 
@@ -449,7 +520,12 @@ class SuperAdminProductController extends Controller
             $imagePath = $request->file('image')->store('products', 'public');
         }
 
-        $product->update([
+        $user = $request->user();
+        $role = $user?->role?->name ?? '';
+        $usesRoleInventory = $this->usesRoleInventory($role);
+        $stockInput = (int) ($data['stock'] ?? 0);
+
+        $payload = [
             'category_id' => $data['category_id'] ?? null,
             'warehouse_id' => $data['warehouse_id'] ?? null,
             'item_code' => $data['item_code'],
@@ -459,7 +535,6 @@ class SuperAdminProductController extends Controller
             'pv' => $data['pv'],
             'price' => $data['price'],
             'cost_price' => $data['cost_price'] ?? null,
-            'stock' => (int) ($data['stock'] ?? 0),
             'expiry_date' => $request->filled('expiry_date') ? $data['expiry_date'] : null,
             'batch_number' => $data['batch_number'] ?? null,
             'min_stock' => (int) ($data['min_stock'] ?? 0),
@@ -467,7 +542,17 @@ class SuperAdminProductController extends Controller
             'sort_order' => (int) ($data['sort_order'] ?? 0),
             'is_active' => $request->boolean('is_active'),
             'can_use_dpbv' => $request->boolean('can_use_dpbv'),
-        ]);
+        ];
+
+        if ($usesRoleInventory) {
+            DB::transaction(function () use ($user, $role, $product, $payload, $stockInput) {
+                $product->update($payload);
+                $this->setRoleInventoryStock((int) $user->id, $role, (int) $product->id, $stockInput);
+            });
+        } else {
+            $payload['stock'] = $stockInput;
+            $product->update($payload);
+        }
 
         return redirect()->route('admin.products.index')->with('success', 'Product updated successfully.');
     }

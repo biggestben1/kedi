@@ -62,7 +62,7 @@
                         @if(auth()->user()->isSuperAdmin())
                             <a href="{{ route('admin.products.trashed') }}" class="btn btn-outline-danger"><i class="fe fe-trash-2 me-2"></i>Trash</a>
                         @endif
-                        @if(!in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']))
+                        @if(!in_array(auth()->user()->role?->name ?? '', ['dispatch', 'accountant', 'reseller']))
                             <a href="{{ route('admin.products.create') }}" class="btn btn-primary">
                                 <i class="fe fe-plus me-2"></i>Create Product
                             </a>
@@ -151,15 +151,13 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
-                                    @if(!in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']))
                                     <a href="{{ route('admin.products.edit', $product) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    @if(!in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']))
                                     <form action="{{ route('admin.products.destroy', $product) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this product?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                     </form>
-                                    @else
-                                    <span class="text-muted">—</span>
                                     @endif
                                 </td>
                             </tr>
@@ -190,7 +188,7 @@
     var baseUrl = '{{ route("admin.products.index") }}';
     var csrfToken = document.querySelector('meta[name="csrf-token"]') && document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     var debounceTimer;
-    var isServiceCenterViewOnly = {{ in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']) ? 'true' : 'false' }};
+    var canDeleteProducts = {{ in_array(auth()->user()->role?->name ?? '', ['service_center', 'annex']) ? 'false' : 'true' }};
 
     function buildQueryParams() {
         var params = new URLSearchParams();
@@ -208,13 +206,13 @@
         var statusBadge = p.is_active
             ? '<span class="badge bg-success">Active</span>'
             : '<span class="badge bg-secondary">Inactive</span>';
-        var actionsHtml = isServiceCenterViewOnly
-            ? '<span class="text-muted">—</span>'
-            : '<a href="' + p.edit_url + '" class="btn btn-sm btn-outline-primary">Edit</a> ' +
-              '<form action="' + p.destroy_url + '" method="POST" class="d-inline" onsubmit="return confirm(\'Delete this product?\');">' +
+        var actionsHtml = '<a href="' + p.edit_url + '" class="btn btn-sm btn-outline-primary">Edit</a>';
+        if (canDeleteProducts) {
+            actionsHtml += ' <form action="' + p.destroy_url + '" method="POST" class="d-inline" onsubmit="return confirm(\'Delete this product?\');">' +
               '<input type="hidden" name="_token" value="' + (csrfToken || '') + '">' +
               '<input type="hidden" name="_method" value="DELETE">' +
               '<button type="submit" class="btn btn-sm btn-outline-danger">Delete</button></form>';
+        }
         return '<tr data-product-row>' +
             '<td>' + imgHtml + '</td>' +
             '<td>' + (p.item_code || '') + '</td>' +

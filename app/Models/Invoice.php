@@ -39,6 +39,7 @@ class Invoice extends Model
         'notes',
         'is_approved',
         'approved_at',
+        'stock_deducted_at',
     ];
 
     protected function casts(): array
@@ -55,6 +56,7 @@ class Invoice extends Model
             'payment_breakdown' => 'array',
             'is_approved' => 'boolean',
             'approved_at' => 'datetime',
+            'stock_deducted_at' => 'datetime',
         ];
     }
 

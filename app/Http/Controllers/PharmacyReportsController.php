@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asset;
 use App\Models\Category;
 use App\Models\Expenditure;
-use App\Models\Asset;
+use App\Models\Invoice;
 use App\Models\JournalEntry;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\PurchaseItem;
 use App\Models\User;
+use App\Support\OrgUserScope;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -22,12 +24,20 @@ class PharmacyReportsController extends Controller
     private const PAID_STATUSES = [Order::STATUS_PAID, Order::STATUS_COMPLETED];
 
     /** Get allowed user IDs for headquarters, branch, or service_center scope. Null = all users. */
-    private function getAllowedUserIdsForReports(?\App\Models\User $user): ?array
+    private function getAllowedUserIdsForReports(?\App\Models\User $user, ?int $officeId = null): ?array
     {
         if (! $user) {
             return null;
         }
         $role = $user->role?->name ?? '';
+
+        if ($role === 'accountant') {
+            return OrgUserScope::scopeForOfficeFilter($user, $officeId);
+        }
+
+        if ($officeId !== null) {
+            return OrgUserScope::scopeForOfficeFilter($user, $officeId);
+        }
         if ($role === 'headquarters') {
             return User::where('id', $user->id)
                 ->orWhere(function ($q) use ($user) {
@@ -152,7 +162,10 @@ class PharmacyReportsController extends Controller
     {
         $filters = $this->parseFilters($request);
         $user = $request->user();
-        $filters['allowedUserIds'] = $this->getAllowedUserIdsForReports($user);
+        $officeId = $request->filled('office_id') ? (int) $request->office_id : null;
+        $filters['allowedUserIds'] = $this->getAllowedUserIdsForReports($user, $officeId);
+        $offices = OrgUserScope::orgOffices($user);
+        $selectedOffice = $officeId ? $offices->firstWhere('id', $officeId) : null;
         $from = $filters['from'];
         $to = $filters['to'];
         $categoryId = $filters['categoryId'];
@@ -258,6 +271,44 @@ class PharmacyReportsController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        // All invoices made in date range (scoped by HQ/branch/SC/annex when applicable)
+        $invoiceStatus = trim((string) $request->query('invoice_status', ''));
+        $invoicesQuery = Invoice::with(['user', 'items'])
+            ->whereBetween('invoice_date', [$from->toDateString(), $to->toDateString()]);
+        if ($allowedUserIds !== null) {
+            $invoicesQuery->where(function ($q) use ($allowedUserIds) {
+                $q->whereIn('user_id', $allowedUserIds)
+                    ->orWhereIn('branch_user_id', $allowedUserIds);
+            });
+        }
+        if ($customerId) {
+            $invoicesQuery->where('user_id', $customerId);
+        }
+        if ($invoiceStatus !== '' && in_array($invoiceStatus, ['draft', 'sent', 'paid', 'overdue', 'cancelled'], true)) {
+            $invoicesQuery->where('status', $invoiceStatus);
+        }
+        if ($paymentMethod) {
+            $invoicesQuery->where('payment_method', $paymentMethod);
+        }
+        $invoices = $invoicesQuery
+            ->orderByDesc('invoice_date')
+            ->orderByDesc('id')
+            ->paginate(50, ['*'], 'invoice_page')
+            ->withQueryString();
+
+        $invoiceStatusCounts = Invoice::query()
+            ->whereBetween('invoice_date', [$from->toDateString(), $to->toDateString()])
+            ->when($allowedUserIds !== null, function ($q) use ($allowedUserIds) {
+                $q->where(function ($inner) use ($allowedUserIds) {
+                    $inner->whereIn('user_id', $allowedUserIds)
+                        ->orWhereIn('branch_user_id', $allowedUserIds);
+                });
+            })
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status')
+            ->toArray();
+
         return view('admin.pharmacy.reports', [
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
@@ -265,6 +316,9 @@ class PharmacyReportsController extends Controller
             'productId' => $productId,
             'customerId' => $customerId,
             'paymentMethod' => $paymentMethod,
+            'offices' => $offices,
+            'officeId' => $officeId,
+            'selectedOffice' => $selectedOffice,
             'categories' => $categories,
             'products' => $products,
             'customers' => $customers,
@@ -284,13 +338,18 @@ class PharmacyReportsController extends Controller
             'expenditures' => $expenditures,
             'assets' => $assets,
             'journalEntries' => $journalEntries,
+            'invoices' => $invoices,
+            'invoiceStatus' => $invoiceStatus,
+            'invoiceStatusCounts' => $invoiceStatusCounts,
+            'activeTab' => $request->query('tab', 'sales'),
         ]);
     }
 
     public function exportPdf(Request $request): \Illuminate\Http\Response
     {
         $filters = $this->parseFilters($request);
-        $filters['allowedUserIds'] = $this->getAllowedUserIdsForReports($request->user());
+        $officeId = $request->filled('office_id') ? (int) $request->office_id : null;
+        $filters['allowedUserIds'] = $this->getAllowedUserIdsForReports($request->user(), $officeId);
         $salesLines = $this->buildSalesLines($filters);
         $pdf = Pdf::loadView('admin.pharmacy.reports-pdf', [
             'salesLines' => $salesLines,
@@ -303,7 +362,8 @@ class PharmacyReportsController extends Controller
     public function exportExcel(Request $request): StreamedResponse
     {
         $filters = $this->parseFilters($request);
-        $filters['allowedUserIds'] = $this->getAllowedUserIdsForReports($request->user());
+        $officeId = $request->filled('office_id') ? (int) $request->office_id : null;
+        $filters['allowedUserIds'] = $this->getAllowedUserIdsForReports($request->user(), $officeId);
         $salesLines = $this->buildSalesLines($filters);
         $filename = 'pharmacy-sales-report-' . $filters['from']->format('Y-m-d') . '-to-' . $filters['to']->format('Y-m-d') . '.csv';
 

@@ -8,7 +8,11 @@
         <div>
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('admin') }}">Admin</a></li>
-                <li class="breadcrumb-item"><a href="{{ route('admin.invoices.index') }}">Invoices</a></li>
+                @if(auth()->user()->role?->name === 'accountant')
+                    <li class="breadcrumb-item"><a href="{{ route('admin.pharmacy.financial') }}">Financial Report</a></li>
+                @else
+                    <li class="breadcrumb-item"><a href="{{ route('admin.invoices.index') }}">Invoices</a></li>
+                @endif
                 <li class="breadcrumb-item active" aria-current="page">View</li>
             </ol>
         </div>
@@ -19,7 +23,9 @@
             <h3 class="card-title mb-0">Invoice {{ $invoice->invoice_number }}</h3>
             <div class="d-flex gap-2">
                 <a href="{{ route('admin.invoices.pdf', $invoice) }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener"><i class="fe fe-file-text me-1"></i>Download PDF</a>
+                @if(auth()->user()->role?->name !== 'accountant')
                 <a href="{{ route('admin.invoices.edit', $invoice) }}" class="btn btn-sm btn-primary">Edit</a>
+                @endif
                 @if($canApprove ?? false)
                     <form action="{{ route('admin.invoices.approve', $invoice) }}" method="POST" class="d-inline">
                         @csrf

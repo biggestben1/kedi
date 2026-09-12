@@ -2,18 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AnnexStock;
+use App\Models\Bank;
+use App\Models\BranchStock;
 use App\Models\Coupon;
 use App\Models\DpbvCollection;
-use App\Models\Bank;
+use App\Models\HeadquartersStock;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\KediCreditTransaction;
 use App\Models\PosMachine;
 use App\Models\Product;
 use App\Models\Role;
+use App\Models\ServiceCenterStock;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -27,6 +33,7 @@ class CustomerInvoiceController extends Controller
         'kd_credit',
         'cash',
         'transfer',
+        'cheque',
     ];
 
     private function resolveServiceCenterByCode(?string $code): ?User
@@ -145,6 +152,217 @@ class CustomerInvoiceController extends Controller
         return $out;
     }
 
+    /**
+     * Map invoice line items to catalog product quantities by display name.
+     *
+     * @param  array<int, array{item_name:string,quantity:float|int}>  $items
+     * @return array<int, float> product_id => quantity
+     */
+    private function productQuantitiesFromItems(array $items): array
+    {
+        $names = [];
+        foreach ($items as $row) {
+            $name = trim((string) ($row['item_name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $names[mb_strtolower($name)] = ($names[mb_strtolower($name)] ?? 0) + (float) ($row['quantity'] ?? 0);
+        }
+
+        if ($names === []) {
+            return [];
+        }
+
+        $products = Product::where('is_active', true)->get();
+        $byDisplay = [];
+        foreach ($products as $product) {
+            $byDisplay[mb_strtolower((string) $product->display_name)] = $product;
+        }
+
+        $quantities = [];
+        foreach ($names as $key => $qty) {
+            if ($qty <= 0 || ! isset($byDisplay[$key])) {
+                continue;
+            }
+            $productId = (int) $byDisplay[$key]->id;
+            $quantities[$productId] = ($quantities[$productId] ?? 0) + $qty;
+        }
+
+        return $quantities;
+    }
+
+    private function stockUserForInvoices(User $user): User
+    {
+        $user->loadMissing(['role', 'createdBy.role']);
+        if ($user->isCashierOrDistributor() && $user->createdBy && $user->createdBy->role) {
+            $ownerRole = $user->createdBy->role->name;
+            if (in_array($ownerRole, ['headquarters', 'branch', 'service_center', 'annex'], true)) {
+                return $user->createdBy;
+            }
+        }
+
+        return $user;
+    }
+
+    private function availableStockForUser(User $user, Product $product): int
+    {
+        $stockUser = $this->stockUserForInvoices($user);
+        $role = $stockUser->role?->name;
+
+        return match ($role) {
+            Role::HEADQUARTERS => HeadquartersStock::getQuantity((int) $stockUser->id, (int) $product->id),
+            Role::BRANCH => BranchStock::getQuantity((int) $stockUser->id, (int) $product->id),
+            Role::SERVICE_CENTER => ServiceCenterStock::getQuantity((int) $stockUser->id, (int) $product->id),
+            Role::ANNEX => AnnexStock::getQuantity((int) $stockUser->id, (int) $product->id),
+            default => (int) $product->stock,
+        };
+    }
+
+    /**
+     * Bulk available stock for many products (product_id => qty).
+     *
+     * @param  \Illuminate\Support\Collection<int, Product>|iterable<Product>  $products
+     * @return array<int, int>
+     */
+    private function stockMapForUser(User $user, $products): array
+    {
+        $stockUser = $this->stockUserForInvoices($user);
+        $stockUser->loadMissing('role');
+        $ids = collect($products)->pluck('id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        if ($ids === []) {
+            return [];
+        }
+
+        $role = $stockUser->role?->name;
+        $map = array_fill_keys($ids, 0);
+
+        if ($role === Role::HEADQUARTERS) {
+            $rows = HeadquartersStock::where('headquarters_user_id', $stockUser->id)
+                ->whereIn('product_id', $ids)
+                ->pluck('quantity', 'product_id');
+            foreach ($rows as $productId => $qty) {
+                $map[(int) $productId] = (int) $qty;
+            }
+
+            return $map;
+        }
+
+        if ($role === Role::BRANCH) {
+            $rows = BranchStock::where('branch_user_id', $stockUser->id)
+                ->whereIn('product_id', $ids)
+                ->pluck('quantity', 'product_id');
+            foreach ($rows as $productId => $qty) {
+                $map[(int) $productId] = (int) $qty;
+            }
+
+            return $map;
+        }
+
+        if ($role === Role::SERVICE_CENTER) {
+            $rows = ServiceCenterStock::where('service_center_user_id', $stockUser->id)
+                ->whereIn('product_id', $ids)
+                ->pluck('quantity', 'product_id');
+            foreach ($rows as $productId => $qty) {
+                $map[(int) $productId] = (int) $qty;
+            }
+
+            return $map;
+        }
+
+        if ($role === Role::ANNEX) {
+            $rows = AnnexStock::where('annex_user_id', $stockUser->id)
+                ->whereIn('product_id', $ids)
+                ->pluck('quantity', 'product_id');
+            foreach ($rows as $productId => $qty) {
+                $map[(int) $productId] = (int) $qty;
+            }
+
+            return $map;
+        }
+
+        foreach ($products as $product) {
+            $map[(int) $product->id] = (int) ($product->stock ?? 0);
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param  array<int, float>  $productQuantities
+     * @return string|null error message
+     */
+    private function validateStockForUser(User $user, array $productQuantities): ?string
+    {
+        if ($productQuantities === []) {
+            return null;
+        }
+
+        $products = Product::whereIn('id', array_keys($productQuantities))->get()->keyBy('id');
+        foreach ($productQuantities as $productId => $qty) {
+            $need = (int) ceil((float) $qty);
+            if ($need <= 0) {
+                continue;
+            }
+            $product = $products->get((int) $productId);
+            if (! $product) {
+                continue;
+            }
+            $avail = $this->availableStockForUser($user, $product);
+            if ($avail < $need) {
+                $name = $product->display_name ?? $product->name ?? "Product #{$productId}";
+
+                return "Insufficient stock for {$name}. Available: {$avail}, required: {$need}.";
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, float>  $productQuantities
+     */
+    private function deductStockForUser(User $user, array $productQuantities): void
+    {
+        if ($productQuantities === []) {
+            return;
+        }
+
+        $stockUser = $this->stockUserForInvoices($user);
+        $role = $stockUser->role?->name;
+        $products = Product::whereIn('id', array_keys($productQuantities))->lockForUpdate()->get()->keyBy('id');
+
+        foreach ($productQuantities as $productId => $qty) {
+            $need = (int) ceil((float) $qty);
+            if ($need <= 0) {
+                continue;
+            }
+            $product = $products->get((int) $productId);
+            if (! $product) {
+                continue;
+            }
+
+            $ok = match ($role) {
+                Role::HEADQUARTERS => HeadquartersStock::decrementStock((int) $stockUser->id, (int) $product->id, $need),
+                Role::BRANCH => BranchStock::decrementStock((int) $stockUser->id, (int) $product->id, $need),
+                Role::SERVICE_CENTER => ServiceCenterStock::decrementStock((int) $stockUser->id, (int) $product->id, $need),
+                Role::ANNEX => AnnexStock::decrementStock((int) $stockUser->id, (int) $product->id, $need),
+                default => (function () use ($product, $need) {
+                    if ((int) $product->stock < $need) {
+                        return false;
+                    }
+                    $product->decrement('stock', $need);
+
+                    return true;
+                })(),
+            };
+
+            if (! $ok) {
+                $name = $product->display_name ?? $product->name ?? "Product #{$productId}";
+                throw new \RuntimeException("Insufficient stock for {$name}.");
+            }
+        }
+    }
+
     public function validateCoupon(Request $request)
     {
         $request->validate([
@@ -204,7 +422,9 @@ class CustomerInvoiceController extends Controller
     public function create(Request $request)
     {
         $user = $request->user();
+        $user->loadMissing('role');
         $products = Product::where('is_active', true)->orderBy('name')->get();
+        $productStocks = $this->stockMapForUser($user, $products);
         $cartCount = array_sum($request->session()->get('cart', []));
         $posMachines = PosMachine::query()
             ->orderBy('bank_name')
@@ -235,13 +455,14 @@ class CustomerInvoiceController extends Controller
             $banksQuery->where('headquarters_user_id', $hqId);
         }
         $banks = $banksQuery->orderBy('name')->get();
-        $manualProducts = $products->map(function (Product $p) use ($user) {
+        $manualProducts = $products->map(function (Product $p) use ($user, $productStocks) {
             return [
                 'name' => (string) $p->display_name,
                 'unit' => (string) ($p->pack_size ?? 'pcs'),
                 'price' => (float) $p->getPriceForUser($user),
                 'pv' => (float) ($p->pv ?? 0),
                 'bv' => (float) ($p->bv ?? 0),
+                'stock' => (int) ($productStocks[(int) $p->id] ?? 0),
             ];
         })->values()->all();
 
@@ -260,6 +481,7 @@ class CustomerInvoiceController extends Controller
         return view('invoices.create', [
             'user' => $user,
             'products' => $products,
+            'productStocks' => $productStocks,
             'manualProducts' => $manualProducts,
             'cartCount' => $cartCount,
             'prefillQuantities' => $prefillQuantities,
@@ -274,9 +496,107 @@ class CustomerInvoiceController extends Controller
         ]);
     }
 
+    public function createFormData(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $user->loadMissing('role');
+        $walletOwner = $user->walletOwnerForShopping();
+
+        $products = Product::where('is_active', true)->orderBy('name')->get();
+        $productStocks = $this->stockMapForUser($user, $products);
+
+        $productRows = $products->map(function (Product $product) use ($user, $productStocks) {
+            return [
+                'id' => $product->id,
+                'item_code' => $product->item_code,
+                'name' => $product->name,
+                'display_name' => $product->display_name,
+                'unit' => $product->pack_size ?? 'pcs',
+                'price' => (float) $product->getPriceForUser($user),
+                'pv' => (float) ($product->pv ?? 0),
+                'bv' => (float) ($product->bv ?? 0),
+                'stock' => (int) ($productStocks[(int) $product->id] ?? 0),
+            ];
+        })->values();
+
+        $totalDpbv = (float) $this->effectiveDpbvQuery($user)->sum('dpbv');
+
+        return response()->json([
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'phone' => $user->phone,
+                'role' => $user->role?->name,
+            ],
+            'wallet_balance' => (float) ($walletOwner->wallet_balance ?? 0),
+            'wallet_owner_name' => $walletOwner->name,
+            'kedi_credit_balance' => (float) ($user->kedi_credit_balance ?? 0),
+            'dpbv' => $totalDpbv,
+            'dpbv_naira' => ($totalDpbv * 0.95) * 990,
+            'payment_methods' => self::PAYMENT_METHODS,
+            'status_counts' => Invoice::where('user_id', $user->id)
+                ->whereIn('status', ['draft', 'sent', 'paid'])
+                ->selectRaw('status, COUNT(*) as total')
+                ->groupBy('status')
+                ->pluck('total', 'status')
+                ->toArray(),
+            'products' => $productRows,
+        ]);
+    }
+
+    private function invoiceFormError(Request $request, array $errors): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => collect($errors)->flatten()->first() ?? 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        return redirect()->back()->withInput()->withErrors($errors);
+    }
+
+    private function invoiceToApiArray(Invoice $invoice): array
+    {
+        $invoice->loadMissing('items');
+
+        return [
+            'id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'customer_name' => $invoice->customer_name,
+            'customer_email' => $invoice->customer_email,
+            'customer_phone' => $invoice->customer_phone,
+            'customer_address' => $invoice->customer_address,
+            'sc_referral_code' => $invoice->sc_referral_code,
+            'coupon_code' => $invoice->coupon_code,
+            'invoice_date' => $invoice->invoice_date?->format('Y-m-d'),
+            'due_date' => $invoice->due_date?->format('Y-m-d'),
+            'subtotal' => (float) $invoice->subtotal,
+            'tax' => (float) $invoice->tax,
+            'discount' => (float) $invoice->discount,
+            'coupon_discount_amount' => (float) ($invoice->coupon_discount_amount ?? 0),
+            'total' => (float) $invoice->total,
+            'status' => $invoice->status,
+            'payment_method' => $invoice->payment_method,
+            'payment_breakdown' => $invoice->payment_breakdown,
+            'notes' => $invoice->notes,
+            'created_at' => $invoice->created_at?->toIso8601String(),
+            'items' => $invoice->items->map(fn (InvoiceItem $item) => [
+                'item_name' => $item->item_name,
+                'description' => $item->description,
+                'quantity' => (float) $item->quantity,
+                'unit' => $item->unit,
+                'unit_price' => (float) $item->unit_price,
+                'line_total' => (float) $item->line_total,
+            ])->all(),
+        ];
+    }
+
     public function store(Request $request)
     {
         $user = $request->user();
+        $user->loadMissing('role');
         $useProducts = $request->boolean('use_product_quantities');
         $splitPayment = $request->boolean('split_payment');
         $useScReferral = $request->boolean('use_sc_referral');
@@ -302,6 +622,7 @@ class CustomerInvoiceController extends Controller
                 'split_kd_credit_amount' => ['nullable', 'numeric', 'min:0'],
                 'split_cash_amount' => ['nullable', 'numeric', 'min:0'],
                 'split_transfer_amount' => ['nullable', 'numeric', 'min:0'],
+                'split_cheque_amount' => ['nullable', 'numeric', 'min:0'],
                 'status' => ['required', 'string', Rule::in(['draft', 'sent', 'paid', 'overdue', 'cancelled'])],
                 'notes' => ['nullable', 'string'],
                 'use_sc_referral' => ['nullable'],
@@ -312,7 +633,7 @@ class CustomerInvoiceController extends Controller
 
             $productQuantities = array_filter($data['product_quantities'] ?? [], fn ($q) => (float) $q > 0);
             if (empty($productQuantities)) {
-                return redirect()->back()->withInput()->withErrors(['product_quantities' => 'Enter quantity for at least one product.']);
+                return $this->invoiceFormError($request, ['product_quantities' => 'Enter quantity for at least one product.']);
             }
 
             $productIds = array_keys($productQuantities);
@@ -335,7 +656,7 @@ class CustomerInvoiceController extends Controller
                 ];
             }
             if (empty($items)) {
-                return redirect()->back()->withInput()->withErrors(['product_quantities' => 'Enter quantity for at least one product.']);
+                return $this->invoiceFormError($request, ['product_quantities' => 'Enter quantity for at least one product.']);
             }
         } else {
             $data = $request->validate([
@@ -358,6 +679,7 @@ class CustomerInvoiceController extends Controller
                 'split_kd_credit_amount' => ['nullable', 'numeric', 'min:0'],
                 'split_cash_amount' => ['nullable', 'numeric', 'min:0'],
                 'split_transfer_amount' => ['nullable', 'numeric', 'min:0'],
+                'split_cheque_amount' => ['nullable', 'numeric', 'min:0'],
                 'status' => ['required', 'string', Rule::in(['draft', 'sent', 'paid', 'overdue', 'cancelled'])],
                 'notes' => ['nullable', 'string'],
                 'use_sc_referral' => ['nullable'],
@@ -390,7 +712,7 @@ class CustomerInvoiceController extends Controller
                 ];
             }
             if (empty($items)) {
-                return redirect()->back()->withInput()->withErrors(['items' => 'Enter at least one item.']);
+                return $this->invoiceFormError($request, ['items' => 'Enter at least one item.']);
             }
             $items = $this->mergeItemsByName($items);
         }
@@ -413,7 +735,7 @@ class CustomerInvoiceController extends Controller
         if ($couponCode !== '') {
             $coupon = Coupon::where('code', $couponCode)->first();
             if (! $coupon || ! $coupon->isValid()) {
-                return redirect()->back()->withInput()->withErrors(['coupon_code' => 'Invalid coupon code.']);
+                return $this->invoiceFormError($request, ['coupon_code' => 'Invalid coupon code.']);
             }
             $couponIdToConsume = (int) $coupon->id;
             $couponDiscountAmount = ((float) $coupon->discount_percentage / 100.0) * (float) $subtotal;
@@ -427,6 +749,14 @@ class CustomerInvoiceController extends Controller
         $status = (string) ($data['status'] ?? '');
         $shouldDeduct = ($status === 'paid');
 
+        $productQuantitiesForStock = $this->productQuantitiesFromItems($items);
+        if ($shouldDeduct) {
+            $stockError = $this->validateStockForUser($user, $productQuantitiesForStock);
+            if ($stockError !== null) {
+                return $this->invoiceFormError($request, ['status' => $stockError]);
+            }
+        }
+
         $paymentMethod = $data['payment_method'] ?? null;
         $scReferralCode = $data['sc_referral_code'] ?? null;
 
@@ -437,14 +767,14 @@ class CustomerInvoiceController extends Controller
             $kediCreditOwner = $serviceCenter ?: $user;
 
             if (($paymentMethod === 'wallet' || $paymentMethod === 'dpbv') && ! $serviceCenter) {
-                return redirect()->back()->withInput()->withErrors([
+                return $this->invoiceFormError($request, [
                     'sc_referral_code' => 'Valid Service Center Referral Code is required to pay with '.($paymentMethod === 'dpbv' ? 'DPBV' : 'wallet').'.',
                 ]);
             }
 
             if ($paymentMethod === 'wallet') {
                 if (((float) ($serviceCenter->wallet_balance ?? 0)) < (float) $total) {
-                    return redirect()->back()->withInput()->withErrors([
+                    return $this->invoiceFormError($request, [
                         'payment_method' => 'Insufficient Service Center wallet balance to pay this invoice.',
                     ]);
                 }
@@ -454,7 +784,7 @@ class CustomerInvoiceController extends Controller
                 $totalDpbv = (float) $this->effectiveDpbvQuery($serviceCenter)->sum('dpbv');
                 $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
                 if (round($dpbvNairaEquivalent, 2) < round((float) $total, 2)) {
-                    return redirect()->back()->withInput()->withErrors([
+                    return $this->invoiceFormError($request, [
                         'payment_method' => 'Insufficient Service Center DPBV balance to pay this invoice.',
                     ]);
                 }
@@ -462,7 +792,7 @@ class CustomerInvoiceController extends Controller
 
             if ($paymentMethod === 'kd_credit') {
                 if (((float) ($kediCreditOwner->kedi_credit_balance ?? 0)) < (float) $total) {
-                    return redirect()->back()->withInput()->withErrors([
+                    return $this->invoiceFormError($request, [
                         'payment_method' => 'Insufficient Kedi Credit balance to pay this invoice.',
                     ]);
                 }
@@ -486,35 +816,36 @@ class CustomerInvoiceController extends Controller
             $kdAmt = (float) ($data['split_kd_credit_amount'] ?? 0);
             $cashAmt = (float) ($data['split_cash_amount'] ?? 0);
             $transferAmt = (float) ($data['split_transfer_amount'] ?? 0);
+            $chequeAmt = (float) ($data['split_cheque_amount'] ?? 0);
             $posAmt = (float) ($data['pos_amount_paid'] ?? 0);
             $bankAmt = (float) ($data['bank_amount_paid'] ?? 0);
 
-            $sum = $walletAmt + $kdAmt + $cashAmt + $transferAmt + $posAmt + $bankAmt;
+            $sum = $walletAmt + $kdAmt + $cashAmt + $transferAmt + $chequeAmt + $posAmt + $bankAmt;
             if (round($sum, 2) <= 0) {
-                return redirect()->back()->withInput()->withErrors([
+                return $this->invoiceFormError($request, [
                     'split_payment' => 'Enter at least one split payment amount.',
                 ]);
             }
             if (round($sum, 2) !== round((float) $total, 2)) {
-                return redirect()->back()->withInput()->withErrors([
+                return $this->invoiceFormError($request, [
                     'split_payment' => 'Split payment amounts must add up to the invoice total (₦'.number_format((float) $total, 2).').',
                 ]);
             }
 
             if ($walletAmt > 0 && ! $serviceCenter) {
-                return redirect()->back()->withInput()->withErrors([
+                return $this->invoiceFormError($request, [
                     'sc_referral_code' => 'Valid Service Center Referral Code is required to pay any amount from wallet.',
                 ]);
             }
 
             if ($walletAmt > 0 && ((float) ($serviceCenter->wallet_balance ?? 0)) < (float) $walletAmt) {
-                return redirect()->back()->withInput()->withErrors([
+                return $this->invoiceFormError($request, [
                     'split_wallet_amount' => 'Insufficient Service Center wallet balance for the wallet amount entered.',
                 ]);
             }
 
             if ($kdAmt > 0 && ((float) ($kediCreditOwner->kedi_credit_balance ?? 0)) < (float) $kdAmt) {
-                return redirect()->back()->withInput()->withErrors([
+                return $this->invoiceFormError($request, [
                     'split_kd_credit_amount' => 'Insufficient Kedi Credit balance for the KD Credit amount entered.',
                 ]);
             }
@@ -525,6 +856,7 @@ class CustomerInvoiceController extends Controller
                 'kd_credit' => round($kdAmt, 2),
                 'cash' => round($cashAmt, 2),
                 'transfer' => round($transferAmt, 2),
+                'cheque' => round($chequeAmt, 2),
                 'pos' => round($posAmt, 2),
                 'bank' => round($bankAmt, 2),
                 'total' => round((float) $total, 2),
@@ -532,7 +864,7 @@ class CustomerInvoiceController extends Controller
         }
 
         $invoice = null;
-        DB::transaction(function () use ($data, $items, $subtotal, $tax, $discount, $couponCode, $couponIdToConsume, $couponDiscountAmount, $total, $user, $paymentMethod, $paymentBreakdown, $serviceCenter, $kediCreditOwner, $splitPayment, $shouldDeduct, &$invoice) {
+        DB::transaction(function () use ($data, $items, $subtotal, $tax, $discount, $couponCode, $couponIdToConsume, $couponDiscountAmount, $total, $user, $paymentMethod, $paymentBreakdown, $serviceCenter, $kediCreditOwner, $splitPayment, $shouldDeduct, $productQuantitiesForStock, &$invoice) {
             if ($shouldDeduct && $couponCode && $couponIdToConsume) {
                 // Consume coupon (single-use) safely inside transaction
                 $locked = Coupon::where('id', $couponIdToConsume)->lockForUpdate()->first();
@@ -564,6 +896,7 @@ class CustomerInvoiceController extends Controller
                 'pos_amount_paid' => (float) ($data['pos_amount_paid'] ?? 0) > 0 ? (float) $data['pos_amount_paid'] : null,
                 'payment_breakdown' => $paymentBreakdown,
                 'notes' => $data['notes'] ?? null,
+                'stock_deducted_at' => $shouldDeduct && $productQuantitiesForStock !== [] ? now() : null,
             ]);
 
             foreach ($items as $index => $item) {
@@ -577,6 +910,10 @@ class CustomerInvoiceController extends Controller
                     'line_total' => $item['line_total'],
                     'sort_order' => $index,
                 ]);
+            }
+
+            if ($shouldDeduct && $productQuantitiesForStock !== []) {
+                $this->deductStockForUser($user, $productQuantitiesForStock);
             }
 
             // Deduct from Service Center wallet when paying with wallet
@@ -636,6 +973,14 @@ class CustomerInvoiceController extends Controller
                 }
             }
         });
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Invoice created successfully.',
+                'data' => $this->invoiceToApiArray($invoice),
+            ], 201);
+        }
 
         return redirect()
             ->route('invoices.index')
@@ -749,6 +1094,7 @@ class CustomerInvoiceController extends Controller
         $this->assertOwner($request, $invoice);
 
         $user = $request->user();
+        $user->loadMissing('role');
         $useProducts = $request->boolean('use_product_quantities');
         $useScReferral = $request->boolean('use_sc_referral');
         $splitPayment = $request->boolean('split_payment');
@@ -772,6 +1118,7 @@ class CustomerInvoiceController extends Controller
             'split_kd_credit_amount' => ['nullable', 'numeric', 'min:0'],
             'split_cash_amount' => ['nullable', 'numeric', 'min:0'],
             'split_transfer_amount' => ['nullable', 'numeric', 'min:0'],
+            'split_cheque_amount' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'string', Rule::in(['draft', 'sent', 'paid', 'overdue', 'cancelled'])],
             'notes' => ['nullable', 'string'],
             'use_sc_referral' => ['nullable'],
@@ -856,13 +1203,13 @@ class CustomerInvoiceController extends Controller
         if ($couponCode !== '') {
             $coupon = Coupon::where('code', $couponCode)->first();
             if (! $coupon) {
-                return redirect()->back()->withInput()->withErrors(['coupon_code' => 'Invalid coupon code.']);
+                return $this->invoiceFormError($request, ['coupon_code' => 'Invalid coupon code.']);
             }
 
             // If user keeps the same coupon on this invoice, allow it even if it has already been consumed.
             $keepingSameCoupon = (string) ($invoice->coupon_code ?? '') !== '' && (string) $invoice->coupon_code === $couponCode;
             if (! $keepingSameCoupon && ! $coupon->isValid()) {
-                return redirect()->back()->withInput()->withErrors(['coupon_code' => 'Invalid coupon code.']);
+                return $this->invoiceFormError($request, ['coupon_code' => 'Invalid coupon code.']);
             }
 
             $couponIdToConsume = (! $keepingSameCoupon && $coupon->isValid()) ? (int) $coupon->id : null;
@@ -885,70 +1232,258 @@ class CustomerInvoiceController extends Controller
         }
 
         $previousCouponCode = (string) ($invoice->coupon_code ?? '');
+        $previousStatus = (string) ($invoice->status ?? '');
+        $newStatus = (string) ($data['status'] ?? '');
+        $shouldDeductStock = $newStatus === 'paid' && $invoice->stock_deducted_at === null;
 
-        DB::transaction(function () use ($invoice, $data, $items, $subtotal, $tax, $discount, $couponCode, $couponIdToConsume, $previousCouponCode, $couponDiscountAmount, $total, $user, $splitPayment) {
-            // Adjust coupon usage counts if coupon changed
-            if ($previousCouponCode !== (string) ($couponCode ?? '')) {
-                if ($previousCouponCode !== '') {
-                    $prev = Coupon::where('code', $previousCouponCode)->lockForUpdate()->first();
-                    if ($prev && (int) $prev->used_count > 0) {
-                        $prev->decrement('used_count');
-                    }
-                }
-                if ($couponCode && $couponIdToConsume) {
-                    $locked = Coupon::where('id', $couponIdToConsume)->lockForUpdate()->first();
-                    if (! $locked || ! $locked->isValid()) {
-                        abort(422, 'Coupon is no longer valid.');
-                    }
-                    $locked->increment('used_count');
-                }
+        $finalItemsForStock = $items !== null
+            ? $items
+            : $invoice->items->map(fn ($row) => [
+                'item_name' => $row->item_name,
+                'quantity' => (float) $row->quantity,
+            ])->all();
+        $productQuantitiesForStock = $shouldDeductStock
+            ? $this->productQuantitiesFromItems($finalItemsForStock)
+            : [];
+
+        if ($shouldDeductStock) {
+            $stockError = $this->validateStockForUser($user, $productQuantitiesForStock);
+            if ($stockError !== null) {
+                return $this->invoiceFormError($request, ['status' => $stockError]);
+            }
+        }
+
+        // Mirror create: when moving to paid, debit wallet / DPBV / KD credit if applicable
+        $shouldDeductPayment = $newStatus === 'paid' && $previousStatus !== 'paid';
+        $paymentMethod = $data['payment_method'] ?? null;
+        $scReferralCode = $data['sc_referral_code'] ?? null;
+        $serviceCenter = null;
+        $kediCreditOwner = null;
+        $paymentBreakdown = null;
+
+        if ($shouldDeductPayment && ($paymentMethod === 'wallet' || $paymentMethod === 'dpbv' || $paymentMethod === 'kd_credit' || $splitPayment)) {
+            $serviceCenter = $this->resolveServiceCenterByCode($scReferralCode);
+            $kediCreditOwner = $serviceCenter ?: $user;
+
+            if (($paymentMethod === 'wallet' || $paymentMethod === 'dpbv') && ! $serviceCenter) {
+                return $this->invoiceFormError($request, [
+                    'sc_referral_code' => 'Valid Service Center Referral Code is required to pay with '.($paymentMethod === 'dpbv' ? 'DPBV' : 'wallet').'.',
+                ]);
             }
 
-            $invoice->update([
-                'customer_name' => $data['customer_name'] ?? $user->name ?? null,
-                'sc_referral_code' => $data['sc_referral_code'] ?? null,
-                'coupon_code' => $couponCode,
-                'customer_email' => $data['customer_email'] ?? $user->email ?? null,
-                'customer_phone' => $data['customer_phone'] ?? null,
-                'customer_address' => $data['customer_address'] ?? null,
-                'invoice_date' => $data['invoice_date'],
-                'due_date' => $data['due_date'] ?? null,
-                'subtotal' => $subtotal,
-                'tax' => $tax,
-                'discount' => $discount,
-                'coupon_discount_amount' => $couponDiscountAmount,
-                'total' => $total,
-                'status' => $data['status'],
-                'payment_method' => $data['payment_method'] ?? null,
-                'pos_amount_paid' => (float) ($data['pos_amount_paid'] ?? 0) > 0 ? (float) $data['pos_amount_paid'] : null,
-                'payment_breakdown' => $splitPayment ? [
-                    'wallet' => round((float) ($data['split_wallet_amount'] ?? 0), 2),
-                    'kd_credit' => round((float) ($data['split_kd_credit_amount'] ?? 0), 2),
-                    'cash' => round((float) ($data['split_cash_amount'] ?? 0), 2),
-                    'transfer' => round((float) ($data['split_transfer_amount'] ?? 0), 2),
-                    'pos' => round((float) ($data['pos_amount_paid'] ?? 0), 2),
-                    'bank' => round((float) ($data['bank_amount_paid'] ?? 0), 2),
-                    'total' => round((float) $total, 2),
-                ] : null,
-                'notes' => $data['notes'] ?? null,
-            ]);
-
-            if ($items !== null) {
-                $invoice->items()->delete();
-                foreach (array_values($items) as $index => $item) {
-                    InvoiceItem::create([
-                        'invoice_id' => $invoice->id,
-                        'item_name' => $item['item_name'],
-                        'description' => $item['description'] ?? null,
-                        'quantity' => $item['quantity'],
-                        'unit' => $item['unit'] ?? null,
-                        'unit_price' => $item['unit_price'],
-                        'line_total' => $item['line_total'],
-                        'sort_order' => $index,
+            if ($paymentMethod === 'wallet') {
+                if (((float) ($serviceCenter->wallet_balance ?? 0)) < (float) $total) {
+                    return $this->invoiceFormError($request, [
+                        'payment_method' => 'Insufficient Service Center wallet balance to pay this invoice.',
                     ]);
                 }
             }
-        });
+
+            if ($paymentMethod === 'dpbv') {
+                $totalDpbv = (float) $this->effectiveDpbvQuery($serviceCenter)->sum('dpbv');
+                $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
+                if (round($dpbvNairaEquivalent, 2) < round((float) $total, 2)) {
+                    return $this->invoiceFormError($request, [
+                        'payment_method' => 'Insufficient Service Center DPBV balance to pay this invoice.',
+                    ]);
+                }
+            }
+
+            if ($paymentMethod === 'kd_credit') {
+                if (((float) ($kediCreditOwner->kedi_credit_balance ?? 0)) < (float) $total) {
+                    return $this->invoiceFormError($request, [
+                        'payment_method' => 'Insufficient Kedi Credit balance to pay this invoice.',
+                    ]);
+                }
+            }
+        }
+
+        if ($shouldDeductPayment && $splitPayment) {
+            $walletAmt = (float) ($data['split_wallet_amount'] ?? 0);
+            $kdAmt = (float) ($data['split_kd_credit_amount'] ?? 0);
+            $cashAmt = (float) ($data['split_cash_amount'] ?? 0);
+            $transferAmt = (float) ($data['split_transfer_amount'] ?? 0);
+            $chequeAmt = (float) ($data['split_cheque_amount'] ?? 0);
+            $posAmt = (float) ($data['pos_amount_paid'] ?? 0);
+            $bankAmt = (float) ($data['bank_amount_paid'] ?? 0);
+
+            $sum = $walletAmt + $kdAmt + $cashAmt + $transferAmt + $chequeAmt + $posAmt + $bankAmt;
+            if (round($sum, 2) <= 0) {
+                return $this->invoiceFormError($request, [
+                    'split_payment' => 'Enter at least one split payment amount.',
+                ]);
+            }
+            if (round($sum, 2) !== round((float) $total, 2)) {
+                return $this->invoiceFormError($request, [
+                    'split_payment' => 'Split payment amounts must add up to the invoice total (₦'.number_format((float) $total, 2).').',
+                ]);
+            }
+
+            if ($walletAmt > 0 && ! $serviceCenter) {
+                return $this->invoiceFormError($request, [
+                    'sc_referral_code' => 'Valid Service Center Referral Code is required to pay any amount from wallet.',
+                ]);
+            }
+
+            if ($walletAmt > 0 && ((float) ($serviceCenter->wallet_balance ?? 0)) < (float) $walletAmt) {
+                return $this->invoiceFormError($request, [
+                    'split_wallet_amount' => 'Insufficient Service Center wallet balance for the wallet amount entered.',
+                ]);
+            }
+
+            if ($kdAmt > 0 && ((float) ($kediCreditOwner->kedi_credit_balance ?? 0)) < (float) $kdAmt) {
+                return $this->invoiceFormError($request, [
+                    'split_kd_credit_amount' => 'Insufficient Kedi Credit balance for the KD Credit amount entered.',
+                ]);
+            }
+
+            $paymentMethod = 'split';
+            $paymentBreakdown = [
+                'wallet' => round($walletAmt, 2),
+                'kd_credit' => round($kdAmt, 2),
+                'cash' => round($cashAmt, 2),
+                'transfer' => round($transferAmt, 2),
+                'cheque' => round($chequeAmt, 2),
+                'pos' => round($posAmt, 2),
+                'bank' => round($bankAmt, 2),
+                'total' => round((float) $total, 2),
+            ];
+        } elseif ($splitPayment) {
+            $paymentBreakdown = [
+                'wallet' => round((float) ($data['split_wallet_amount'] ?? 0), 2),
+                'kd_credit' => round((float) ($data['split_kd_credit_amount'] ?? 0), 2),
+                'cash' => round((float) ($data['split_cash_amount'] ?? 0), 2),
+                'transfer' => round((float) ($data['split_transfer_amount'] ?? 0), 2),
+                'cheque' => round((float) ($data['split_cheque_amount'] ?? 0), 2),
+                'pos' => round((float) ($data['pos_amount_paid'] ?? 0), 2),
+                'bank' => round((float) ($data['bank_amount_paid'] ?? 0), 2),
+                'total' => round((float) $total, 2),
+            ];
+        }
+
+        try {
+            DB::transaction(function () use ($invoice, $data, $items, $subtotal, $tax, $discount, $couponCode, $couponIdToConsume, $previousCouponCode, $couponDiscountAmount, $total, $user, $splitPayment, $paymentMethod, $paymentBreakdown, $shouldDeductStock, $shouldDeductPayment, $productQuantitiesForStock, $serviceCenter, $kediCreditOwner) {
+                // Adjust coupon usage counts if coupon changed
+                if ($previousCouponCode !== (string) ($couponCode ?? '')) {
+                    if ($previousCouponCode !== '') {
+                        $prev = Coupon::where('code', $previousCouponCode)->lockForUpdate()->first();
+                        if ($prev && (int) $prev->used_count > 0) {
+                            $prev->decrement('used_count');
+                        }
+                    }
+                    if ($couponCode && $couponIdToConsume) {
+                        $locked = Coupon::where('id', $couponIdToConsume)->lockForUpdate()->first();
+                        if (! $locked || ! $locked->isValid()) {
+                            abort(422, 'Coupon is no longer valid.');
+                        }
+                        $locked->increment('used_count');
+                    }
+                }
+
+                $updatePayload = [
+                    'customer_name' => $data['customer_name'] ?? $user->name ?? null,
+                    'sc_referral_code' => $data['sc_referral_code'] ?? null,
+                    'coupon_code' => $couponCode,
+                    'customer_email' => $data['customer_email'] ?? $user->email ?? null,
+                    'customer_phone' => $data['customer_phone'] ?? null,
+                    'customer_address' => $data['customer_address'] ?? null,
+                    'invoice_date' => $data['invoice_date'],
+                    'due_date' => $data['due_date'] ?? null,
+                    'subtotal' => $subtotal,
+                    'tax' => $tax,
+                    'discount' => $discount,
+                    'coupon_discount_amount' => $couponDiscountAmount,
+                    'total' => $total,
+                    'status' => $data['status'],
+                    'payment_method' => $paymentMethod ?? ($data['payment_method'] ?? null),
+                    'pos_amount_paid' => (float) ($data['pos_amount_paid'] ?? 0) > 0 ? (float) $data['pos_amount_paid'] : null,
+                    'payment_breakdown' => $paymentBreakdown,
+                    'notes' => $data['notes'] ?? null,
+                ];
+
+                if ($shouldDeductStock && $productQuantitiesForStock !== []) {
+                    $updatePayload['stock_deducted_at'] = now();
+                }
+
+                if ($shouldDeductPayment && $serviceCenter && empty($invoice->branch_user_id)) {
+                    $updatePayload['branch_user_id'] = $serviceCenter->id;
+                }
+
+                $invoice->update($updatePayload);
+
+                if ($items !== null) {
+                    $invoice->items()->delete();
+                    foreach (array_values($items) as $index => $item) {
+                        InvoiceItem::create([
+                            'invoice_id' => $invoice->id,
+                            'item_name' => $item['item_name'],
+                            'description' => $item['description'] ?? null,
+                            'quantity' => $item['quantity'],
+                            'unit' => $item['unit'] ?? null,
+                            'unit_price' => $item['unit_price'],
+                            'line_total' => $item['line_total'],
+                            'sort_order' => $index,
+                        ]);
+                    }
+                }
+
+                if ($shouldDeductStock && $productQuantitiesForStock !== []) {
+                    $this->deductStockForUser($user, $productQuantitiesForStock);
+                }
+
+                if ($shouldDeductPayment && ($paymentMethod === 'wallet' || $splitPayment) && $serviceCenter) {
+                    $debitAmount = (float) ($splitPayment ? ((float) ($paymentBreakdown['wallet'] ?? 0)) : (float) $total);
+                    if ($debitAmount > 0) {
+                        $serviceCenter->decrement('wallet_balance', $debitAmount);
+                        $balanceAfter = (float) $serviceCenter->fresh()->wallet_balance;
+                        WalletTransaction::create([
+                            'user_id' => $serviceCenter->id,
+                            'type' => WalletTransaction::TYPE_DEBIT,
+                            'amount' => $debitAmount,
+                            'balance_after' => $balanceAfter,
+                            'reference' => 'Invoice #'.$invoice->invoice_number,
+                            'status' => WalletTransaction::STATUS_ACCEPTED,
+                            'approved_at' => now(),
+                        ]);
+                    }
+                }
+
+                if ($shouldDeductPayment && $paymentMethod === 'dpbv' && $serviceCenter) {
+                    $amountToDeduct = (float) $total;
+                    $dpbvToDeduct = $amountToDeduct / 990 / 0.95;
+
+                    DpbvCollection::create([
+                        'no' => null,
+                        'code' => $invoice->invoice_number,
+                        'name' => $serviceCenter->name,
+                        'record_date' => now(),
+                        'sc' => 'INVOICE',
+                        'dpbv' => -$dpbvToDeduct,
+                        'user_id' => $serviceCenter->id,
+                    ]);
+                }
+
+                if ($shouldDeductPayment && ($paymentMethod === 'kd_credit' || $splitPayment) && $kediCreditOwner) {
+                    $debitAmount = (float) ($splitPayment ? ((float) ($paymentBreakdown['kd_credit'] ?? 0)) : (float) $total);
+                    if ($debitAmount > 0) {
+                        $kediCreditOwner->decrement('kedi_credit_balance', $debitAmount);
+                        $balanceAfter = (float) $kediCreditOwner->fresh()->kedi_credit_balance;
+
+                        KediCreditTransaction::create([
+                            'user_id' => $kediCreditOwner->id,
+                            'type' => KediCreditTransaction::TYPE_DEBIT,
+                            'amount' => $debitAmount,
+                            'balance_after' => $balanceAfter,
+                            'reference' => 'Invoice #'.$invoice->invoice_number,
+                            'notes' => $serviceCenter ? 'Debited from Service Center Kedi Credit via referral code.' : 'Debited from customer Kedi Credit.',
+                            'created_by_user_id' => $user->id,
+                        ]);
+                    }
+                }
+            });
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->withInput()->withErrors(['status' => $e->getMessage()]);
+        }
 
         return redirect()
             ->route('invoices.show', $invoice)

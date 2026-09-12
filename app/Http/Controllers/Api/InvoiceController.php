@@ -16,8 +16,14 @@ class InvoiceController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $invoices = Invoice::with('items')
-            ->where('user_id', $request->user()->id)
+        $query = Invoice::with('items')->where('user_id', $request->user()->id);
+
+        $status = trim((string) $request->query('status', ''));
+        if ($status !== '' && in_array($status, ['draft', 'sent', 'paid', 'overdue', 'cancelled'], true)) {
+            $query->where('status', $status);
+        }
+
+        $invoices = $query
             ->orderByDesc('invoice_date')
             ->orderByDesc('id')
             ->paginate($request->input('per_page', 15));
@@ -161,6 +167,10 @@ class InvoiceController extends Controller
             'discount' => (float) $invoice->discount,
             'total' => (float) $invoice->total,
             'status' => $invoice->status,
+            'payment_method' => $invoice->payment_method,
+            'coupon_code' => $invoice->coupon_code,
+            'sc_referral_code' => $invoice->sc_referral_code,
+            'notes' => $invoice->notes,
             'created_at' => $invoice->created_at->toIso8601String(),
             'items' => $invoice->items->map(fn ($i) => [
                 'item_name' => $i->item_name,

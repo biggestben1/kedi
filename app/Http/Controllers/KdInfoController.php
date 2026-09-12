@@ -50,99 +50,164 @@ class KdInfoController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'kd_id' => 'nullable|string|max:100',
-            'customer_name' => 'nullable|string|max:255',
+            'kd_id' => 'required|string|max:100',
+            'customer_name' => 'required|string|max:255',
+        ], [
+            'kd_id.required' => 'Enter a KD NO to start this sale.',
+            'customer_name.required' => 'Enter the customer name to register this KD and start the sale.',
         ]);
 
-        $kdId = trim((string) $request->input('kd_id', ''));
+        $kdId = $this->normalizeKdNo((string) $request->input('kd_id', ''));
         $customerName = trim((string) $request->input('customer_name', ''));
 
-        $request->session()->put('kd_id', $kdId);
-        $request->session()->put('customer_name', $customerName);
-
-        if ($kdId !== '' && $customerName !== '') {
-            // Save to kd_customers table (canonical KD list)
-            KdCustomer::updateOrCreate(
-                ['kd_no' => $kdId],
-                ['customer_name' => $customerName, 'user_id' => $request->user()?->id]
-            );
-
-            // Transfer guest orders (orders with null kd_id) to this KD
-            $user = $request->user();
-            if ($user) {
-                Order::where('user_id', $user->id)
-                    ->whereNull('kd_id')
-                    ->update(['kd_id' => $kdId, 'customer_name' => $customerName]);
-            }
+        $existing = $this->findExistingKd($kdId);
+        if ($existing) {
+            // Already registered — leave the record unchanged and use it as the sales session.
+            $kdId = $existing['kd_no'];
+            $customerName = $existing['customer_name'];
+        } else {
+            KdCustomer::create([
+                'kd_no' => $kdId,
+                'customer_name' => $customerName,
+                'user_id' => $request->user()?->id,
+            ]);
         }
+
+        $this->startSalesSession($request, $kdId, $customerName);
 
         if ($request->wantsJson()) {
-            return response()->json(['success' => true, 'message' => 'KD info saved.']);
+            return response()->json([
+                'success' => true,
+                'kd_id' => $kdId,
+                'customer_name' => $customerName,
+                'message' => 'Registered and sales session started.',
+            ]);
         }
 
-        return back()->with('success', $kdId !== '' && $customerName !== '' ? 'KD info saved. You can now shop.' : 'You can browse and add items. Add KD info later when you have it.');
+        return redirect()->route('shop')->with('success', 'Sales session started for '.$kdId.' — '.$customerName.'.');
     }
 
-    /**
-     * Search for KD NO in the system and check if it belongs to the logged-in user
-     */
-    public function search(Request $request)
+    /** If the KEDI number already exists, start a sales session without changing it. */
+    public function useExisting(Request $request)
     {
-        $user = $request->user();
-        if (!$user) {
+        if (! $request->user()) {
             return response()->json(['error' => 'You must be logged in.'], 403);
         }
 
-        $kdNo = trim((string) $request->input('kd_no', ''));
-        if (empty($kdNo)) {
+        $kdNo = $this->normalizeKdNo((string) $request->input('kd_no', ''));
+        $existing = $this->findExistingKd($kdNo);
+        if (! $existing) {
+            return response()->json([
+                'found' => false,
+                'can_register' => true,
+                'message' => 'New KD NO. Enter the customer name to register it.',
+            ]);
+        }
+
+        $this->startSalesSession($request, $existing['kd_no'], $existing['customer_name']);
+
+        return response()->json([
+            'found' => true,
+            'session_started' => true,
+            'kd_no' => $existing['kd_no'],
+            'customer_name' => $existing['customer_name'],
+            'message' => 'This KEDI number already exists. Sales session started with the saved name.',
+        ]);
+    }
+
+    /** End the current sales session so another KD can be registered. */
+    public function clear(Request $request)
+    {
+        $request->session()->forget(['kd_id', 'customer_name']);
+
+        return redirect()->route('shop')->with('message', 'Sales session ended. Enter a KD NO and name to start another sale.');
+    }
+
+    /**
+     * Look up a KD NO. Unknown numbers can be registered with a name on this page.
+     */
+    public function search(Request $request)
+    {
+        if (! $request->user()) {
+            return response()->json(['error' => 'You must be logged in.'], 403);
+        }
+
+        $kdNo = $this->normalizeKdNo((string) $request->input('kd_no', ''));
+        if ($kdNo === '') {
             return response()->json(['error' => 'Please enter a KD NO.'], 400);
         }
 
-        // Normalize KD NO (uppercase, ensure KN prefix if needed)
-        $kdNo = strtoupper($kdNo);
-        if (!str_starts_with($kdNo, 'KN') && !str_starts_with($kdNo, 'KD')) {
-            // Try both KN and KD prefixes
-            $kdNoKn = 'KN' . ltrim($kdNo, '-');
-            $kdNoKd = 'KD' . ltrim($kdNo, '-');
-        } else {
-            $kdNoKn = $kdNo;
-            $kdNoKd = $kdNo;
-        }
-
-        // Search in kd_registrations table
-        $registration = KdRegistration::where(function($query) use ($kdNoKn, $kdNoKd) {
-            $query->where('kd_no', $kdNoKn)
-                  ->orWhere('kd_no', $kdNoKd);
-        })->first();
-
-        if (!$registration) {
-            return response()->json([
-                'found' => false,
-                'message' => 'KD NO not found in the system.',
-            ]);
-        }
-
-        // Check if it belongs to the logged-in user
-        $belongsToUser = false;
-        if ($registration->user_id == $user->id || $registration->registered_by_user_id == $user->id) {
-            $belongsToUser = true;
-        }
-
-        if (!$belongsToUser) {
+        $existing = $this->findExistingKd($kdNo);
+        if ($existing) {
             return response()->json([
                 'found' => true,
-                'belongs_to_user' => false,
-                'message' => 'KD NO found but does not belong to your account.',
+                'registered' => true,
+                'kd_no' => $existing['kd_no'],
+                'customer_name' => $existing['customer_name'],
+                'message' => 'This KEDI number already exists. Using the saved name for this sales session.',
             ]);
         }
 
-        // Auto-fill customer name from database
         return response()->json([
-            'found' => true,
-            'belongs_to_user' => true,
-            'kd_no' => $registration->kd_no,
-            'customer_name' => $registration->full_name, // This is the name from kd_registrations table
-            'message' => 'KD NO found and belongs to you. Customer name auto-filled from database.',
+            'found' => false,
+            'can_register' => true,
+            'kd_no' => $kdNo,
+            'message' => 'New KD NO. Enter the customer name below to register it and start this sale.',
         ]);
+    }
+
+    /**
+     * @return array{kd_no: string, customer_name: string}|null
+     */
+    private function findExistingKd(string $kdNo): ?array
+    {
+        if ($kdNo === '') {
+            return null;
+        }
+
+        $customer = KdCustomer::query()
+            ->whereRaw("UPPER(REPLACE(kd_no, ' ', '')) = ?", [$kdNo])
+            ->first();
+
+        if ($customer && trim((string) $customer->customer_name) !== '') {
+            return [
+                'kd_no' => strtoupper(trim($customer->kd_no)),
+                'customer_name' => trim($customer->customer_name),
+            ];
+        }
+
+        $registration = KdRegistration::query()
+            ->whereRaw("UPPER(REPLACE(kd_no, ' ', '')) = ?", [$kdNo])
+            ->first();
+
+        if ($registration && trim((string) $registration->full_name) !== '') {
+            return [
+                'kd_no' => strtoupper(trim($registration->kd_no)),
+                'customer_name' => trim($registration->full_name),
+            ];
+        }
+
+        return null;
+    }
+
+    private function startSalesSession(Request $request, string $kdId, string $customerName): void
+    {
+        $request->session()->put('kd_id', $kdId);
+        $request->session()->put('customer_name', $customerName);
+
+        $user = $request->user();
+        if ($user) {
+            Order::where('user_id', $user->id)
+                ->whereNull('kd_id')
+                ->update(['kd_id' => $kdId, 'customer_name' => $customerName]);
+        }
+    }
+
+    private function normalizeKdNo(string $kdNo): string
+    {
+        $kdNo = strtoupper(trim($kdNo));
+        $kdNo = preg_replace('/\s+/', '', $kdNo) ?? $kdNo;
+
+        return $kdNo;
     }
 }

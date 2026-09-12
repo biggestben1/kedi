@@ -74,4 +74,24 @@ class AnnexStock extends Model
 
         return true;
     }
+
+    /** Set absolute annex stock quantity (creates row if missing). */
+    public static function setQuantity(int $annexUserId, int $productId, int $qty): void
+    {
+        $qty = max(0, $qty);
+        $row = self::where('annex_user_id', $annexUserId)
+            ->where('product_id', $productId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($row) {
+            $row->update(['quantity' => $qty]);
+        } else {
+            self::create([
+                'annex_user_id' => $annexUserId,
+                'product_id' => $productId,
+                'quantity' => $qty,
+            ]);
+        }
+    }
 }

@@ -348,9 +348,21 @@
                             </div>
                         @endif
 
-                        @if($showKdModal ?? false)
+                        @if(session('kd_id') && session('customer_name'))
+                        <div class="alert alert-success mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <strong><i class="fe fe-user me-1"></i> Sales session:</strong>
+                                {{ session('kd_id') }} — {{ session('customer_name') }}
+                                <span class="text-muted small d-block">Orders in this shop session are recorded under this KD.</span>
+                            </div>
+                            <form method="POST" action="{{ route('kd-info.clear') }}" class="mb-0">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Change customer</button>
+                            </form>
+                        </div>
+                        @elseif($showKdModal ?? false)
                         <div class="alert alert-info mb-3">
-                            <strong><i class="fe fe-info me-1"></i> Optional:</strong> Enter your KD NO and Customer Name below to associate with orders. You can shop without them and add them later.
+                            <strong><i class="fe fe-info me-1"></i> Start a sale:</strong> Enter the KD NO and customer name. A new KD is registered here and used for this sales session.
                         </div>
                         @endif
                         
@@ -622,31 +634,30 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="kdInfoModalLabel"><i class="fe fe-user me-2"></i>Enter KD NO & Customer Name</h5>
+                    <h5 class="modal-title" id="kdInfoModalLabel"><i class="fe fe-user me-2"></i>Start sale — KD NO & name</h5>
                 </div>
                 <form action="{{ route('kd-info.store') }}" method="POST" id="kdInfoForm">
                     @csrf
                     <div class="modal-body">
-                        <p class="text-muted mb-3">You can shop without KD NO and Customer Name – add them later when you have them. Or auto-generate one (saved to your account, editable later) or enter manually.</p>
+                        <p class="text-muted mb-3">Type the KEDI number. If it already exists, it is used as this sales session without changing the saved name. If it is new, enter the name to register it.</p>
                         <div class="mb-3">
                             <label for="kd_id" class="form-label">KD NO</label>
                             <div class="input-group">
-                                <input type="text" name="kd_id" id="kd_id" class="form-control @error('kd_id') is-invalid @enderror" placeholder="Enter your KD number" value="{{ old('kd_id', session('kd_id')) }}" autofocus>
-                                <button type="button" class="btn btn-outline-info" id="kdSearchBtn" title="Search for KD NO in system"><i class="fe fe-search me-1"></i>Search</button>
-                                <button type="button" class="btn btn-outline-secondary" id="kdAutoGenerateBtn" title="Auto-generate and save to your account"><i class="fe fe-zap me-1"></i>Auto Generate</button>
+                                <input type="text" name="kd_id" id="kd_id" class="form-control @error('kd_id') is-invalid @enderror" placeholder="Enter KD number" value="{{ old('kd_id', session('kd_id')) }}" required autofocus>
+                                <button type="button" class="btn btn-outline-info" id="kdSearchBtn" title="Look up KD NO"><i class="fe fe-search me-1"></i>Search</button>
                             </div>
                             <div id="kdSearchResult" class="mt-2"></div>
                             @error('kd_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                         </div>
-                        <div class="mb-3" id="customerNameField" style="display: {{ old('customer_name', session('customer_name')) ? 'block' : 'none' }};">
+                        <div class="mb-3" id="customerNameField" style="display: none;">
                             <label for="customer_name" class="form-label">Customer Name</label>
-                            <input type="text" name="customer_name" id="customer_name" class="form-control @error('customer_name') is-invalid @enderror" placeholder="Enter customer name" value="{{ old('customer_name', session('customer_name')) }}">
+                            <input type="text" name="customer_name" id="customer_name" class="form-control @error('customer_name') is-invalid @enderror" placeholder="Type the customer name" value="{{ old('customer_name') }}">
                             @error('customer_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">I'll browse only</button>
-                        <button type="submit" class="btn btn-primary" id="kdInfoSubmit"><i class="fe fe-check me-1"></i>Continue Shopping</button>
+                        <button type="submit" class="btn btn-primary" id="kdInfoSubmit"><i class="fe fe-check me-1"></i>Register & start sale</button>
                         {{-- DPBV buy action removed --}}
                     </div>
                 </form>
@@ -855,82 +866,88 @@
 
         const kdInfoRequired = false; // Guests can shop without KD; they can add it later
 
-        // Search KD NO button
-        const kdSearchBtn = document.getElementById('kdSearchBtn');
-        if (kdSearchBtn) {
-            kdSearchBtn.addEventListener('click', async function() {
-                const btn = this;
-                const kdInput = document.getElementById('kd_id');
-                const nameInput = document.getElementById('customer_name');
-                const nameField = document.getElementById('customerNameField');
-                const resultDiv = document.getElementById('kdSearchResult');
-                
-                if (!kdInput || !kdInput.value.trim()) {
+        let kdLookupTimer = null;
+
+        async function lookupKdNo(showEmptyWarning) {
+            const kdInput = document.getElementById('kd_id');
+            const nameInput = document.getElementById('customer_name');
+            const nameField = document.getElementById('customerNameField');
+            const resultDiv = document.getElementById('kdSearchResult');
+            const submitBtn = document.getElementById('kdInfoSubmit');
+
+            if (!kdInput || !kdInput.value.trim()) {
+                if (showEmptyWarning && resultDiv) {
+                    resultDiv.innerHTML = '<div class="alert alert-warning small mb-0">Please enter a KD NO.</div>';
+                }
+                return;
+            }
+
+            if (resultDiv) resultDiv.innerHTML = '<div class="text-muted small">Checking KEDI number...</div>';
+
+            try {
+                const res = await fetch('{{ route("kd-info.use-existing") }}', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-TOKEN': CSRF,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: 'kd_no=' + encodeURIComponent(kdInput.value.trim()) + '&_token=' + encodeURIComponent(CSRF),
+                });
+                const data = await res.json().catch(function() { return {}; });
+
+                if (!res.ok || data.error) {
                     if (resultDiv) {
-                        resultDiv.innerHTML = '<div class="alert alert-warning small mb-0">Please enter a KD NO to search.</div>';
+                        resultDiv.innerHTML = '<div class="alert alert-danger small mb-0">' + (data.error || 'Could not check this KEDI number.') + '</div>';
                     }
                     return;
                 }
 
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fe fe-loader me-1"></i>Searching...';
-                if (resultDiv) resultDiv.innerHTML = '';
-                if (nameField) nameField.style.display = 'none';
-                if (nameInput) nameInput.value = '';
-
-                try {
-                    const res = await fetch('{{ route("kd-info.search") }}', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: { 
-                            'Accept': 'application/json', 
-                            'Content-Type': 'application/x-www-form-urlencoded', 
-                            'X-CSRF-TOKEN': CSRF, 
-                            'X-Requested-With': 'XMLHttpRequest' 
-                        },
-                        body: 'kd_no=' + encodeURIComponent(kdInput.value.trim()) + '&_token=' + encodeURIComponent(CSRF),
-                    });
-                    const data = await res.json().catch(function() { return {}; });
-                    
-                    if (!res.ok || data.error) {
-                        if (resultDiv) {
-                            resultDiv.innerHTML = '<div class="alert alert-danger small mb-0">' + (data.error || 'Search failed.') + '</div>';
-                        }
-                    } else if (data.found && data.belongs_to_user) {
-                        // KD NO found and belongs to user - auto-fill and show customer name field
-                        if (kdInput) kdInput.value = data.kd_no || kdInput.value;
-                        if (nameInput) nameInput.value = data.customer_name || '';
-                        const nameField = document.getElementById('customerNameField');
-                        if (nameField) nameField.style.display = 'block';
-                        if (resultDiv) {
-                            resultDiv.innerHTML = '<div class="alert alert-success small mb-0"><i class="fe fe-check me-1"></i>' + (data.message || 'KD NO found and customer name auto-filled.') + '</div>';
-                        }
-                    } else if (data.found && !data.belongs_to_user) {
-                        // KD NO found but doesn't belong to user
-                        if (resultDiv) {
-                            resultDiv.innerHTML = '<div class="alert alert-warning small mb-0"><i class="fe fe-alert-triangle me-1"></i>' + (data.message || 'KD NO found but does not belong to your account.') + ' <a href="{{ route("admin.kd.registration.create") }}" target="_blank" class="alert-link">Please register this KD NO</a> first.</div>';
-                        }
-                        if (nameField) nameField.style.display = 'none';
-                        if (nameInput) nameInput.value = '';
-                    } else {
-                        // KD NO not found - show red alert
-                        if (resultDiv) {
-                            resultDiv.innerHTML = '<div class="alert alert-danger small mb-0"><i class="fe fe-x-circle me-1"></i>' + (data.message || 'KD NO not found in the system.') + ' <a href="{{ route("admin.kd.registration.create") }}" target="_blank" class="alert-link">Please register this KD NO</a> first.</div>';
-                        }
-                        if (nameField) nameField.style.display = 'none';
-                        if (nameInput) nameInput.value = '';
-                    }
-                } catch (err) {
+                if (data.found && data.session_started) {
                     if (resultDiv) {
-                        resultDiv.innerHTML = '<div class="alert alert-danger small mb-0">Search failed: ' + (err?.message || 'Unknown error') + '</div>';
+                        resultDiv.innerHTML = '<div class="alert alert-success small mb-0"><i class="fe fe-check me-1"></i>' + (data.message || 'Existing KEDI number used for this sales session.') + '</div>';
                     }
-                    if (nameField) nameField.style.display = 'none';
-                    if (nameInput) nameInput.value = '';
+                    window.location.reload();
+                    return;
                 }
-                
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fe fe-search me-1"></i>Search';
+
+                if (kdInput && data.kd_no) kdInput.value = data.kd_no;
+                if (nameField) nameField.style.display = 'block';
+                if (nameInput) {
+                    nameInput.required = true;
+                    nameInput.focus();
+                }
+                if (submitBtn) submitBtn.innerHTML = '<i class="fe fe-check me-1"></i>Register & start sale';
+                if (resultDiv) {
+                    resultDiv.innerHTML = '<div class="alert alert-info small mb-0"><i class="fe fe-edit me-1"></i>' + (data.message || 'New KD. Type the customer name to register it.') + '</div>';
+                }
+            } catch (err) {
+                if (resultDiv) {
+                    resultDiv.innerHTML = '<div class="alert alert-danger small mb-0">Check failed: ' + (err?.message || 'Unknown error') + '</div>';
+                }
+            }
+        }
+
+        const kdInputEl = document.getElementById('kd_id');
+        if (kdInputEl) {
+            kdInputEl.addEventListener('input', function() {
+                clearTimeout(kdLookupTimer);
+                kdLookupTimer = setTimeout(function() { lookupKdNo(false); }, 500);
             });
+            kdInputEl.addEventListener('blur', function() { lookupKdNo(false); });
+            kdInputEl.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    lookupKdNo(true);
+                }
+            });
+        }
+
+        const kdSearchBtn = document.getElementById('kdSearchBtn');
+        if (kdSearchBtn) {
+            kdSearchBtn.addEventListener('click', function() { lookupKdNo(true); });
         }
 
         // KD Auto Generate button

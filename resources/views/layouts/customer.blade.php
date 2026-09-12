@@ -26,7 +26,11 @@
         .app-sidebar .side-header .header-brand-img { max-height: 58px; max-width: 100%; display: block !important; visibility: visible !important; background-color: #fff !important; }
         .app-sidebar { height: 100vh; display: flex !important; flex-direction: column !important; overflow: hidden !important; }
         .app-sidebar .side-header { flex-shrink: 0; }
-        .app-sidebar .main-sidemenu { flex: 1; min-height: 0; overflow-y: auto !important; overflow-x: hidden; }
+        .app-sidebar .main-sidemenu { flex: 1; min-height: 0; overflow-y: auto !important; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: rgba(80, 90, 120, 0.45) rgba(0, 0, 0, 0.06); }
+        .app-sidebar .main-sidemenu::-webkit-scrollbar { width: 8px; }
+        .app-sidebar .main-sidemenu::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.05); border-radius: 4px; }
+        .app-sidebar .main-sidemenu::-webkit-scrollbar-thumb { background: rgba(80, 90, 120, 0.4); border-radius: 4px; }
+        .app-sidebar .main-sidemenu::-webkit-scrollbar-thumb:hover { background: rgba(80, 90, 120, 0.6); }
     </style>
     @stack('styles')
 </head>

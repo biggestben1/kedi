@@ -95,7 +95,17 @@
                                 <th>Product</th>
                                 <th style="width:80px">Unit</th>
                                 @if(!empty($branchStockByProduct))
-                                <th style="width:80px" class="text-end">{{ ($serviceCenterOnly ?? false) ? 'Your Stock' : 'Branch Stock' }}</th>
+                                <th style="width:80px" class="text-end">
+                                    @if($headquartersOnly ?? false)
+                                        HQ Stock
+                                    @elseif($branchOnly ?? false)
+                                        Branch Stock
+                                    @elseif($serviceCenterOnly ?? false)
+                                        SC Stock
+                                    @else
+                                        In Stock
+                                    @endif
+                                </th>
                                 @endif
                                 <th style="width:120px" class="text-end">Unit Price</th>
                                 <th style="width:120px">Quantity</th>

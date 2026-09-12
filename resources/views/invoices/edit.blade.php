@@ -229,9 +229,10 @@
                                     <input type="number" step="0.01" min="0" name="pos_amount_paid" id="pos_amount_paid_hidden" value="{{ old('pos_amount_paid', $invoice->pos_amount_paid) }}">
                                     <input type="number" step="0.01" min="0" name="bank_amount_paid" id="bank_amount_paid_hidden" value="{{ old('bank_amount_paid') }}">
                                     <input type="checkbox" id="split-payment-toggle" name="split_payment" value="1" {{ old('split_payment') ? 'checked' : '' }}>
-                                    <input type="number" step="0.01" min="0" name="split_wallet_amount" value="{{ old('split_wallet_amount', 0) }}">
-                                    <input type="number" step="0.01" min="0" name="split_kd_credit_amount" value="{{ old('split_kd_credit_amount', 0) }}">
-                                    <input type="number" step="0.01" min="0" name="split_cash_amount" value="{{ old('split_cash_amount', 0) }}">
+                                    <input type="number" step="0.01" min="0" name="split_wallet_amount" value="{{ old('split_wallet_amount', $invoice->payment_breakdown['wallet'] ?? 0) }}">
+                                    <input type="number" step="0.01" min="0" name="split_kd_credit_amount" value="{{ old('split_kd_credit_amount', $invoice->payment_breakdown['kd_credit'] ?? 0) }}">
+                                    <input type="number" step="0.01" min="0" name="split_cash_amount" value="{{ old('split_cash_amount', $invoice->payment_breakdown['cash'] ?? 0) }}">
+                                    <input type="number" step="0.01" min="0" name="split_cheque_amount" value="{{ old('split_cheque_amount', $invoice->payment_breakdown['cheque'] ?? 0) }}">
                                 </div>
 
                                 <div id="products-section">
@@ -417,9 +418,19 @@
                                 <div class="modal-body">
                                     <div class="row g-3">
                                         <div class="col-12">
+                                            <div class="text-muted fw-semibold" style="font-size: 15px;">
+                                                DPBV Available: <strong><span id="split-dpbv-total-modal">0.00</span> DPBV</strong> (₦<span id="split-dpbv-naira-modal">0.00</span>)
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="text-muted fw-semibold" style="font-size: 15px;">
+                                                Total due: ₦<span id="split-total-due-modal">0.00</span> • Split total: ₦<span id="split-total-entered-modal">0.00</span> • Remaining: ₦<span id="split-remaining-modal">0.00</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="split_payment_modal">
-                                                <label class="form-check-label" for="split_payment_modal">Split payment (Wallet + Credit + Cash)</label>
+                                                <label class="form-check-label" for="split_payment_modal">Split payment (Wallet + Credit + Cash + Cheque)</label>
                                             </div>
                                         </div>
 
@@ -438,6 +449,10 @@
                                                 <div class="col-md-3">
                                                     <label class="form-label">Cash Amount</label>
                                                     <input type="text" inputmode="decimal" id="split_cash_amount_modal" class="form-control" value="" placeholder="0.00">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Cheque Amount</label>
+                                                    <input type="text" inputmode="decimal" id="split_cheque_amount_modal" class="form-control" value="" placeholder="0.00">
                                                 </div>
                                                 <div class="col-md-6" id="split_pos_bank_modal_wrap">
                                                     <div class="mb-2">
@@ -471,12 +486,6 @@
                                                     </div>
                                                     <div id="bank_amount_paid_modal_wrap" style="display:none;">
                                                         <input type="text" inputmode="decimal" id="bank_amount_paid_modal" class="form-control" placeholder="Enter amount (e.g. 1,000,000)">
-                                                    </div>
-                                                </div>
-
-                                                <div class="col-12">
-                                                    <div class="text-muted fw-semibold" style="font-size: 15px;">
-                                                        Total due: ₦<span id="split-total-due-modal">0.00</span> • Split total: ₦<span id="split-total-entered-modal">0.00</span> • Remaining: ₦<span id="split-remaining-modal">0.00</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -918,12 +927,14 @@
     var hiddenWallet = document.querySelector('input[name="split_wallet_amount"]');
     var hiddenKd = document.querySelector('input[name="split_kd_credit_amount"]');
     var hiddenCash = document.querySelector('input[name="split_cash_amount"]');
+    var hiddenCheque = document.querySelector('input[name="split_cheque_amount"]');
 
     var modalSplit = document.getElementById('split_payment_modal');
     var modalSplitWrap = document.getElementById('split_fields_modal');
     var modalWallet = document.getElementById('split_wallet_amount_modal');
     var modalKd = document.getElementById('split_kd_credit_amount_modal');
     var modalCash = document.getElementById('split_cash_amount_modal');
+    var modalCheque = document.getElementById('split_cheque_amount_modal');
     var modalWalletWrap = document.getElementById('split_wallet_amount_modal_wrap');
     var modalKdWrap = document.getElementById('split_kd_credit_amount_modal_wrap');
     var modalPosMachine = document.getElementById('pos_machine_modal');
@@ -969,6 +980,7 @@
         sum += parseMoney(modalWallet?.value);
         sum += parseMoney(modalKd?.value);
         sum += parseMoney(modalCash?.value);
+        sum += parseMoney(modalCheque?.value);
         sum += parseMoney(modalPosAmt?.value);
         sum += parseMoney(modalBankAmt?.value);
         var rem = due - sum;
@@ -983,6 +995,7 @@
         if (modalWallet && hiddenWallet) modalWallet.value = (parseFloat(hiddenWallet.value || 0) > 0) ? fmtMoney(hiddenWallet.value) : '';
         if (modalKd && hiddenKd) modalKd.value = (parseFloat(hiddenKd.value || 0) > 0) ? fmtMoney(hiddenKd.value) : '';
         if (modalCash && hiddenCash) modalCash.value = (parseFloat(hiddenCash.value || 0) > 0) ? fmtMoney(hiddenCash.value) : '';
+        if (modalCheque && hiddenCheque) modalCheque.value = (parseFloat(hiddenCheque.value || 0) > 0) ? fmtMoney(hiddenCheque.value) : '';
         if (modalPosAmt) modalPosAmt.value = hiddenPos.value ? fmtMoney(hiddenPos.value) : '';
         if (modalBankAmt) modalBankAmt.value = hiddenBankAmt.value ? fmtMoney(hiddenBankAmt.value) : '';
 
@@ -1006,6 +1019,7 @@
         if (hiddenWallet && modalWallet) hiddenWallet.value = parseMoney(modalWallet.value).toFixed(2);
         if (hiddenKd && modalKd) hiddenKd.value = parseMoney(modalKd.value).toFixed(2);
         if (hiddenCash && modalCash) hiddenCash.value = parseMoney(modalCash.value).toFixed(2);
+        if (hiddenCheque && modalCheque) hiddenCheque.value = parseMoney(modalCheque.value).toFixed(2);
 
         hiddenPos.value = modalPosAmt && modalPosAmt.value.trim() !== '' ? parseMoney(modalPosAmt.value).toFixed(2) : '';
         hiddenPos.dispatchEvent(new Event('input'));
@@ -1042,7 +1056,7 @@
     });
     applyBtn.addEventListener('click', applyToHidden);
 
-    [modalWallet, modalKd, modalCash].forEach(function (el) {
+    [modalWallet, modalKd, modalCash, modalCheque].forEach(function (el) {
         if (!el) return;
         wireMoneyInput(el);
     });

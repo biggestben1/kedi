@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\ServiceCenterStock;
 use App\Models\User;
 use App\Models\WalletTransaction;
+use App\Support\OrgUserScope;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -212,10 +213,11 @@ class SuperAdminInvoiceController extends Controller
     {
         $resellerOnly = $request->user()?->role?->name === 'reseller';
         $branchOnly = $request->user()?->role?->name === 'branch';
+        $headquartersOnly = $request->user()?->role?->name === 'headquarters';
         $serviceCenterOnly = $request->user()?->role?->name === 'service_center';
         $users = $resellerOnly
             ? $request->user()->createdUsers()->with('role')->orderBy('name')->get()
-            : ($branchOnly || $serviceCenterOnly
+            : ($branchOnly || $serviceCenterOnly || $headquartersOnly
                 ? $request->user()->createdUsers()->with('role')->orderBy('name')->get()
                 : User::with('role')->orderBy('name')->get());
         $selectedUser = null;
@@ -231,6 +233,18 @@ class SuperAdminInvoiceController extends Controller
                 if ($bs->product && $bs->product->is_active) {
                     $products->push($bs->product);
                     $branchStockByProduct[$bs->product_id] = $bs->quantity;
+                }
+            }
+            $products = $products->sortBy('name')->values();
+        } elseif ($headquartersOnly) {
+            $hqStock = HeadquartersStock::where('headquarters_user_id', $request->user()->id)
+                ->where('quantity', '>', 0)
+                ->with('product')
+                ->get();
+            foreach ($hqStock as $hs) {
+                if ($hs->product && $hs->product->is_active) {
+                    $products->push($hs->product);
+                    $branchStockByProduct[$hs->product_id] = $hs->quantity;
                 }
             }
             $products = $products->sortBy('name')->values();
@@ -252,10 +266,11 @@ class SuperAdminInvoiceController extends Controller
 
         if ($request->filled('user_id')) {
             $selectedUser = User::find($request->query('user_id'));
-            $allowed = ! $resellerOnly && ! $branchOnly && ! $serviceCenterOnly
+            $allowed = ! $resellerOnly && ! $branchOnly && ! $serviceCenterOnly && ! $headquartersOnly
                 || ($resellerOnly && $selectedUser && $selectedUser->created_by_user_id === $request->user()->id)
                 || ($branchOnly && $selectedUser && $selectedUser->created_by_user_id === $request->user()->id)
-                || ($serviceCenterOnly && $selectedUser && $selectedUser->created_by_user_id === $request->user()->id);
+                || ($serviceCenterOnly && $selectedUser && $selectedUser->created_by_user_id === $request->user()->id)
+                || ($headquartersOnly && $selectedUser && $selectedUser->created_by_user_id === $request->user()->id);
             if (! $allowed) {
                 $selectedUser = null;
             }
@@ -268,6 +283,7 @@ class SuperAdminInvoiceController extends Controller
             'branchStockByProduct' => $branchStockByProduct,
             'branchOnly' => $branchOnly,
             'serviceCenterOnly' => $serviceCenterOnly,
+            'headquartersOnly' => $headquartersOnly,
         ]);
     }
 
@@ -355,12 +371,16 @@ class SuperAdminInvoiceController extends Controller
 
         $resellerOnly = $request->user()?->role?->name === 'reseller';
         $branchOnly = $request->user()?->role?->name === 'branch';
+        $headquartersOnly = $request->user()?->role?->name === 'headquarters';
         $serviceCenterOnly = $request->user()?->role?->name === 'service_center';
         if ($resellerOnly && ! empty($data['user_id']) && ! in_array((int) $data['user_id'], $request->user()->createdUsers()->pluck('id')->all(), true)) {
             return redirect()->back()->withInput()->withErrors(['user_id' => 'You can only create invoices for your customers.']);
         }
         if ($branchOnly && ! empty($data['user_id']) && ! in_array((int) $data['user_id'], $request->user()->createdUsers()->pluck('id')->all(), true)) {
             return redirect()->back()->withInput()->withErrors(['user_id' => 'You can only create invoices for your Annex or Service Center users.']);
+        }
+        if ($headquartersOnly && ! empty($data['user_id']) && ! in_array((int) $data['user_id'], $request->user()->createdUsers()->pluck('id')->all(), true)) {
+            return redirect()->back()->withInput()->withErrors(['user_id' => 'You can only create invoices for your Branch, Service Center, or Annex users.']);
         }
         if ($serviceCenterOnly && ! empty($data['user_id']) && ! in_array((int) $data['user_id'], $request->user()->createdUsers()->pluck('id')->all(), true)) {
             return redirect()->back()->withInput()->withErrors(['user_id' => 'You can only create invoices for your Annex users.']);
@@ -377,7 +397,18 @@ class SuperAdminInvoiceController extends Controller
                 }
             }
         }
-        // Check service center stock if service center and using products (no deduct at create; stock moves on approve)
+        // Check HQ stock if headquarters user and using products
+        if ($headquartersOnly && $hasProductQuantities && ! empty($productQuantities)) {
+            foreach ($productQuantities as $productId => $qty) {
+                $avail = HeadquartersStock::getQuantity($request->user()->id, (int) $productId);
+                if ($avail < (float) $qty) {
+                    $name = Product::find($productId)?->name ?? "Product #{$productId}";
+
+                    return redirect()->back()->withInput()->withErrors(['product_quantities' => "Insufficient HQ stock for {$name}. Available: {$avail}."]);
+                }
+            }
+        }
+        // Check service center stock if service center and using products
         if ($serviceCenterOnly && $hasProductQuantities && ! empty($productQuantities)) {
             foreach ($productQuantities as $productId => $qty) {
                 $avail = ServiceCenterStock::getQuantity($request->user()->id, (int) $productId);
@@ -398,6 +429,8 @@ class SuperAdminInvoiceController extends Controller
 
         $invoice = null;
         $branchUserId = $branchOnly ? $request->user()->id : null;
+        $hqUserId = $headquartersOnly ? $request->user()->id : null;
+        $scUserId = $serviceCenterOnly ? $request->user()->id : null;
         if (! $branchUserId && ! empty($data['user_id'])) {
             $customer = User::with('role')->find($data['user_id']);
             if ($customer && $customer->role?->name === 'branch') {
@@ -406,8 +439,11 @@ class SuperAdminInvoiceController extends Controller
                 $branchUserId = (int) $customer->created_by_user_id;
             }
         }
-        $deductOnCreate = $branchOnly; // Only Branch deducts at create; SC stock moves on approve
-        DB::transaction(function () use ($data, $items, $subtotal, $tax, $discount, $total, $branchUserId, $productQuantities, $hasProductQuantities, $deductOnCreate, &$invoice) {
+        // Branch, HQ, and SC deduct their own stock at create
+        $deductBranchOnCreate = $branchOnly;
+        $deductHqOnCreate = $headquartersOnly;
+        $deductScOnCreate = $serviceCenterOnly;
+        DB::transaction(function () use ($data, $items, $subtotal, $tax, $discount, $total, $branchUserId, $hqUserId, $scUserId, $productQuantities, $hasProductQuantities, $deductBranchOnCreate, $deductHqOnCreate, $deductScOnCreate, &$invoice) {
             $invoice = Invoice::create([
                 'invoice_number' => $data['invoice_number'],
                 'user_id' => $data['user_id'] ?? null,
@@ -439,10 +475,36 @@ class SuperAdminInvoiceController extends Controller
                 ]);
             }
 
-            if ($deductOnCreate && $branchUserId && $hasProductQuantities && ! empty($productQuantities)) {
+            if ($deductBranchOnCreate && $branchUserId && $hasProductQuantities && ! empty($productQuantities)) {
                 foreach ($productQuantities as $productId => $qty) {
                     if ((float) $qty > 0) {
                         BranchStock::decrementStock($branchUserId, (int) $productId, (float) $qty);
+                    }
+                }
+            }
+
+            if ($deductHqOnCreate && $hqUserId && $hasProductQuantities && ! empty($productQuantities)) {
+                foreach ($productQuantities as $productId => $qty) {
+                    $need = (int) round((float) $qty);
+                    if ($need > 0) {
+                        $ok = HeadquartersStock::decrementStock($hqUserId, (int) $productId, $need);
+                        if (! $ok) {
+                            $name = Product::find($productId)?->name ?? "Product #{$productId}";
+                            throw new \RuntimeException("Insufficient HQ stock for {$name}.");
+                        }
+                    }
+                }
+            }
+
+            if ($deductScOnCreate && $scUserId && $hasProductQuantities && ! empty($productQuantities)) {
+                foreach ($productQuantities as $productId => $qty) {
+                    $need = (int) round((float) $qty);
+                    if ($need > 0) {
+                        $ok = ServiceCenterStock::decrementStock($scUserId, (int) $productId, $need);
+                        if (! $ok) {
+                            $name = Product::find($productId)?->name ?? "Product #{$productId}";
+                            throw new \RuntimeException("Insufficient service center stock for {$name}.");
+                        }
                     }
                 }
             }
@@ -500,6 +562,12 @@ class SuperAdminInvoiceController extends Controller
         if ($request->user()?->role?->name === 'annex') {
             if (! $invoice->user_id || (int) $invoice->user_id !== (int) $request->user()->id) {
                 abort(403, 'Access denied. You can only view your own invoices.');
+            }
+        }
+        if ($request->user()?->role?->name === 'accountant') {
+            $allowedUserIds = OrgUserScope::allowedUserIds($request->user());
+            if ($allowedUserIds !== null && ! $this->invoiceBelongsToOrg($invoice, $allowedUserIds)) {
+                abort(403, 'Access denied. You can only view invoices for your organization.');
             }
         }
 
@@ -971,6 +1039,12 @@ class SuperAdminInvoiceController extends Controller
                 abort(403, 'Access denied. You can only view invoices for your customers.');
             }
         }
+        if ($request->user()?->role?->name === 'accountant') {
+            $allowedUserIds = OrgUserScope::allowedUserIds($request->user());
+            if ($allowedUserIds !== null && ! $this->invoiceBelongsToOrg($invoice, $allowedUserIds)) {
+                abort(403, 'Access denied. You can only view invoices for your organization.');
+            }
+        }
         $invoice->load('items', 'user');
         $products = Product::where('is_active', true)->get();
         $productsByName = $products->keyBy(fn ($p) => $p->display_name);
@@ -1387,5 +1461,17 @@ class SuperAdminInvoiceController extends Controller
         $prod = $products->first(fn ($p) => str_contains(strtolower($p->display_name ?? ''), $lower) || str_contains(strtolower($p->name ?? ''), $lower));
 
         return $prod ?: null;
+    }
+
+    /**
+     * @param  list<int>  $allowedUserIds
+     */
+    private function invoiceBelongsToOrg(Invoice $invoice, array $allowedUserIds): bool
+    {
+        $userId = (int) ($invoice->user_id ?? 0);
+        $branchUserId = (int) ($invoice->branch_user_id ?? 0);
+
+        return ($userId && in_array($userId, $allowedUserIds, true))
+            || ($branchUserId && in_array($branchUserId, $allowedUserIds, true));
     }
 }

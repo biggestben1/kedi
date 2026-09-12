@@ -4,13 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Mail\OrderConfirmationMail;
-use App\Models\AnnexStock;
-use App\Models\BranchStock;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
-use App\Models\ServiceCenterStock;
 use App\Models\WalletTransaction;
+use App\Support\ShoppingContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,9 +57,9 @@ class OrderController extends Controller
         ]);
 
         $user = $request->user();
-        $user->loadMissing(['role', 'createdBy.role']);
-        $walletOwner = $user->walletOwnerForShopping();
-        $branchUserId = ($user->role?->name === 'annex' && $user->created_by_user_id) ? (int) $user->created_by_user_id : null;
+        $context = new ShoppingContext($user);
+        $walletOwner = $context->walletOwner;
+        $branchUserId = $context->branchUserId;
 
         $itemsByCode = [];
         foreach ($request->items as $row) {
@@ -88,9 +86,7 @@ class OrderController extends Controller
             if (! $product || $qty < 1) {
                 continue;
             }
-            $availableStock = $branchUserId
-                ? $this->getStockForUser($branchUserId, $user->role?->name, $product->id)
-                : (int) $product->stock;
+            $availableStock = $context->availableStock((int) $product->id, (int) $product->stock);
             if ($availableStock < $qty) {
                 return response()->json([
                     'message' => "Insufficient stock for {$product->name}. Available: {$availableStock}.",
@@ -130,16 +126,18 @@ class OrderController extends Controller
 
         $paymentMethod = $request->input('payment_method');
 
-        if ($paymentMethod === Order::PAYMENT_WALLET && ! $user->canPayWithWallet($totalAmount)) {
-            return response()->json(['message' => 'Insufficient wallet balance.'], 422);
+        if ($paymentMethod === Order::PAYMENT_WALLET && ! $walletOwner->canPayWithWallet($totalAmount)) {
+            return response()->json([
+                'message' => 'Insufficient wallet balance.',
+                'available_balance' => (float) ($walletOwner->wallet_balance ?? 0),
+            ], 422);
         }
 
         $order = null;
-        $branchUserIdForOrder = $branchUserId ?? null;
-        DB::transaction(function () use ($user, $cartItems, $subtotal, $totalBv, $totalPv, $paymentMethod, $request, $branchUserIdForOrder, &$order) {
+        DB::transaction(function () use ($user, $walletOwner, $cartItems, $subtotal, $totalBv, $totalPv, $paymentMethod, $request, $branchUserId, $totalAmount, $coupon, $discountAmount, &$order) {
             $order = Order::create([
                 'user_id' => $user->id,
-                'branch_user_id' => $branchUserIdForOrder,
+                'branch_user_id' => $branchUserId,
                 'invoice_number' => Order::generateOrderNumber(),
                 'subtotal' => $subtotal,
                 'total_bv' => $totalBv,
@@ -169,14 +167,13 @@ class OrderController extends Controller
                     'bv' => $item->product->bv,
                     'pv' => $item->product->pv,
                 ]);
-                // Stock will be deducted when order is marked as completed
             }
 
             if ($paymentMethod === Order::PAYMENT_WALLET) {
-                $user->decrement('wallet_balance', $totalAmount);
-                $balanceAfter = (float) $user->fresh()->wallet_balance;
+                $walletOwner->decrement('wallet_balance', $totalAmount);
+                $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
                 WalletTransaction::create([
-                    'user_id' => $user->id,
+                    'user_id' => $walletOwner->id,
                     'type' => WalletTransaction::TYPE_DEBIT,
                     'amount' => $totalAmount,
                     'balance_after' => $balanceAfter,
@@ -233,20 +230,5 @@ class OrderController extends Controller
                 'line_total' => (float) $i->line_total,
             ])->all(),
         ];
-    }
-
-    private function getStockForUser(int $userId, ?string $role, int $productId): int
-    {
-        if ($role === 'branch') {
-            return BranchStock::getQuantity($userId, $productId);
-        }
-        if ($role === 'service_center') {
-            return ServiceCenterStock::getQuantity($userId, $productId);
-        }
-        if ($role === 'annex') {
-            return AnnexStock::getQuantity($userId, $productId);
-        }
-
-        return BranchStock::getQuantity($userId, $productId);
     }
 }

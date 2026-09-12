@@ -74,4 +74,24 @@ class ServiceCenterStock extends Model
 
         return true;
     }
+
+    /** Set absolute service center stock quantity (creates row if missing). */
+    public static function setQuantity(int $serviceCenterUserId, int $productId, int $qty): void
+    {
+        $qty = max(0, $qty);
+        $row = self::where('service_center_user_id', $serviceCenterUserId)
+            ->where('product_id', $productId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($row) {
+            $row->update(['quantity' => $qty]);
+        } else {
+            self::create([
+                'service_center_user_id' => $serviceCenterUserId,
+                'product_id' => $productId,
+                'quantity' => $qty,
+            ]);
+        }
+    }
 }

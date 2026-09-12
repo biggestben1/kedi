@@ -78,4 +78,24 @@ class HeadquartersStock extends Model
 
         return true;
     }
+
+    /** Set absolute headquarters stock quantity (creates row if missing). */
+    public static function setQuantity(int $headquartersUserId, int $productId, int $qty): void
+    {
+        $qty = max(0, $qty);
+        $hs = self::where('headquarters_user_id', $headquartersUserId)
+            ->where('product_id', $productId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($hs) {
+            $hs->update(['quantity' => $qty]);
+        } else {
+            self::create([
+                'headquarters_user_id' => $headquartersUserId,
+                'product_id' => $productId,
+                'quantity' => $qty,
+            ]);
+        }
+    }
 }

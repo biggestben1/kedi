@@ -3,10 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\AnnexStock;
-use App\Models\BranchStock;
 use App\Models\Product;
-use App\Models\ServiceCenterStock;
+use App\Support\ShoppingContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,19 +13,14 @@ class ProductController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
-        $stockUserId = ($user && in_array($user->role?->name ?? '', ['branch', 'service_center', 'annex'])) ? (int) $user->id : null;
-        $role = $user?->role?->name ?? '';
+        $context = $user ? new ShoppingContext($user) : null;
 
         $query = Product::with('category:id,name,slug')
             ->where('is_active', true);
 
-        if ($stockUserId) {
-            $productIds = $role === 'branch'
-                ? BranchStock::where('branch_user_id', $stockUserId)->where('quantity', '>', 0)->pluck('product_id')
-                : ($role === 'service_center'
-                    ? \App\Models\ServiceCenterStock::where('service_center_user_id', $stockUserId)->where('quantity', '>', 0)->pluck('product_id')
-                    : \App\Models\AnnexStock::where('annex_user_id', $stockUserId)->where('quantity', '>', 0)->pluck('product_id'));
-            $query->whereIn('id', $productIds);
+        if ($context && $context->usesOrgStock()) {
+            $productIds = $context->inStockProductIds();
+            $query->whereIn('id', $productIds ?: [0]);
         }
 
         if ($request->filled('category_id')) {
@@ -44,8 +37,8 @@ class ProductController extends Controller
 
         $products = $query->orderBy('name')->paginate($request->input('per_page', 15));
 
-        $products->getCollection()->transform(function (Product $product) {
-            return $this->productResource($product);
+        $products->getCollection()->transform(function (Product $product) use ($context) {
+            return $this->productResource($product, $context);
         });
 
         return response()->json($products);
@@ -58,26 +51,19 @@ class ProductController extends Controller
         }
 
         $product->load('category:id,name,slug');
+        $user = auth()->user();
+        $context = $user ? new ShoppingContext($user) : null;
 
-        return response()->json(['data' => $this->productResource($product)]);
+        return response()->json(['data' => $this->productResource($product, $context)]);
     }
 
-    private function productResource(Product $product): array
+    private function productResource(Product $product, ?ShoppingContext $context = null): array
     {
         $user = auth()->user();
         $price = $product->getPriceForUser($user);
-
-        $stock = $product->stock;
-        if ($user) {
-            $role = $user->role?->name ?? '';
-            if ($role === 'branch') {
-                $stock = BranchStock::getQuantity((int) $user->id, $product->id);
-            } elseif ($role === 'service_center') {
-                $stock = ServiceCenterStock::getQuantity((int) $user->id, $product->id);
-            } elseif ($role === 'annex') {
-                $stock = AnnexStock::getQuantity((int) $user->id, $product->id);
-            }
-        }
+        $stock = $context
+            ? $context->availableStock((int) $product->id, (int) $product->stock)
+            : (int) $product->stock;
 
         return [
             'id' => $product->id,

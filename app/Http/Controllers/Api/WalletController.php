@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\WalletTopupApproverRequestMail;
 use App\Models\User;
 use App\Models\WalletTransaction;
+use App\Support\ShoppingContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,17 +16,21 @@ class WalletController extends Controller
 {
     public function balance(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $balance = (float) ($user->wallet_balance ?? 0);
+        $context = new ShoppingContext($request->user());
+        $walletOwner = $context->walletOwner;
 
         return response()->json([
-            'balance' => $balance,
+            'balance' => (float) ($walletOwner->wallet_balance ?? 0),
+            'wallet_owner_id' => $walletOwner->id,
+            'uses_parent_wallet' => $walletOwner->id !== $context->user->id,
         ]);
     }
 
     public function transactions(Request $request): JsonResponse
     {
-        $transactions = WalletTransaction::where('user_id', $request->user()->id)
+        $walletOwner = (new ShoppingContext($request->user()))->walletOwner;
+
+        $transactions = WalletTransaction::where('user_id', $walletOwner->id)
             ->orderByDesc('created_at')
             ->limit(50)
             ->get()
@@ -50,7 +55,8 @@ class WalletController extends Controller
             'proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);
 
-        $user = $request->user();
+        $context = new ShoppingContext($request->user());
+        $walletOwner = $context->walletOwner;
         $amount = (float) $request->input('amount');
         $proofPath = null;
 
@@ -59,9 +65,9 @@ class WalletController extends Controller
         }
 
         $tx = null;
-        DB::transaction(function () use ($user, $amount, $proofPath, $request, &$tx) {
+        DB::transaction(function () use ($walletOwner, $amount, $proofPath, $request, &$tx) {
             $tx = WalletTransaction::create([
-                'user_id' => $user->id,
+                'user_id' => $walletOwner->id,
                 'type' => WalletTransaction::TYPE_CREDIT,
                 'amount' => $amount,
                 'balance_after' => null,
@@ -72,7 +78,6 @@ class WalletController extends Controller
             ]);
         });
 
-        // Notify Super Admins about the new pending request.
         try {
             $approvers = User::with('role')
                 ->whereHas('role', function ($q) {
@@ -80,7 +85,7 @@ class WalletController extends Controller
                 })
                 ->get();
 
-            $roleName = $user->role?->name ?? '';
+            $roleName = $walletOwner->role?->name ?? '';
             $sourceUnit = match ($roleName) {
                 'headquarters' => 'HQ',
                 'branch' => 'Branch',
@@ -95,7 +100,7 @@ class WalletController extends Controller
             foreach ($approvers as $approver) {
                 Mail::to($approver->email)->send(new WalletTopupApproverRequestMail(
                     $approver,
-                    $user,
+                    $walletOwner,
                     (float) $tx->amount,
                     $date,
                     (int) $tx->id,
@@ -113,6 +118,7 @@ class WalletController extends Controller
                 'id' => $tx->id,
                 'amount' => (float) $tx->amount,
                 'status' => $tx->status,
+                'wallet_owner_id' => $walletOwner->id,
                 'created_at' => $tx->created_at->toIso8601String(),
             ],
         ], 201);

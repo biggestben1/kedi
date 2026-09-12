@@ -21,8 +21,7 @@ class RestrictServiceCenterAdmin
 
         $routeName = $request->route()?->getName() ?? '';
         $allowed = $routeName === 'admin'
-            || str_starts_with($routeName, 'admin.pharmacy.dashboard')
-            || str_starts_with($routeName, 'admin.pharmacy.reports')
+            || str_starts_with($routeName, 'admin.pharmacy')
             || str_starts_with($routeName, 'admin.invoices')
             || str_starts_with($routeName, 'admin.users')
             || str_starts_with($routeName, 'admin.banks')
@@ -30,6 +29,8 @@ class RestrictServiceCenterAdmin
             || str_starts_with($routeName, 'admin.accountant.wallet')
             || str_starts_with($routeName, 'admin.back_orders')
             || $routeName === 'admin.products.index'
+            || in_array($routeName, ['admin.products.create', 'admin.products.store', 'admin.products.update'], true)
+            || (str_starts_with($routeName, 'admin.products.') && str_ends_with($routeName, '.edit'))
             || str_starts_with($routeName, 'admin.kd')
             || str_starts_with($routeName, 'admin.kedi-kits.purchase');
 
