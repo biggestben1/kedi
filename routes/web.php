@@ -172,6 +172,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/collection-centers', [CollectionCenterController::class, 'index'])->name('collection-centers.index');
     Route::get('/collection-centers/orders', [CollectionCenterController::class, 'incoming'])->name('collection-centers.incoming');
     Route::get('/collection-centers/orders/{order}/invoice', [CollectionCenterController::class, 'invoice'])->name('collection-centers.invoice');
+    Route::get('/collection-centers/orders/{order}/proof', [CollectionCenterController::class, 'proof'])->name('collection-centers.proof.show');
+    Route::get('/collection-centers/proof', [CollectionCenterController::class, 'sessionProof'])->name('collection-centers.proof.preview');
     Route::get('/collection-centers/collected', [CollectionCenterController::class, 'collected'])->name('collection-centers.collected');
     Route::get('/collection-centers/{branch}', [CollectionCenterController::class, 'show'])->name('collection-centers.show');
     Route::post('/collection-centers/{branch}/select', [CollectionCenterController::class, 'select'])->name('collection-centers.select');

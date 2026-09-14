@@ -67,7 +67,7 @@
                             <label class="form-label">Upload proof (optional)</label>
                             <input type="file" name="payment_proof" class="form-control" accept="image/*,.pdf">
                             @if(session('collection_payment_proof'))
-                                <div class="small mt-2"><a href="{{ asset('storage/'.session('collection_payment_proof')) }}" target="_blank">Proof already saved</a></div>
+                                <div class="small mt-2"><a href="{{ route('collection-centers.proof.preview') }}" target="_blank">Proof already saved</a></div>
                             @endif
                             <button class="btn btn-success mt-2">Save proof</button>
                         </form>

@@ -39,7 +39,7 @@
                                     <div class="mt-2 d-flex flex-column align-items-start gap-1">
                                         <a href="{{ route('collection-centers.invoice', $order) }}" class="btn btn-sm btn-outline-primary" target="_blank">View invoice</a>
                                         @if($order->payment_proof)
-                                            <a href="{{ asset('storage/'.$order->payment_proof) }}" class="btn btn-sm btn-outline-secondary" target="_blank">View proof of payment</a>
+                                            <a href="{{ route('collection-centers.proof.show', $order) }}" class="btn btn-sm btn-outline-secondary" target="_blank">View proof of payment</a>
                                         @else
                                             <span class="small text-muted">View proof of payment — not uploaded yet</span>
                                         @endif
@@ -79,7 +79,7 @@
                                         <div class="collapse mt-2" id="payment-{{ $order->id }}">
                                             @include('collection-centers.payment-details', ['order' => $order])
                                             @if($order->payment_proof)
-                                                <a href="{{ asset('storage/'.$order->payment_proof) }}" target="_blank">View proof of payment</a>
+                                                <a href="{{ route('collection-centers.proof.show', $order) }}" target="_blank">View proof of payment</a>
                                             @endif
                                         </div>
                                     @endif

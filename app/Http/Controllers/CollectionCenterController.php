@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class CollectionCenterController extends Controller
 {
@@ -136,17 +137,22 @@ class CollectionCenterController extends Controller
 
     public function invoice(Request $request, Order $order)
     {
-        $user = $request->user();
-        $user->loadMissing('role');
-        $branch = $this->viewerBranch($user);
-        $seeAll = $user->isSuperAdmin() || $user->role?->name === Role::HEADQUARTERS;
-        $ownsOrder = $branch && (int) $order->collection_branch_id === (int) $branch->id;
-
-        abort_unless($order->collection_branch_id && ($seeAll || $ownsOrder), 403);
-
+        $this->authorizeCollectionOrder($request, $order);
         $order->load('user', 'items', 'collectionBranch');
 
         return view('collection-centers.invoice', ['order' => $order]);
+    }
+
+    public function proof(Request $request, Order $order)
+    {
+        $this->authorizeCollectionOrder($request, $order);
+
+        return $this->proofResponse((string) $order->payment_proof);
+    }
+
+    public function sessionProof(Request $request)
+    {
+        return $this->proofResponse((string) $request->session()->get('collection_payment_proof'));
     }
 
     public function collect(Request $request, Order $order)
@@ -225,6 +231,25 @@ class CollectionCenterController extends Controller
             'branch' => $branch,
             'canCollect' => false,
         ]);
+    }
+
+    private function authorizeCollectionOrder(Request $request, Order $order): void
+    {
+        $user = $request->user();
+        $user->loadMissing('role');
+        $branch = $this->viewerBranch($user);
+        $seeAll = $user->isSuperAdmin() || $user->role?->name === Role::HEADQUARTERS;
+        $ownsOrder = $branch && (int) $order->collection_branch_id === (int) $branch->id;
+
+        abort_unless($order->collection_branch_id && ($seeAll || $ownsOrder), 403);
+    }
+
+    private function proofResponse(string $path)
+    {
+        abort_unless($path !== '' && ! str_contains($path, '..') && str_starts_with($path, 'collection-proofs/'), 404);
+        abort_unless(Storage::disk('public')->exists($path), 404);
+
+        return Storage::disk('public')->response($path);
     }
 
     private function branchesQuery()

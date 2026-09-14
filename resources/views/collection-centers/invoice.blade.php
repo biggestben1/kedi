@@ -20,7 +20,7 @@
         <button onclick="window.print()" style="padding: 8px 16px; cursor: pointer; background: #0d6efd; color: #fff; border: none; border-radius: 4px;">Print</button>
         <a href="{{ route('collection-centers.incoming') }}" style="margin-left: 8px;">Back to orders</a>
         @if($order->payment_proof)
-            <a href="{{ asset('storage/'.$order->payment_proof) }}" target="_blank" style="margin-left: 8px;">View proof of payment</a>
+            <a href="{{ route('collection-centers.proof.show', $order) }}" target="_blank" style="margin-left: 8px;">View proof of payment</a>
         @endif
     </div>
 
