@@ -78,12 +78,23 @@ class AccountantOfficeReportsController extends Controller
         $invoiceCount = (int) (clone $invoicesQuery)->count();
 
         $ordersQuery = Order::query()
-            ->whereIn('status', $paidStatuses)
-            ->whereBetween('created_at', [$from, $to]);
+            ->whereBetween('created_at', [$from, $to])
+            ->where(function ($q) use ($paidStatuses) {
+                $q->whereIn('status', $paidStatuses)
+                    ->orWhereNotNull('collected_at')
+                    ->orWhereNotNull('payment_proof')
+                    ->orWhereNotNull('collection_branch_id')
+                    ->orWhereIn('payment_method', ['wallet', 'dpbv', 'kd_credit', 'split']);
+            });
         if ($scopeIds !== null) {
             $ordersQuery->where(function ($q) use ($scopeIds) {
-                $q->whereIn('user_id', $scopeIds)
-                    ->orWhereIn('branch_user_id', $scopeIds);
+                $q->where(function ($owner) use ($scopeIds) {
+                    $owner->whereNull('collection_branch_id')
+                        ->where(function ($inner) use ($scopeIds) {
+                            $inner->whereIn('user_id', $scopeIds)
+                                ->orWhereIn('branch_user_id', $scopeIds);
+                        });
+                })->orWhereIn('collection_branch_id', $scopeIds);
             });
         }
         $shopOrders = (clone $ordersQuery)->get(['subtotal', 'shipping_cost']);

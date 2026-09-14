@@ -28,7 +28,8 @@
                 <th class="text-end">Selling Price</th>
                 <th class="text-end">Discount</th>
                 <th class="text-end">Profit</th>
-                <th>Payment Status</th>
+                <th>Payment</th>
+                <th>Proof</th>
             </tr>
         </thead>
         <tbody>
@@ -42,10 +43,11 @@
                     <td class="text-end">{{ number_format($row->selling_price, 2) }}</td>
                     <td class="text-end">{{ $row->discount }}</td>
                     <td class="text-end">{{ number_format($row->profit, 2) }}</td>
-                    <td>{{ $row->payment_status }}</td>
+                    <td>{{ $row->payment_method }} ({{ $row->payment_status }})</td>
+                    <td>{{ $row->payment_proof ? 'Yes' : '—' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="text-center">No sales in date range.</td></tr>
+                <tr><td colspan="10" class="text-center">No sales in date range.</td></tr>
             @endforelse
         </tbody>
     </table>

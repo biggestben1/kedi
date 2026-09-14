@@ -140,7 +140,7 @@
             <button class="nav-link" id="assets-tab" data-bs-toggle="tab" data-bs-target="#assets" type="button" role="tab">Assets</button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="payment-tab" data-bs-toggle="tab" data-bs-target="#payment" type="button" role="tab">Payment</button>
+            <button class="nav-link {{ $tab === 'payment' ? 'active' : '' }}" id="payment-tab" data-bs-toggle="tab" data-bs-target="#payment" type="button" role="tab">Payment</button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="pl-tab" data-bs-toggle="tab" data-bs-target="#pl" type="button" role="tab">Profit & Loss</button>
@@ -176,13 +176,20 @@
                                     <th class="text-end">Selling Price</th>
                                     <th class="text-end">Discount</th>
                                     <th class="text-end">Profit</th>
-                                    <th>Payment Status</th>
+                                    <th>Payment</th>
+                                    <th>Proof</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($salesLines as $row)
                                     <tr>
-                                        <td>{{ $row->invoice_number }}</td>
+                                        <td>
+                                            @if(!empty($row->invoice_url))
+                                                <a href="{{ $row->invoice_url }}" target="_blank">{{ $row->invoice_number }}</a>
+                                            @else
+                                                {{ $row->invoice_number }}
+                                            @endif
+                                        </td>
                                         <td>{{ $row->order_date->format('M d, Y H:i') }}</td>
                                         <td>{{ $row->customer_name }}</td>
                                         <td>{{ $row->product_name }}</td>
@@ -190,10 +197,23 @@
                                         <td class="text-end">₦{{ number_format($row->selling_price, 0) }}</td>
                                         <td class="text-end">₦{{ number_format($row->discount, 0) }}</td>
                                         <td class="text-end">₦{{ number_format($row->profit, 0) }}</td>
-                                        <td><span class="badge bg-success">{{ $row->payment_status }}</span></td>
+                                        <td>
+                                            {{ $row->payment_method }}
+                                            <div class="small text-muted">{{ str_replace('_', ' ', $row->payment_status) }}</div>
+                                            @if(!empty($row->collection_branch))
+                                                <div class="small text-muted">{{ $row->collection_branch }}</div>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if(!empty($row->proof_url))
+                                                <a href="{{ $row->proof_url }}" target="_blank">View proof of payment</a>
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="9" class="text-center text-muted p-4">No sales in date range.</td></tr>
+                                    <tr><td colspan="10" class="text-center text-muted p-4">No sales in date range.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -591,11 +611,64 @@
             </div>
         </div>
 
-        {{-- D. Payment (placeholder) --}}
-        <div class="tab-pane fade" id="payment" role="tabpanel">
+        {{-- D. Payment --}}
+        <div class="tab-pane fade {{ $tab === 'payment' ? 'show active' : '' }}" id="payment" role="tabpanel">
             <div class="card">
-                <div class="card-body">
-                    <p class="text-muted mb-0">Payment reports (Customer Payments, Supplier Payments, Pending, Daily Cash Flow) will appear here when payment tracking is extended.</p>
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Payments</h3>
+                    <div class="small text-muted mt-1">Shop and collection-center payments in this date range, including proof of payment.</div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Invoice</th>
+                                    <th>Customer</th>
+                                    <th>Collection center</th>
+                                    <th>Payment</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Proof</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($paymentOrders as $order)
+                                    <tr>
+                                        <td>{{ $order->created_at->format('M d, Y H:i') }}</td>
+                                        <td>
+                                            @if($order->collection_branch_id)
+                                                <a href="{{ route('collection-centers.invoice', $order) }}" target="_blank">{{ $order->invoice_number ?: ('ORD-'.$order->id) }}</a>
+                                            @else
+                                                {{ $order->invoice_number ?: ('ORD-'.$order->id) }}
+                                            @endif
+                                        </td>
+                                        <td>
+                                            {{ $order->customer_name ?: ($order->user?->name ?? '—') }}
+                                            @if($order->kd_id)
+                                                <div class="small text-muted">{{ $order->kd_id }}</div>
+                                            @endif
+                                        </td>
+                                        <td>{{ $order->collectionBranch?->name ?: '—' }}</td>
+                                        <td>
+                                            {{ $order->paymentLabel() }}
+                                            @include('collection-centers.payment-details', ['order' => $order])
+                                        </td>
+                                        <td class="text-end">₦{{ number_format($order->subtotal, 2) }}</td>
+                                        <td>
+                                            @if($order->payment_proof && $order->collection_branch_id)
+                                                <a href="{{ route('collection-centers.proof.show', $order) }}" target="_blank">View proof of payment</a>
+                                            @else
+                                                <span class="text-muted">No proof</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="7" class="text-center text-muted p-4">No payments in this date range.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

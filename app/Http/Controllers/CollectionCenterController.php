@@ -239,7 +239,13 @@ class CollectionCenterController extends Controller
         $user->loadMissing('role');
         $branch = $this->viewerBranch($user);
         $seeAll = $user->isSuperAdmin() || $user->role?->name === Role::HEADQUARTERS;
-        $ownsOrder = $branch && (int) $order->collection_branch_id === (int) $branch->id;
+        $relatedIds = array_filter([
+            (int) $order->collection_branch_id,
+            (int) $order->branch_user_id,
+            (int) $order->user_id,
+        ]);
+        $ownsOrder = in_array((int) $user->id, $relatedIds, true)
+            || ($branch && in_array((int) $branch->id, $relatedIds, true));
 
         abort_unless($order->collection_branch_id && ($seeAll || $ownsOrder), 403);
     }

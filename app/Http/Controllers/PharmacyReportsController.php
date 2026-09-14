@@ -105,19 +105,9 @@ class PharmacyReportsController extends Controller
         $allowedUserIds = $filters['allowedUserIds'] ?? null;
 
         $query = OrderItem::query()
-            ->with(['order.user'])
+            ->with(['order.user', 'order.collectionBranch'])
             ->whereHas('order', function ($q) use ($from, $to, $customerId, $paymentMethod, $allowedUserIds) {
-                $q->whereIn('status', self::PAID_STATUSES)
-                    ->whereBetween('created_at', [$from, $to]);
-                if ($customerId) {
-                    $q->where('user_id', $customerId);
-                }
-                if ($paymentMethod) {
-                    $q->where('payment_method', $paymentMethod);
-                }
-                if ($allowedUserIds !== null) {
-                    $q->whereIn('user_id', $allowedUserIds);
-                }
+                $this->applyReportedOrderScope($q, $from, $to, $customerId, $paymentMethod, $allowedUserIds);
             });
 
         if ($productId) {
@@ -141,17 +131,24 @@ class PharmacyReportsController extends Controller
             $qty = (int) $item->quantity;
             $profit = ($sellingPrice - $cost) * $qty;
             $lines->push((object) [
+                'order_id' => $item->order->id,
                 'invoice_number' => $item->order->invoice_number ?: '#' . $item->order->id,
                 'order_date' => $item->order->created_at,
-                'customer_name' => $item->order->user?->name ?? '—',
+                'customer_name' => $item->order->customer_name ?: ($item->order->user?->name ?? '—'),
                 'product_name' => $item->product_name,
                 'quantity_sold' => $qty,
                 'selling_price' => $sellingPrice,
                 'line_total' => (float) $item->line_total,
                 'discount' => 0,
                 'profit' => $profit,
-                'payment_status' => $item->order->status,
-                'payment_method' => $item->order->payment_method,
+                'payment_status' => $item->order->collected_at ? 'collected' : $item->order->status,
+                'payment_method' => $item->order->paymentLabel(),
+                'payment_proof' => $item->order->payment_proof,
+                'collection_branch' => $item->order->collectionBranch?->name,
+                'invoice_url' => $item->order->collection_branch_id ? route('collection-centers.invoice', $item->order) : null,
+                'proof_url' => $item->order->payment_proof && $item->order->collection_branch_id
+                    ? route('collection-centers.proof.show', $item->order)
+                    : null,
             ]);
         }
 
@@ -195,10 +192,7 @@ class PharmacyReportsController extends Controller
 
         $allowedUserIds = $filters['allowedUserIds'] ?? null;
         $topSelling = OrderItem::whereHas('order', function ($q) use ($from, $to, $allowedUserIds) {
-            $q->whereIn('status', self::PAID_STATUSES)->whereBetween('created_at', [$from, $to]);
-            if ($allowedUserIds !== null) {
-                $q->whereIn('user_id', $allowedUserIds);
-            }
+            $this->applyReportedOrderScope($q, $from, $to, null, null, $allowedUserIds);
         })
             ->select('product_name', 'item_code', DB::raw('SUM(quantity) as total_qty'), DB::raw('SUM(line_total) as total_sales'))
             ->groupBy('product_name', 'item_code')
@@ -206,10 +200,8 @@ class PharmacyReportsController extends Controller
             ->limit(20)
             ->get();
 
-        $customerReportQuery = Order::whereIn('status', self::PAID_STATUSES)->whereBetween('created_at', [$from, $to]);
-        if ($allowedUserIds !== null) {
-            $customerReportQuery->whereIn('user_id', $allowedUserIds);
-        }
+        $customerReportQuery = Order::query();
+        $this->applyReportedOrderScope($customerReportQuery, $from, $to, null, null, $allowedUserIds);
         $customerReport = $customerReportQuery
             ->select('user_id', DB::raw('COUNT(*) as order_count'), DB::raw('SUM(subtotal) as total_spent'))
             ->groupBy('user_id')
@@ -218,10 +210,8 @@ class PharmacyReportsController extends Controller
             ->limit(50)
             ->get();
 
-        $ordersForPLQuery = Order::whereIn('status', self::PAID_STATUSES)->whereBetween('created_at', [$from, $to]);
-        if ($allowedUserIds !== null) {
-            $ordersForPLQuery->whereIn('user_id', $allowedUserIds);
-        }
+        $ordersForPLQuery = Order::query();
+        $this->applyReportedOrderScope($ordersForPLQuery, $from, $to, null, null, $allowedUserIds);
         $ordersForPL = $ordersForPLQuery->with('items')->get();
         $totalSalesPL = $ordersForPL->sum('subtotal');
         $totalCostPL = 0;
@@ -263,7 +253,19 @@ class PharmacyReportsController extends Controller
         $paymentMethods = [
             Order::PAYMENT_WALLET => 'Wallet',
             Order::PAYMENT_PAY_ON_DELIVERY => 'Pay on Delivery',
+            Order::PAYMENT_DPBV => 'DPBV',
+            'kd_credit' => 'KD Credit',
+            'split' => 'Split',
         ];
+
+        $paymentOrdersQuery = Order::with(['user', 'collectionBranch'])
+            ->where(function ($q) {
+                $q->whereNotNull('collection_branch_id')
+                    ->orWhereNotNull('payment_proof')
+                    ->orWhereNotNull('payment_breakdown');
+            });
+        $this->applyReportedOrderScope($paymentOrdersQuery, $from, $to, $customerId, $paymentMethod, $allowedUserIds);
+        $paymentOrders = $paymentOrdersQuery->orderByDesc('created_at')->limit(200)->get();
 
         // Purchase report (line-level, filter by date range)
         $purchaseReportLines = PurchaseItem::with('purchase.supplier')
@@ -339,10 +341,37 @@ class PharmacyReportsController extends Controller
             'assets' => $assets,
             'journalEntries' => $journalEntries,
             'invoices' => $invoices,
+            'paymentOrders' => $paymentOrders,
             'invoiceStatus' => $invoiceStatus,
             'invoiceStatusCounts' => $invoiceStatusCounts,
             'activeTab' => $request->query('tab', 'sales'),
         ]);
+    }
+
+    private function applyReportedOrderScope($query, Carbon $from, Carbon $to, $customerId, $paymentMethod, ?array $allowedUserIds): void
+    {
+        $query->whereBetween('created_at', [$from, $to])
+            ->where(function ($q) {
+                $q->whereIn('status', self::PAID_STATUSES)
+                    ->orWhereNotNull('collected_at')
+                    ->orWhereNotNull('payment_proof')
+                    ->orWhereNotNull('collection_branch_id')
+                    ->orWhereIn('payment_method', ['wallet', 'dpbv', 'kd_credit', 'split']);
+            });
+
+        if ($customerId) {
+            $query->where('user_id', $customerId);
+        }
+        if ($paymentMethod) {
+            $query->where('payment_method', $paymentMethod);
+        }
+        if ($allowedUserIds !== null) {
+            $query->where(function ($q) use ($allowedUserIds) {
+                $q->whereIn('user_id', $allowedUserIds)
+                    ->orWhereIn('branch_user_id', $allowedUserIds)
+                    ->orWhereIn('collection_branch_id', $allowedUserIds);
+            });
+        }
     }
 
     public function exportPdf(Request $request): \Illuminate\Http\Response
@@ -369,7 +398,7 @@ class PharmacyReportsController extends Controller
 
         return new StreamedResponse(function () use ($salesLines) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Invoice Number', 'Date', 'Customer', 'Product Name', 'Quantity Sold', 'Selling Price', 'Discount', 'Profit', 'Payment Status']);
+            fputcsv($out, ['Invoice Number', 'Date', 'Customer', 'Product Name', 'Quantity Sold', 'Selling Price', 'Discount', 'Profit', 'Payment', 'Payment Status', 'Collection Center', 'Proof of Payment']);
             foreach ($salesLines as $row) {
                 fputcsv($out, [
                     $row->invoice_number,
@@ -380,7 +409,10 @@ class PharmacyReportsController extends Controller
                     number_format($row->selling_price, 2),
                     $row->discount,
                     number_format($row->profit, 2),
+                    $row->payment_method,
                     $row->payment_status,
+                    $row->collection_branch ?? '',
+                    $row->payment_proof ? 'Yes' : '',
                 ]);
             }
             fclose($out);

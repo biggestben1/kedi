@@ -57,13 +57,20 @@ class PharmacyFinancialReportController extends Controller
             Order::STATUS_DELIVERED,
             Order::STATUS_COMPLETED,
         ];
-        $ordersQuery = Order::with(['user.role', 'branchUser.role'])
-            ->whereIn('status', $paidStatuses)
-            ->whereBetween('created_at', [$from, $to]);
+        $ordersQuery = Order::with(['user.role', 'branchUser.role', 'collectionBranch.role'])
+            ->whereBetween('created_at', [$from, $to])
+            ->where(function ($q) use ($paidStatuses) {
+                $q->whereIn('status', $paidStatuses)
+                    ->orWhereNotNull('collected_at')
+                    ->orWhereNotNull('payment_proof')
+                    ->orWhereNotNull('collection_branch_id')
+                    ->orWhereIn('payment_method', ['wallet', 'dpbv', 'kd_credit', 'split']);
+            });
         if ($allowedUserIds !== null) {
             $ordersQuery->where(function ($q) use ($allowedUserIds) {
                 $q->whereIn('user_id', $allowedUserIds)
-                    ->orWhereIn('branch_user_id', $allowedUserIds);
+                    ->orWhereIn('branch_user_id', $allowedUserIds)
+                    ->orWhereIn('collection_branch_id', $allowedUserIds);
             });
         }
         $shopOrders = $ordersQuery->orderByDesc('created_at')->get();
@@ -178,6 +185,15 @@ class PharmacyFinancialReportController extends Controller
         foreach ($orders as $order) {
             $method = $order->payment_method ?: 'unspecified';
             $amount = (float) $order->subtotal + (float) ($order->shipping_cost ?? 0);
+            if ($method === 'split' && is_array($order->payment_breakdown)) {
+                foreach ($order->payment_breakdown as $key => $part) {
+                    if (in_array($key, ['total', 'pos_machine', 'bank_account'], true) || ! is_numeric($part) || (float) $part <= 0) {
+                        continue;
+                    }
+                    $map[$key] = ($map[$key] ?? 0) + (float) $part;
+                }
+                continue;
+            }
             $map[$method] = ($map[$method] ?? 0) + $amount;
         }
 
@@ -206,7 +222,7 @@ class PharmacyFinancialReportController extends Controller
         }
 
         foreach ($orders as $order) {
-            $owner = $order->branchUser ?? $order->user;
+            $owner = $order->collectionBranch ?? $order->branchUser ?? $order->user;
             $unit = OrgUserScope::resolveOrgUnit($owner);
             $amount = (float) $order->subtotal + (float) ($order->shipping_cost ?? 0);
             $map[$unit] = ($map[$unit] ?? 0) + $amount;
@@ -260,18 +276,23 @@ class PharmacyFinancialReportController extends Controller
         }
 
         foreach ($orders as $order) {
-            $owner = $order->branchUser ?? $order->user;
+            $owner = $order->collectionBranch ?? $order->branchUser ?? $order->user;
             $unit = OrgUserScope::resolveOrgUnit($owner);
             $amount = (float) $order->subtotal + (float) ($order->shipping_cost ?? 0);
             $rows->push((object) [
-                'when' => $order->created_at,
-                'source' => 'Shop',
+                'when' => $order->collected_at ?? $order->created_at,
+                'source' => $order->collection_branch_id ? 'Collection' : 'Shop',
                 'reference' => $order->invoice_number ?: '#'.$order->id,
                 'party' => $order->customer_name ?: ($order->user?->name ?? '—'),
-                'location' => $locationLabels[$unit] ?? 'Other',
-                'method' => $order->payment_method ?: '—',
+                'location' => $order->collectionBranch?->name ?: ($locationLabels[$unit] ?? 'Other'),
+                'method' => $order->paymentLabel(),
                 'amount' => $amount,
-                'url' => route('admin.dispatch.orders.show', $order),
+                'url' => $order->collection_branch_id
+                    ? route('collection-centers.invoice', $order)
+                    : route('admin.dispatch.orders.show', $order),
+                'proof_url' => $order->payment_proof && $order->collection_branch_id
+                    ? route('collection-centers.proof.show', $order)
+                    : null,
             ]);
         }
 

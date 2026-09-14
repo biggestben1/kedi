@@ -214,6 +214,7 @@
                                         $badge = match ($row->source) {
                                             'Invoice' => 'info',
                                             'Shop' => 'primary',
+                                            'Collection' => 'dark',
                                             'Wallet top-up' => 'success',
                                             'Kit purchase' => 'warning',
                                             default => 'secondary',
@@ -228,7 +229,10 @@
                                 <td class="text-end fw-semibold">₦{{ number_format($row->amount, 2) }}</td>
                                 <td class="text-end">
                                     @if(!empty($row->url))
-                                        <a href="{{ $row->url }}" class="btn btn-sm btn-outline-primary">View</a>
+                                        <a href="{{ $row->url }}" class="btn btn-sm btn-outline-primary" target="_blank">View invoice</a>
+                                    @endif
+                                    @if(!empty($row->proof_url))
+                                        <a href="{{ $row->proof_url }}" class="btn btn-sm btn-outline-secondary" target="_blank">View proof of payment</a>
                                     @endif
                                 </td>
                             </tr>
