@@ -15,6 +15,9 @@ class Order extends Model
         'invoice_number',
         'user_id',
         'branch_user_id',
+        'collection_branch_id',
+        'collected_at',
+        'collected_by_user_id',
         'invoice_id',
         'subtotal',
         'shipping_cost',
@@ -62,6 +65,7 @@ class Order extends Model
             'pos_amount_paid' => 'decimal:2',
             'payment_breakdown' => 'array',
             'stock_deducted_at' => 'datetime',
+            'collected_at' => 'datetime',
         ];
     }
 
@@ -120,6 +124,11 @@ class Order extends Model
     public function branchUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'branch_user_id');
+    }
+
+    public function collectionBranch(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'collection_branch_id');
     }
 
     public function invoice(): BelongsTo

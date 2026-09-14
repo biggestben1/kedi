@@ -214,6 +214,9 @@ class CheckoutController extends Controller
             'canPayWithCredit' => $canPayWithCredit,
             'posMachines' => $paymentOptions['posMachines'],
             'banks' => $paymentOptions['banks'],
+            'collectionBranch' => $request->session()->get('collection_branch_id')
+                ? User::with('role')->find($request->session()->get('collection_branch_id'))
+                : null,
         ]));
     }
 
@@ -290,6 +293,7 @@ class CheckoutController extends Controller
         $rules['shipping_state'] = 'nullable|string|max:100';
         $rules['shipping_postal_code'] = 'nullable|string|max:20';
         $rules['sc_referral_code'] = 'nullable|string|max:100';
+        $rules['collection_branch_id'] = 'nullable|integer';
         $rules['sc_collection_code'] = 'nullable|string|max:100';
 
         $request->validate($rules);
@@ -304,6 +308,13 @@ class CheckoutController extends Controller
         $kdId = trim((string) $request->input('kd_id', ''));
         $customerName = trim((string) $request->input('customer_name', ''));
         $scReferralCode = trim((string) $request->input('sc_referral_code', ''));
+        $collectionBranchId = (int) ($request->input('collection_branch_id') ?: $request->session()->get('collection_branch_id', 0));
+        $collectionBranch = $collectionBranchId
+            ? User::where('id', $collectionBranchId)->whereHas('role', fn ($q) => $q->where('name', Role::BRANCH))->first()
+            : null;
+        if ($collectionBranchId && ! $collectionBranch) {
+            return back()->withErrors(['collection_branch_id' => 'Choose a valid collection branch.'])->withInput();
+        }
 
         // Cashier → parent wallet; Distributor → own wallet
         $walletOwner = $user->walletOwnerForShopping();
@@ -512,7 +523,7 @@ class CheckoutController extends Controller
         }
         $order = null;
         $paymentCompleted = $splitPayment || in_array($paymentMethod, [Order::PAYMENT_WALLET, Order::PAYMENT_DPBV, 'kd_credit'], true);
-        DB::transaction(function () use ($user, $walletOwner, $data, $paymentMethod, $paymentBreakdown, $splitPayment, $walletAmt, $kdAmt, $dpbvAmt, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, $stockOwner, $stockUserId, $roleName, $paymentCompleted, $serviceCenterForDistributor, $scReferralCode, &$order) {
+        DB::transaction(function () use ($user, $walletOwner, $data, $paymentMethod, $paymentBreakdown, $splitPayment, $walletAmt, $kdAmt, $dpbvAmt, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, $stockOwner, $stockUserId, $roleName, $paymentCompleted, $serviceCenterForDistributor, $scReferralCode, $collectionBranch, &$order) {
             if (! $orderKdId || ! $orderCustomerName) {
                 Guest::firstOrCreate(
                     ['session_id' => $request->session()->getId(), 'user_id' => $user->id],
@@ -522,6 +533,7 @@ class CheckoutController extends Controller
             $order = Order::create([
                 'user_id' => $user->id,
                 'branch_user_id' => $branchUserId,
+                'collection_branch_id' => $collectionBranch?->id,
                 'kd_id' => $orderKdId,
                 'customer_name' => $orderCustomerName,
                 'delivery_type' => $deliveryType,
@@ -559,7 +571,7 @@ class CheckoutController extends Controller
 
             }
 
-            if ($paymentCompleted) {
+            if ($paymentCompleted && ! $collectionBranch) {
                 $this->deductStockForCompletedPayment($data['cartItems'], $isHeadquarters, $stockUserId, $roleName, (int) $stockOwner->id);
                 $order->update(['stock_deducted_at' => now()]);
             }
@@ -685,7 +697,7 @@ class CheckoutController extends Controller
         });
 
         $request->session()->forget('cart');
-        $request->session()->forget(['kd_id', 'customer_name']);
+        $request->session()->forget(['kd_id', 'customer_name', 'collection_branch_id']);
 
         $order->load(['user', 'items']);
         try {

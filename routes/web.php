@@ -23,6 +23,7 @@ use App\Http\Controllers\BonusController;
 use App\Http\Controllers\BranchStockController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\CollectionCenterController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerInvoiceController;
 use App\Http\Controllers\DashboardController;
@@ -168,6 +169,16 @@ Route::middleware('auth')->group(function () {
     Route::delete('/my-blog/{blog_post:id}', [UserBlogController::class, 'destroy'])->name('my-blog.destroy');
 
     // Customer: Checkout & Wallet
+    Route::get('/collection-centers', [CollectionCenterController::class, 'index'])->name('collection-centers.index');
+    Route::get('/collection-centers/orders', [CollectionCenterController::class, 'incoming'])->name('collection-centers.incoming');
+    Route::get('/collection-centers/collected', [CollectionCenterController::class, 'collected'])->name('collection-centers.collected');
+    Route::get('/collection-centers/{branch}', [CollectionCenterController::class, 'show'])->name('collection-centers.show');
+    Route::post('/collection-centers/{branch}/select', [CollectionCenterController::class, 'select'])->name('collection-centers.select');
+    Route::post('/collection-centers/clear', [CollectionCenterController::class, 'clear'])->name('collection-centers.clear');
+    Route::post('/collection-centers/{branch}/account', [CollectionCenterController::class, 'storeAccount'])->name('collection-centers.account');
+    Route::post('/collection-centers/{branch}/pos', [CollectionCenterController::class, 'storePos'])->name('collection-centers.pos');
+    Route::post('/collection-centers/orders/{order}/collect', [CollectionCenterController::class, 'collect'])->name('collection-centers.collect');
+
     Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
     Route::post('/checkout', [CheckoutController::class, 'placeOrder'])->name('checkout.place');
     Route::post('/checkout/check-kd-credit', [CheckoutController::class, 'checkKdCredit'])->name('checkout.check-kd-credit');

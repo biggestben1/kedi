@@ -10,6 +10,7 @@ class PosMachine extends Model
         'bank_name',
         'account_name',
         'account_number',
+        'branch_user_id',
         'is_active',
         'notes',
     ];

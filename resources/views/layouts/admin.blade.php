@@ -356,6 +356,9 @@
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.dispatch.orders*') ? 'active' : '' }}" href="{{ route('admin.dispatch.orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">Dispatch Orders</span></a>
                             </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-centers.collected') ? 'active' : '' }}" href="{{ route('collection-centers.collected') }}"><i class="side-menu__icon fe fe-check-circle"></i><span class="side-menu__label">Collected</span></a>
+                            </li>
                             
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.promo*') ? 'active' : '' }}" href="{{ route('admin.promo.index') }}"><i class="side-menu__icon fe fe-gift"></i><span class="side-menu__label">Promo Upload</span></a>
@@ -437,6 +440,12 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.branch.stock*') ? 'active' : '' }}" href="{{ route('admin.branch.stock.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Stock</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-centers.incoming') ? 'active' : '' }}" href="{{ route('collection-centers.incoming') }}"><i class="side-menu__icon fe fe-map-pin"></i><span class="side-menu__label">Orders sent here</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-centers.collected') ? 'active' : '' }}" href="{{ route('collection-centers.collected') }}"><i class="side-menu__icon fe fe-check-circle"></i><span class="side-menu__label">Collected</span></a>
                             </li>
                             <li class="sub-category"><h3>Branch</h3></li>
                             <li class="slide">
@@ -706,6 +715,9 @@
                                     <li><a href="{{ route('admin.dispatch.orders.index') }}" class="slide-item {{ request()->routeIs('admin.dispatch.orders.index') && request()->query('status') !== 'completed' ? 'active' : '' }}">All Orders</a></li>
                                     <li><a href="{{ route('admin.dispatch.orders.index', ['status' => 'completed']) }}" class="slide-item {{ request()->routeIs('admin.dispatch.orders.index') && request()->query('status') === 'completed' ? 'active' : '' }}">Completed Orders</a></li>
                                 </ul>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-centers.collected') ? 'active' : '' }}" href="{{ route('collection-centers.collected') }}"><i class="side-menu__icon fe fe-check-circle"></i><span class="side-menu__label">Collected</span></a>
                             </li>
                             @endif
                             @if(auth()->user()->role?->name !== 'accountant')

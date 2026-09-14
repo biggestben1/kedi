@@ -91,6 +91,7 @@ class SuperAdminBankController extends Controller
                 return redirect()->route('admin.banks.index')->with('error', 'Branch must be linked to a headquarters to manage banks.');
             }
             $data['headquarters_user_id'] = $user->created_by_user_id;
+            $data['branch_user_id'] = $user->id;
         }
         if ($serviceCenterOnly && $allowedHqId !== null && $allowedHqId > 0) {
             $data['headquarters_user_id'] = $allowedHqId;

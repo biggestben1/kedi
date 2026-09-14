@@ -20,6 +20,7 @@ class Bank extends Model
         'sort_order',
         'is_active',
         'headquarters_user_id',
+        'branch_user_id',
     ];
 
     protected function casts(): array

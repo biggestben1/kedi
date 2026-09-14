@@ -236,6 +236,14 @@
                                 <a class="side-menu__item" href="{{ route('orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Orders</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ route('collection-centers.index') }}"><i class="side-menu__icon fe fe-map-pin"></i><span class="side-menu__label">Collection Center</span></a>
+                            </li>
+                            @if(auth()->user()->role?->name === 'branch')
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('collection-centers.incoming') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">Orders sent here</span></a>
+                            </li>
+                            @endif
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('orders.index', ['status' => 'draft']) }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Drafts</span></a>
                             </li>
                             @if(auth()->user()->role?->name === 'service_center')

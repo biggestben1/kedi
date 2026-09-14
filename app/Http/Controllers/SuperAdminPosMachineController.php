@@ -35,6 +35,11 @@ class SuperAdminPosMachineController extends Controller
         ]);
 
         $data['is_active'] = (bool) ($data['is_active'] ?? false);
+        $creator = $request->user();
+        $creator?->loadMissing('role');
+        if ($creator?->role?->name === 'branch') {
+            $data['branch_user_id'] = $creator->id;
+        }
 
         PosMachine::create($data);
 

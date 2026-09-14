@@ -111,6 +111,9 @@
                                 <a class="side-menu__item active" href="{{ route('checkout.show') }}"><i class="side-menu__icon fe fe-credit-card"></i><span class="side-menu__label">Checkout</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ route('collection-centers.index') }}"><i class="side-menu__icon fe fe-map-pin"></i><span class="side-menu__label">Collection Center</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Orders</span></a>
                             </li>
                             <li class="slide">
@@ -284,6 +287,7 @@
                                         <input type="number" step="0.01" min="0" name="split_cash_amount" value="{{ old('split_cash_amount', 0) }}">
                                         <input type="number" step="0.01" min="0" name="split_cheque_amount" value="{{ old('split_cheque_amount', 0) }}">
                                         <input type="number" step="0.01" min="0" name="split_dpbv_amount" value="{{ old('split_dpbv_amount', 0) }}">
+                                        <input type="hidden" name="collection_branch_id" value="{{ old('collection_branch_id', $collectionBranch->id ?? '') }}">
                                     </div>
                                 </form>
                                 <div class="card">
@@ -352,7 +356,10 @@
                                 <div class="card">
                                     <div class="card-header d-flex align-items-center justify-content-between">
                                         <h3 class="card-title mb-0">Payment</h3>
-                                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#paymentModal">Payment</button>
+                                        <div class="d-flex gap-2">
+                                            <a href="{{ route('collection-centers.index') }}" class="btn btn-outline-info btn-sm">Collection Center</a>
+                                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#paymentModal">Payment</button>
+                                        </div>
                                     </div>
                                     <div class="card-body text-center">
                                         <div class="p-3 bg-light rounded mb-3">
@@ -370,6 +377,16 @@
                                             <h2 class="mb-0 fw-bold">₦{{ number_format($cartTotal, 0) }}</h2>
                                         </div>
 
+                                        @if($collectionBranch)
+                                        <div class="alert alert-info text-start py-2">
+                                            Collect at <strong>{{ $collectionBranch->name }}</strong>.
+                                            Stock is removed from that branch when they mark it collected.
+                                            <form method="POST" action="{{ route('collection-centers.clear') }}" class="d-inline">
+                                                @csrf
+                                                <button class="btn btn-link btn-sm p-0">Clear</button>
+                                            </form>
+                                        </div>
+                                        @endif
                                         <div class="mb-3 text-start">
                                             <p class="mb-2"><i class="fe fe-wallet me-2"></i> <strong>Wallet balance:</strong> ₦{{ number_format($walletBalance, 2) }}</p>
                                             <p class="mb-2"><i class="fe fe-award me-2"></i> <strong>DPBV balance:</strong> {{ number_format($totalDpbv ?? 0, 2) }} DPBV = ₦{{ number_format($dpbvNairaEquivalent ?? 0, 2) }}</p>
