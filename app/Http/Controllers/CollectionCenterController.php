@@ -76,6 +76,23 @@ class CollectionCenterController extends Controller
         return back()->with('success', 'Account added for this branch.');
     }
 
+    public function storeProof(Request $request, User $branch)
+    {
+        $this->ensureBranch($branch);
+        $request->validate([
+            'payment_proof' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
+        ]);
+
+        if ($request->hasFile('payment_proof')) {
+            $path = $request->file('payment_proof')->store('collection-proofs', 'public');
+            $request->session()->put('collection_payment_proof', $path);
+        }
+
+        $request->session()->put('collection_branch_id', $branch->id);
+
+        return back()->with('success', 'Payment proof saved. It will be attached when you place the order.');
+    }
+
     public function storePos(Request $request, User $branch)
     {
         $this->ensureBranch($branch);

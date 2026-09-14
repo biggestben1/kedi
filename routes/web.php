@@ -177,6 +177,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/collection-centers/clear', [CollectionCenterController::class, 'clear'])->name('collection-centers.clear');
     Route::post('/collection-centers/{branch}/account', [CollectionCenterController::class, 'storeAccount'])->name('collection-centers.account');
     Route::post('/collection-centers/{branch}/pos', [CollectionCenterController::class, 'storePos'])->name('collection-centers.pos');
+    Route::post('/collection-centers/{branch}/proof', [CollectionCenterController::class, 'storeProof'])->name('collection-centers.proof');
     Route::post('/collection-centers/orders/{order}/collect', [CollectionCenterController::class, 'collect'])->name('collection-centers.collect');
 
     Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');

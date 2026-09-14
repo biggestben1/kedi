@@ -37,11 +37,14 @@
                                     @if((int) $selectedId === (int) $branch->id)
                                         <span class="badge bg-success ms-1">Selected</span>
                                     @endif
+                                    <div class="mt-2">
+                                        <a href="{{ route('collection-centers.show', $branch) }}" class="btn btn-primary">Account details</a>
+                                    </div>
                                 </td>
                                 <td>{{ $branch->phone ?: '—' }}</td>
                                 <td>{{ $branch->email }}</td>
                                 <td class="text-end">
-                                    <a href="{{ route('collection-centers.show', $branch) }}" class="btn btn-sm btn-primary">View account & POS</a>
+                                    <a href="{{ route('collection-centers.show', $branch) }}" class="btn btn-primary">Account details</a>
                                 </td>
                             </tr>
                         @empty

@@ -381,10 +381,13 @@
                                         <div class="alert alert-info text-start py-2">
                                             Collect at <strong>{{ $collectionBranch->name }}</strong>.
                                             Stock is removed from that branch when they mark it collected.
-                                            <form method="POST" action="{{ route('collection-centers.clear') }}" class="d-inline">
-                                                @csrf
-                                                <button class="btn btn-link btn-sm p-0">Clear</button>
-                                            </form>
+                                            <div class="mt-2 d-flex gap-2 flex-wrap">
+                                                <a href="{{ route('collection-centers.show', $collectionBranch) }}" class="btn btn-primary btn-sm">Account details</a>
+                                                <form method="POST" action="{{ route('collection-centers.clear') }}">
+                                                    @csrf
+                                                    <button class="btn btn-outline-secondary btn-sm">Clear</button>
+                                                </form>
+                                            </div>
                                         </div>
                                         @endif
                                         <div class="mb-3 text-start">

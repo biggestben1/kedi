@@ -49,23 +49,27 @@
                                     <td>{{ $order->collectionBranch?->name ?: '—' }}</td>
                                     <td>{{ $order->collected_at?->format('M d, Y H:i') }}</td>
                                 @endif
-                                <td class="text-end">
-                                    <button type="button" class="btn btn-sm btn-outline-primary mb-1" data-bs-toggle="collapse" data-bs-target="#payment-{{ $order->id }}">Payment</button>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td colspan="7" class="bg-light">
                                     @if($canCollect ?? false)
                                         <form method="POST" action="{{ route('collection-centers.collect', $order) }}" enctype="multipart/form-data" onsubmit="return confirm('Collect this order and remove it from branch stock?');">
                                             @csrf
-                                            <div class="collapse text-start mt-2" id="payment-{{ $order->id }}">
+                                            <button type="button" class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#payment-{{ $order->id }}">Payment</button>
+                                            <button class="btn btn-success ms-2">Collected</button>
+                                            <div class="collapse mt-2" id="payment-{{ $order->id }}">
                                                 @include('collection-centers.payment-details', ['order' => $order])
-                                                <label class="form-label small mb-1">Upload proof (optional)</label>
-                                                <input type="file" name="payment_proof" class="form-control form-control-sm mb-2" accept="image/*,.pdf">
+                                                <label class="form-label mb-1">Upload proof (optional)</label>
+                                                <input type="file" name="payment_proof" class="form-control mb-2" accept="image/*,.pdf">
                                             </div>
-                                            <button class="btn btn-sm btn-success">Collected</button>
                                         </form>
                                     @else
-                                        <div class="collapse text-start mt-2" id="payment-{{ $order->id }}">
+                                        <button type="button" class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#payment-{{ $order->id }}">Payment</button>
+                                        <div class="collapse mt-2" id="payment-{{ $order->id }}">
                                             @include('collection-centers.payment-details', ['order' => $order])
                                             @if($order->payment_proof)
-                                                <a href="{{ asset('storage/'.$order->payment_proof) }}" target="_blank" class="small">View proof</a>
+                                                <a href="{{ asset('storage/'.$order->payment_proof) }}" target="_blank">View proof</a>
                                             @endif
                                         </div>
                                     @endif

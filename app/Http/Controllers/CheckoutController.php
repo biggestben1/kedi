@@ -541,6 +541,7 @@ class CheckoutController extends Controller
                 'user_id' => $user->id,
                 'branch_user_id' => $branchUserId,
                 'collection_branch_id' => $collectionBranch?->id,
+                'payment_proof' => $collectionBranch ? $request->session()->get('collection_payment_proof') : null,
                 'kd_id' => $orderKdId,
                 'customer_name' => $orderCustomerName,
                 'delivery_type' => $deliveryType,
@@ -704,7 +705,7 @@ class CheckoutController extends Controller
         });
 
         $request->session()->forget('cart');
-        $request->session()->forget(['kd_id', 'customer_name', 'collection_branch_id']);
+        $request->session()->forget(['kd_id', 'customer_name', 'collection_branch_id', 'collection_payment_proof']);
 
         $order->load(['user', 'items']);
         try {
