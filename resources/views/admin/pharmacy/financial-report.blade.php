@@ -198,7 +198,8 @@
                             <th>When</th>
                             <th>Source</th>
                             <th>Reference</th>
-                            <th>Customer / User</th>
+                            <th>KEDI No</th>
+                            <th>Name</th>
                             <th>Location</th>
                             <th>Method</th>
                             <th class="text-end">Amount</th>
@@ -223,7 +224,8 @@
                                     <span class="badge bg-{{ $badge }}">{{ $row->source }}</span>
                                 </td>
                                 <td>{{ $row->reference }}</td>
-                                <td>{{ $row->party }}</td>
+                                <td>{{ $row->kd_id ?: '—' }}</td>
+                                <td>{{ $row->name ?? $row->party }}</td>
                                 <td>{{ $row->location ?? '—' }}</td>
                                 <td>{{ $row->method && $row->method !== '—' ? str_replace('_', ' ', ucfirst($row->method)) : '—' }}</td>
                                 <td class="text-end fw-semibold">₦{{ number_format($row->amount, 2) }}</td>
@@ -238,24 +240,24 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="text-center text-muted p-4">No money paid in for this date range.</td>
+                                <td colspan="9" class="text-center text-muted p-4">No money paid in for this date range.</td>
                             </tr>
                         @endforelse
                     </tbody>
                     @if($entries->isNotEmpty())
                         <tfoot>
                             <tr>
-                                <th colspan="6" class="text-end">Sales subtotal</th>
+                                <th colspan="7" class="text-end">Sales subtotal</th>
                                 <th class="text-end">₦{{ number_format($salesTotal, 2) }}</th>
                                 <th></th>
                             </tr>
                             <tr>
-                                <th colspan="6" class="text-end">Wallet top-ups</th>
+                                <th colspan="7" class="text-end">Wallet top-ups</th>
                                 <th class="text-end">₦{{ number_format($walletTopupTotal, 2) }}</th>
                                 <th></th>
                             </tr>
                             <tr>
-                                <th colspan="6" class="text-end">All money in</th>
+                                <th colspan="7" class="text-end">All money in</th>
                                 <th class="text-end">₦{{ number_format($allMoneyIn, 2) }}</th>
                                 <th></th>
                             </tr>
