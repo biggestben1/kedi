@@ -22,7 +22,8 @@
             <tr>
                 <th>Invoice #</th>
                 <th>Date</th>
-                <th>Customer</th>
+                <th>KEDI No</th>
+                <th>Name</th>
                 <th>Product</th>
                 <th class="text-end">Qty</th>
                 <th class="text-end">Selling Price</th>
@@ -37,6 +38,7 @@
                 <tr>
                     <td>{{ $row->invoice_number }}</td>
                     <td>{{ $row->order_date->format('Y-m-d H:i') }}</td>
+                    <td>{{ $row->kd_id ?: '—' }}</td>
                     <td>{{ $row->customer_name }}</td>
                     <td>{{ $row->product_name }}</td>
                     <td class="text-end">{{ $row->quantity_sold }}</td>
@@ -47,7 +49,7 @@
                     <td>{{ $row->payment_proof ? 'Yes' : '—' }}</td>
                 </tr>
             @empty
-                <tr><td colspan="10" class="text-center">No sales in date range.</td></tr>
+                <tr><td colspan="11" class="text-center">No sales in date range.</td></tr>
             @endforelse
         </tbody>
     </table>

@@ -170,7 +170,8 @@
                                 <tr>
                                     <th>Invoice #</th>
                                     <th>Date</th>
-                                    <th>Customer</th>
+                                    <th>KEDI No</th>
+                                    <th>Name</th>
                                     <th>Product Name</th>
                                     <th class="text-end">Qty Sold</th>
                                     <th class="text-end">Selling Price</th>
@@ -191,6 +192,7 @@
                                             @endif
                                         </td>
                                         <td>{{ $row->order_date->format('M d, Y H:i') }}</td>
+                                        <td>{{ $row->kd_id ?: '—' }}</td>
                                         <td>{{ $row->customer_name }}</td>
                                         <td>{{ $row->product_name }}</td>
                                         <td class="text-end">{{ $row->quantity_sold }}</td>
@@ -213,7 +215,7 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="10" class="text-center text-muted p-4">No sales in date range.</td></tr>
+                                    <tr><td colspan="11" class="text-center text-muted p-4">No sales in date range.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -625,7 +627,8 @@
                                 <tr>
                                     <th>Date</th>
                                     <th>Invoice</th>
-                                    <th>Customer</th>
+                                    <th>KEDI No</th>
+                                    <th>Name</th>
                                     <th>Collection center</th>
                                     <th>Payment</th>
                                     <th class="text-end">Amount</th>
@@ -643,12 +646,8 @@
                                                 {{ $order->invoice_number ?: ('ORD-'.$order->id) }}
                                             @endif
                                         </td>
-                                        <td>
-                                            {{ $order->customer_name ?: ($order->user?->name ?? '—') }}
-                                            @if($order->kd_id)
-                                                <div class="small text-muted">{{ $order->kd_id }}</div>
-                                            @endif
-                                        </td>
+                                        <td>{{ $order->kd_id ?: '—' }}</td>
+                                        <td>{{ $order->customer_name ?: ($order->user?->name ?? '—') }}</td>
                                         <td>{{ $order->collectionBranch?->name ?: '—' }}</td>
                                         <td>
                                             {{ $order->paymentLabel() }}
@@ -664,7 +663,7 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="7" class="text-center text-muted p-4">No payments in this date range.</td></tr>
+                                    <tr><td colspan="8" class="text-center text-muted p-4">No payments in this date range.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>

@@ -134,6 +134,7 @@ class PharmacyReportsController extends Controller
                 'order_id' => $item->order->id,
                 'invoice_number' => $item->order->invoice_number ?: '#' . $item->order->id,
                 'order_date' => $item->order->created_at,
+                'kd_id' => $item->order->kd_id,
                 'customer_name' => $item->order->customer_name ?: ($item->order->user?->name ?? '—'),
                 'product_name' => $item->product_name,
                 'quantity_sold' => $qty,
@@ -399,11 +400,12 @@ class PharmacyReportsController extends Controller
 
         return new StreamedResponse(function () use ($salesLines) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Invoice Number', 'Date', 'Customer', 'Product Name', 'Quantity Sold', 'Selling Price', 'Discount', 'Profit', 'Payment', 'Payment Status', 'Collection Center', 'Proof of Payment']);
+            fputcsv($out, ['Invoice Number', 'Date', 'KEDI No', 'Name', 'Product Name', 'Quantity Sold', 'Selling Price', 'Discount', 'Profit', 'Payment', 'Payment Status', 'Collection Center', 'Proof of Payment']);
             foreach ($salesLines as $row) {
                 fputcsv($out, [
                     $row->invoice_number,
                     $row->order_date->format('Y-m-d H:i'),
+                    $row->kd_id,
                     $row->customer_name,
                     $row->product_name,
                     $row->quantity_sold,
