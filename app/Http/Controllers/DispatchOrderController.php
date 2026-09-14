@@ -505,7 +505,6 @@ class DispatchOrderController extends Controller
                 } elseif ($branchUserId) {
                     $stockUser = \App\Models\User::with('role')->find($branchUserId);
                     $role = $stockUser?->role?->name ?? '';
-                    $product->decrement('stock', $item->quantity);
                     if ($role === 'service_center') {
                         ServiceCenterStock::decrementStock($branchUserId, $product->id, $item->quantity);
                     } elseif ($role === 'annex') {
@@ -513,8 +512,7 @@ class DispatchOrderController extends Controller
                     } else {
                         BranchStock::decrementStock($branchUserId, $product->id, $item->quantity);
                     }
-                } else {
-                    // For regular users, deduct from main product stock
+                } elseif ((int) $product->stock >= (int) $item->quantity) {
                     $product->decrement('stock', $item->quantity);
                 }
             }

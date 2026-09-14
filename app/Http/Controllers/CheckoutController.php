@@ -1042,7 +1042,6 @@ class CheckoutController extends Controller
             }
 
             if ($stockUserId) {
-                $product->decrement('stock', $qty);
                 if ($roleName === 'service_center') {
                     ServiceCenterStock::decrementStock($stockUserId, $product->id, $qty);
                 } elseif ($roleName === 'annex') {
@@ -1053,7 +1052,9 @@ class CheckoutController extends Controller
                 continue;
             }
 
-            $product->decrement('stock', $qty);
+            if ((int) $product->stock >= $qty) {
+                $product->decrement('stock', $qty);
+            }
         }
     }
 

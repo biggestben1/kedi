@@ -247,9 +247,6 @@ class DriverOrderController extends Controller
                     continue;
                 }
 
-                // Deduct from main product stock
-                $product->decrement('stock', $item->quantity);
-
                 if ($branchUserId) {
                     $stockUser = \App\Models\User::with('role')->find($branchUserId);
                     $role = $stockUser?->role?->name ?? '';
@@ -260,6 +257,8 @@ class DriverOrderController extends Controller
                     } else {
                         BranchStock::decrementStock($branchUserId, $product->id, $item->quantity);
                     }
+                } elseif ((int) $product->stock >= (int) $item->quantity) {
+                    $product->decrement('stock', $item->quantity);
                 }
             }
 
