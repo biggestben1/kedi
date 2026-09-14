@@ -134,6 +134,21 @@ class CollectionCenterController extends Controller
         ]);
     }
 
+    public function invoice(Request $request, Order $order)
+    {
+        $user = $request->user();
+        $user->loadMissing('role');
+        $branch = $this->viewerBranch($user);
+        $seeAll = $user->isSuperAdmin() || $user->role?->name === Role::HEADQUARTERS;
+        $ownsOrder = $branch && (int) $order->collection_branch_id === (int) $branch->id;
+
+        abort_unless($order->collection_branch_id && ($seeAll || $ownsOrder), 403);
+
+        $order->load('user', 'items', 'collectionBranch');
+
+        return view('collection-centers.invoice', ['order' => $order]);
+    }
+
     public function collect(Request $request, Order $order)
     {
         $branch = $this->viewerBranch($request->user());
