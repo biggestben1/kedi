@@ -18,6 +18,7 @@ class Order extends Model
         'collection_branch_id',
         'collected_at',
         'collected_by_user_id',
+        'payment_proof',
         'invoice_id',
         'subtotal',
         'shipping_cost',

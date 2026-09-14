@@ -487,8 +487,15 @@ class CheckoutController extends Controller
         }
         $branchUserId = $stockUserId; // keep for order.branch_user_id (used when deducting)
 
-        // Check stock availability before placing order (using stock owner's account)
+        // Sending to a collection branch: check that branch's stock, not the sender's.
         foreach ($data['cartItems'] as $item) {
+            if ($collectionBranch) {
+                $avail = BranchStock::getQuantity($collectionBranch->id, $item->product->id);
+                if ($avail < $item->quantity) {
+                    return back()->with('error', "Not enough stock at {$collectionBranch->name} for {$item->product->name}. Available: {$avail}.");
+                }
+                continue;
+            }
             if ($isHeadquarters) {
                 $avail = HeadquartersStock::getQuantity($stockOwner->id, $item->product->id);
                 if ($avail < $item->quantity) {

@@ -125,6 +125,10 @@ class CollectionCenterController extends Controller
             return back()->with('error', 'This order is already collected.');
         }
 
+        $request->validate([
+            'payment_proof' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
+        ]);
+
         $order->load('items');
         foreach ($order->items as $item) {
             $product = Product::where('item_code', $item->item_code)->first();
@@ -146,10 +150,16 @@ class CollectionCenterController extends Controller
                     }
                 }
 
+                $proofPath = $order->payment_proof;
+                if ($request->hasFile('payment_proof')) {
+                    $proofPath = $request->file('payment_proof')->store('collection-proofs', 'public');
+                }
+
                 $order->update([
                     'collected_at' => now(),
                     'collected_by_user_id' => $request->user()->id,
                     'stock_deducted_at' => $order->stock_deducted_at ?? now(),
+                    'payment_proof' => $proofPath,
                 ]);
             });
         } catch (\RuntimeException $e) {

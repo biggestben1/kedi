@@ -50,11 +50,24 @@
                                     <td>{{ $order->collected_at?->format('M d, Y H:i') }}</td>
                                 @endif
                                 <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary mb-1" data-bs-toggle="collapse" data-bs-target="#payment-{{ $order->id }}">Payment</button>
                                     @if($canCollect ?? false)
-                                        <form method="POST" action="{{ route('collection-centers.collect', $order) }}" onsubmit="return confirm('Collect this order and remove it from branch stock?');">
+                                        <form method="POST" action="{{ route('collection-centers.collect', $order) }}" enctype="multipart/form-data" onsubmit="return confirm('Collect this order and remove it from branch stock?');">
                                             @csrf
+                                            <div class="collapse text-start mt-2" id="payment-{{ $order->id }}">
+                                                @include('collection-centers.payment-details', ['order' => $order])
+                                                <label class="form-label small mb-1">Upload proof (optional)</label>
+                                                <input type="file" name="payment_proof" class="form-control form-control-sm mb-2" accept="image/*,.pdf">
+                                            </div>
                                             <button class="btn btn-sm btn-success">Collected</button>
                                         </form>
+                                    @else
+                                        <div class="collapse text-start mt-2" id="payment-{{ $order->id }}">
+                                            @include('collection-centers.payment-details', ['order' => $order])
+                                            @if($order->payment_proof)
+                                                <a href="{{ asset('storage/'.$order->payment_proof) }}" target="_blank" class="small">View proof</a>
+                                            @endif
+                                        </div>
                                     @endif
                                 </td>
                             </tr>
