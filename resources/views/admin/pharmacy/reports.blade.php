@@ -616,7 +616,7 @@
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title mb-0">Payments</h3>
-                    <div class="small text-muted mt-1">Shop and collection-center payments in this date range, including proof of payment.</div>
+                    <div class="small text-muted mt-1">Collection payments appear here only after the branch marks them collected.</div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">

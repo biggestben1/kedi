@@ -259,11 +259,7 @@ class PharmacyReportsController extends Controller
         ];
 
         $paymentOrdersQuery = Order::with(['user', 'collectionBranch'])
-            ->where(function ($q) {
-                $q->whereNotNull('collection_branch_id')
-                    ->orWhereNotNull('payment_proof')
-                    ->orWhereNotNull('payment_breakdown');
-            });
+            ->whereNotNull('collected_at');
         $this->applyReportedOrderScope($paymentOrdersQuery, $from, $to, $customerId, $paymentMethod, $allowedUserIds);
         $paymentOrders = $paymentOrdersQuery->orderByDesc('created_at')->limit(200)->get();
 
@@ -350,14 +346,19 @@ class PharmacyReportsController extends Controller
 
     private function applyReportedOrderScope($query, Carbon $from, Carbon $to, $customerId, $paymentMethod, ?array $allowedUserIds): void
     {
-        $query->whereBetween('created_at', [$from, $to])
-            ->where(function ($q) {
-                $q->whereIn('status', self::PAID_STATUSES)
-                    ->orWhereNotNull('collected_at')
-                    ->orWhereNotNull('payment_proof')
-                    ->orWhereNotNull('collection_branch_id')
-                    ->orWhereIn('payment_method', ['wallet', 'dpbv', 'kd_credit', 'split']);
+        $query->where(function ($q) use ($from, $to) {
+            $q->where(function ($paid) use ($from, $to) {
+                $paid->whereNull('collection_branch_id')
+                    ->whereBetween('created_at', [$from, $to])
+                    ->where(function ($inner) {
+                        $inner->whereIn('status', self::PAID_STATUSES)
+                            ->orWhereIn('payment_method', ['wallet', 'dpbv', 'kd_credit', 'split']);
+                    });
+            })->orWhere(function ($collected) use ($from, $to) {
+                $collected->whereNotNull('collected_at')
+                    ->whereBetween('collected_at', [$from, $to]);
             });
+        });
 
         if ($customerId) {
             $query->where('user_id', $customerId);

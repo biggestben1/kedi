@@ -58,13 +58,18 @@ class PharmacyFinancialReportController extends Controller
             Order::STATUS_COMPLETED,
         ];
         $ordersQuery = Order::with(['user.role', 'branchUser.role', 'collectionBranch.role'])
-            ->whereBetween('created_at', [$from, $to])
-            ->where(function ($q) use ($paidStatuses) {
-                $q->whereIn('status', $paidStatuses)
-                    ->orWhereNotNull('collected_at')
-                    ->orWhereNotNull('payment_proof')
-                    ->orWhereNotNull('collection_branch_id')
-                    ->orWhereIn('payment_method', ['wallet', 'dpbv', 'kd_credit', 'split']);
+            ->where(function ($q) use ($from, $to, $paidStatuses) {
+                $q->where(function ($paid) use ($from, $to, $paidStatuses) {
+                    $paid->whereNull('collection_branch_id')
+                        ->whereBetween('created_at', [$from, $to])
+                        ->where(function ($inner) use ($paidStatuses) {
+                            $inner->whereIn('status', $paidStatuses)
+                                ->orWhereIn('payment_method', ['wallet', 'dpbv', 'kd_credit', 'split']);
+                        });
+                })->orWhere(function ($collected) use ($from, $to) {
+                    $collected->whereNotNull('collected_at')
+                        ->whereBetween('collected_at', [$from, $to]);
+                });
             });
         if ($allowedUserIds !== null) {
             $ordersQuery->where(function ($q) use ($allowedUserIds) {
