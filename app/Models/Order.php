@@ -148,6 +148,20 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    /** Draft/order that is a KD registration fee line (pay with group). */
+    public function isKdRegistrationFee(): bool
+    {
+        if (str_starts_with((string) ($this->notes ?? ''), 'KD Registration Fee')) {
+            return true;
+        }
+
+        if ($this->relationLoaded('items')) {
+            return $this->items->contains(fn ($item) => $item->item_code === 'KD-REG-FEE');
+        }
+
+        return $this->items()->where('item_code', 'KD-REG-FEE')->exists();
+    }
+
     /** Generate next order number (e.g. ORD-000001). */
     public static function generateOrderNumber(): string
     {

@@ -42,35 +42,78 @@
         <div class="card">
             <div class="card-header"><h3 class="card-title mb-0">Unpaid orders</h3></div>
             <div class="card-body">
+                @php
+                    $registrationDrafts = $drafts->filter(fn ($o) => $o->isKdRegistrationFee())->values();
+                    $productDrafts = $drafts->reject(fn ($o) => $o->isKdRegistrationFee())->values();
+                    $registrationDraftTotal = (float) $registrationDrafts->sum('subtotal');
+                    $productDraftTotal = (float) $productDrafts->sum('subtotal');
+                @endphp
                 <div class="table-responsive">
                     <table class="table mb-0">
                         <thead>
                         <tr>
                             <th>Invoice</th>
+                            <th>Type</th>
                             <th class="text-end">Amount</th>
                         </tr>
                         </thead>
                         <tbody>
-                        @foreach($drafts as $order)
-                            <tr>
-                                <td>{{ $order->invoice_number }}</td>
-                                <td class="text-end">₦{{ number_format($order->subtotal, 0) }}</td>
+                        @if($registrationDrafts->isNotEmpty())
+                            <tr class="table-primary">
+                                <td colspan="3"><strong>KD registrations ({{ $registrationDrafts->count() }})</strong></td>
                             </tr>
-                        @endforeach
+                            @foreach($registrationDrafts as $order)
+                                <tr>
+                                    <td>
+                                        {{ $order->invoice_number }}
+                                        @if($order->kd_id)<div class="small text-muted">{{ $order->kd_id }}@if($order->customer_name) · {{ $order->customer_name }}@endif</div>@endif
+                                    </td>
+                                    <td><span class="badge bg-primary">Registration</span></td>
+                                    <td class="text-end">₦{{ number_format($order->subtotal, 0) }}</td>
+                                </tr>
+                            @endforeach
+                            <tr>
+                                <td colspan="2" class="text-muted">Registrations subtotal</td>
+                                <td class="text-end">₦{{ number_format($registrationDraftTotal, 0) }}</td>
+                            </tr>
+                        @endif
+                        @if($productDrafts->isNotEmpty())
+                            @if($registrationDrafts->isNotEmpty())
+                            <tr class="table-light">
+                                <td colspan="3"><strong>Product orders ({{ $productDrafts->count() }})</strong></td>
+                            </tr>
+                            @endif
+                            @foreach($productDrafts as $order)
+                                <tr>
+                                    <td>
+                                        {{ $order->invoice_number }}
+                                        @if($order->kd_id)<div class="small text-muted">{{ $order->kd_id }}@if($order->customer_name) · {{ $order->customer_name }}@endif</div>@endif
+                                    </td>
+                                    <td><span class="badge bg-secondary">Products</span></td>
+                                    <td class="text-end">₦{{ number_format($order->subtotal, 0) }}</td>
+                                </tr>
+                            @endforeach
+                            @if($registrationDrafts->isNotEmpty())
+                            <tr>
+                                <td colspan="2" class="text-muted">Products subtotal</td>
+                                <td class="text-end">₦{{ number_format($productDraftTotal, 0) }}</td>
+                            </tr>
+                            @endif
+                        @endif
                         </tbody>
                         <tfoot>
                         <tr>
-                            <th>Subtotal</th>
+                            <th colspan="2">Subtotal</th>
                             <th class="text-end">₦{{ number_format($draftTotal, 0) }}</th>
                         </tr>
                         @if(($discountAmount ?? 0) > 0)
                         <tr class="text-success">
-                            <th>Coupon discount @if($coupon)({{ number_format($coupon->discount_percentage, 0) }}%)@endif</th>
+                            <th colspan="2">Coupon discount @if($coupon)({{ number_format($coupon->discount_percentage, 0) }}%)@endif</th>
                             <th class="text-end">-₦{{ number_format($discountAmount, 0) }}</th>
                         </tr>
                         @endif
                         <tr>
-                            <th>Amount due</th>
+                            <th colspan="2">Amount due</th>
                             <th class="text-end">₦{{ number_format($amountDue ?? $draftTotal, 0) }}</th>
                         </tr>
                         </tfoot>

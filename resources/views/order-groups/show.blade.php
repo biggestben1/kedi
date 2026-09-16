@@ -47,11 +47,85 @@
 
 <div class="row">
     <div class="col-lg-7">
+        @php
+            $registrationOrders = $group->orders->filter(fn ($o) => $o->isKdRegistrationFee())->values();
+            $productOrders = $group->orders->reject(fn ($o) => $o->isKdRegistrationFee())->values();
+            $registrationTotal = (float) $registrationOrders->sum('subtotal');
+            $productTotal = (float) $productOrders->sum('subtotal');
+        @endphp
+
+        @if($group->orders->isEmpty())
         <div class="card">
             <div class="card-header"><h3 class="card-title mb-0">Orders in this group</h3></div>
             <div class="card-body">
-                @if($group->orders->isEmpty())
-                    <p class="text-muted mb-0">No orders yet. Add drafts below, or shop and use <strong>Add to Group</strong> while the session is active.</p>
+                <p class="text-muted mb-0">No orders yet. Add drafts below, or shop and use <strong>Add to Group</strong> while the session is active.</p>
+            </div>
+        </div>
+        @else
+
+        @if($registrationOrders->isNotEmpty())
+        <div class="card mb-3 border-primary">
+            <div class="card-header bg-primary-transparent d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h3 class="card-title mb-0">
+                    <span class="badge bg-primary me-1">Registration</span>
+                    KD registrations
+                    <small class="text-muted fw-normal">({{ $registrationOrders->count() }})</small>
+                </h3>
+                <strong>₦{{ number_format($registrationTotal, 0) }}</strong>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead>
+                        <tr>
+                            <th>Invoice</th>
+                            <th>KD NO / Name</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th class="text-end">Fee</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($registrationOrders as $order)
+                            <tr>
+                                <td><a href="{{ route('orders.show', $order) }}">{{ $order->invoice_number }}</a></td>
+                                <td>
+                                    <strong>{{ $order->kd_id ?: '—' }}</strong>
+                                    @if($order->customer_name)<br><small class="text-muted">{{ $order->customer_name }}</small>@endif
+                                </td>
+                                <td><span class="badge bg-primary">KD Registration</span></td>
+                                <td><span class="badge bg-secondary">{{ $order->status }}</span></td>
+                                <td class="text-end">₦{{ number_format($order->subtotal, 0) }}</td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                        <tfoot>
+                        <tr>
+                            <th colspan="4">Registrations total</th>
+                            <th class="text-end">₦{{ number_format($registrationTotal, 0) }}</th>
+                        </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+        @endif
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h3 class="card-title mb-0">
+                    Product orders
+                    @if($productOrders->isNotEmpty())
+                        <small class="text-muted fw-normal">({{ $productOrders->count() }})</small>
+                    @endif
+                </h3>
+                @if($productOrders->isNotEmpty())
+                    <strong>₦{{ number_format($productTotal, 0) }}</strong>
+                @endif
+            </div>
+            <div class="card-body">
+                @if($productOrders->isEmpty())
+                    <p class="text-muted mb-0">No product orders yet. Shop and use <strong>Add to Group</strong>, or add registrations above.</p>
                 @else
                     <div class="table-responsive">
                         <table class="table mb-0">
@@ -65,7 +139,7 @@
                             </tr>
                             </thead>
                             <tbody>
-                            @foreach($group->orders as $order)
+                            @foreach($productOrders as $order)
                                 <tr>
                                     <td><a href="{{ route('orders.show', $order) }}">{{ $order->invoice_number }}</a></td>
                                     <td>
@@ -80,6 +154,16 @@
                             </tbody>
                             <tfoot>
                             <tr>
+                                <th colspan="4">Products total</th>
+                                <th class="text-end">₦{{ number_format($productTotal, 0) }}</th>
+                            </tr>
+                            @if($registrationOrders->isNotEmpty())
+                            <tr>
+                                <th colspan="4">+ Registrations</th>
+                                <th class="text-end">₦{{ number_format($registrationTotal, 0) }}</th>
+                            </tr>
+                            @endif
+                            <tr>
                                 <th colspan="4">Draft total (unpaid)</th>
                                 <th class="text-end">₦{{ number_format($draftTotal, 0) }}</th>
                             </tr>
@@ -89,6 +173,7 @@
                 @endif
             </div>
         </div>
+        @endif
 
         @if($group->isOpen() && ($availableDrafts ?? collect())->isNotEmpty())
         <div class="card mt-3">
@@ -166,7 +251,13 @@
                 <div class="p-3 bg-primary text-white rounded mb-3 text-center">
                     <div class="opacity-75">Group total</div>
                     <h2 class="mb-0">₦{{ number_format($draftTotal, 0) }}</h2>
-                    <small>{{ $drafts->count() }} unpaid order(s)</small>
+                    <small>
+                        {{ $drafts->count() }} unpaid order(s)
+                        @php $regCount = $drafts->filter(fn ($o) => $o->isKdRegistrationFee())->count(); @endphp
+                        @if($regCount > 0)
+                            · {{ $regCount }} registration{{ $regCount === 1 ? '' : 's' }}
+                        @endif
+                    </small>
                 </div>
                 <a href="{{ route('order-groups.pay-form', $group) }}" class="btn btn-success btn-lg w-100">
                     <i class="fe fe-credit-card me-1"></i>Pay all ₦{{ number_format($draftTotal, 0) }}
