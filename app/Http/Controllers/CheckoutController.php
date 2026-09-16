@@ -14,6 +14,7 @@ use App\Models\KdCustomer;
 use App\Models\KdRegistration;
 use App\Models\KdRegistrationCredit;
 use App\Models\Order;
+use App\Models\OrderGroup;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Role;
@@ -528,9 +529,14 @@ class CheckoutController extends Controller
                 ['customer_name' => $orderCustomerName, 'user_id' => $user->id]
             );
         }
+        $activeGroupId = (int) $request->session()->get('order_group_id', 0);
+        $activeGroup = $activeGroupId > 0
+            ? OrderGroup::where('id', $activeGroupId)->where('user_id', $user->id)->where('status', OrderGroup::STATUS_OPEN)->first()
+            : null;
+
         $order = null;
         $paymentCompleted = $splitPayment || in_array($paymentMethod, [Order::PAYMENT_WALLET, Order::PAYMENT_DPBV, 'kd_credit'], true);
-        DB::transaction(function () use ($user, $walletOwner, $data, $paymentMethod, $paymentBreakdown, $splitPayment, $walletAmt, $kdAmt, $dpbvAmt, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, $stockOwner, $stockUserId, $roleName, $paymentCompleted, $serviceCenterForDistributor, $scReferralCode, $collectionBranch, &$order) {
+        DB::transaction(function () use ($user, $walletOwner, $data, $paymentMethod, $paymentBreakdown, $splitPayment, $walletAmt, $kdAmt, $dpbvAmt, $request, $orderKdId, $orderCustomerName, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $branchUserId, $isHeadquarters, $stockOwner, $stockUserId, $roleName, $paymentCompleted, $serviceCenterForDistributor, $scReferralCode, $collectionBranch, $activeGroup, &$order) {
             if (! $orderKdId || ! $orderCustomerName) {
                 Guest::firstOrCreate(
                     ['session_id' => $request->session()->getId(), 'user_id' => $user->id],
@@ -539,6 +545,7 @@ class CheckoutController extends Controller
             }
             $order = Order::create([
                 'user_id' => $user->id,
+                'order_group_id' => $activeGroup?->id,
                 'branch_user_id' => $branchUserId,
                 'collection_branch_id' => $collectionBranch?->id,
                 'payment_proof' => $collectionBranch ? $request->session()->get('collection_payment_proof') : null,
@@ -705,7 +712,12 @@ class CheckoutController extends Controller
         });
 
         $request->session()->forget('cart');
-        $request->session()->forget(['kd_id', 'customer_name', 'collection_branch_id', 'collection_payment_proof']);
+        // Keep group session open if one is active; close the KEDI transaction after checkout.
+        if ($request->session()->get('order_group_id')) {
+            $request->session()->forget(['kd_id', 'customer_name', 'collection_branch_id', 'collection_payment_proof']);
+        } else {
+            $request->session()->forget(['kd_id', 'customer_name', 'collection_branch_id', 'collection_payment_proof']);
+        }
 
         $order->load(['user', 'items']);
         try {
@@ -766,13 +778,31 @@ class CheckoutController extends Controller
         $shippingPostal = $deliveryType === 'walk_in' ? '' : $request->input('shipping_postal_code', '');
         $shippingPhone = $request->input('shipping_phone', '') ?: ($request->user()->phone ?? '');
 
+        $activeGroupId = (int) $request->session()->get('order_group_id', 0);
+        $activeGroup = null;
+        if ($activeGroupId > 0) {
+            $activeGroup = OrderGroup::where('id', $activeGroupId)
+                ->where('user_id', $user->id)
+                ->where('status', OrderGroup::STATUS_OPEN)
+                ->first();
+            if (! $activeGroup) {
+                $request->session()->forget('order_group_id');
+                $activeGroupId = 0;
+            }
+        }
+
+        if ($activeGroup && ($orderKdId === null || $orderCustomerName === null || $orderKdId === '' || $orderCustomerName === '')) {
+            return redirect()->route('shop')->with('error', 'Enter KEDI NO and customer name for this transaction before adding to the group.');
+        }
+
         $order = null;
-        DB::transaction(function () use ($request, $user, $data, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $orderKdId, $orderCustomerName, $branchUserId, &$order) {
+        DB::transaction(function () use ($request, $user, $data, $deliveryType, $shippingAddress, $shippingCity, $shippingState, $shippingPostal, $shippingPhone, $orderKdId, $orderCustomerName, $branchUserId, $activeGroup, &$order) {
             $order = Order::create([
                 'user_id' => $user->id,
+                'order_group_id' => $activeGroup?->id,
                 'branch_user_id' => $branchUserId,
-                'kd_id' => $orderKdId,
-                'customer_name' => $orderCustomerName,
+                'kd_id' => $orderKdId ?: $activeGroup?->kd_id,
+                'customer_name' => $orderCustomerName ?: $activeGroup?->customer_name,
                 'delivery_type' => $deliveryType,
                 'invoice_number' => Order::generateOrderNumber(),
                 'subtotal' => $data['cartSubtotal'],
@@ -801,9 +831,27 @@ class CheckoutController extends Controller
                     'pv' => $item->product->pv,
                 ]);
             }
+
+            if ($activeGroup) {
+                $activeGroup->update([
+                    'total_amount' => (float) $activeGroup->draftOrders()->sum('subtotal'),
+                ]);
+            }
         });
 
         $request->session()->forget('cart');
+
+        if ($activeGroup) {
+            // Keep the group open; close this KEDI transaction so the next one can start.
+            $request->session()->forget(['kd_id', 'customer_name']);
+            $request->session()->put('order_group_id', $activeGroup->id);
+
+            return redirect()->route('shop')->with(
+                'success',
+                'Transaction added to group "'.$activeGroup->displayName().'". Enter the next KEDI NO and name to add another, or pay the group when finished.'
+            );
+        }
+
         $request->session()->forget(['kd_id', 'customer_name']);
 
         return redirect()->route('home')->with('success', 'Order saved as draft. You can complete it later from My Orders. Cart cleared – start shopping again.');
@@ -848,6 +896,8 @@ class CheckoutController extends Controller
         }
 
         $user = $request->user();
+        $user->load(['role', 'createdBy.role']);
+        $walletOwner = $user->walletOwnerForShopping();
         $subtotal = (float) $order->subtotal;
 
         // Determine stock owner when placing a single draft from wallet
@@ -871,12 +921,12 @@ class CheckoutController extends Controller
             $product = \App\Models\Product::where('item_code', $item->item_code)->first();
             if ($product) {
                 if ($isHeadquarters) {
-                    $avail = HeadquartersStock::getQuantity($user->id, $product->id);
+                    $avail = HeadquartersStock::getQuantity($stockOwner->id, $product->id);
                     if ($avail < $item->quantity) {
                         return redirect()->route('orders.index', ['status' => 'draft'])->with('error', "Insufficient Headquarters stock for {$item->product_name}. Available: {$avail}. Remove from cart or reduce quantity.");
                     }
                 } elseif ($stockUserId) {
-                    $avail = $this->getStockForUser($stockUserId, $user->role?->name, $product->id);
+                    $avail = $this->getStockForUser($stockUserId, $roleName, $product->id);
                     if ($avail < $item->quantity) {
                         return redirect()->route('orders.index', ['status' => 'draft'])->with('error', "Insufficient stock for {$item->product_name}. Available: {$avail}. Remove from cart or reduce quantity.");
                     }
@@ -936,9 +986,11 @@ class CheckoutController extends Controller
             return redirect()->route('orders.index', ['status' => 'draft'])->with('error', 'No draft orders to place.');
         }
 
+        $user->load(['role', 'createdBy.role']);
+        $walletOwner = $user->walletOwnerForShopping();
         $totalAmount = $drafts->sum('subtotal');
-        if (! $user->canPayWithWallet($totalAmount)) {
-            return redirect()->route('orders.index', ['status' => 'draft'])->with('error', 'Insufficient wallet balance. Need ₦'.number_format($totalAmount, 0).' – you have ₦'.number_format($user->wallet_balance ?? 0, 0).'.');
+        if (! $walletOwner->canPayWithWallet($totalAmount)) {
+            return redirect()->route('orders.index', ['status' => 'draft'])->with('error', 'Insufficient wallet balance. Need ₦'.number_format($totalAmount, 0).' – you have ₦'.number_format($walletOwner->wallet_balance ?? 0, 0).'.');
         }
 
         // Determine stock owner when placing all drafts from wallet

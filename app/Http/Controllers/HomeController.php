@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\DpbvCollection;
+use App\Models\OrderGroup;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -85,8 +86,30 @@ class HomeController extends Controller
         $dpbvNairaEquivalent = 0;
         $canBuyWithDpbv = false;
         $hasDpbvBalance = false;
+        $activeGroup = null;
 
         if ($request->user()) {
+            // Keep an open order group session active on shop so more orders can be added.
+            $activeGroupId = (int) $request->session()->get('order_group_id', 0);
+            if ($activeGroupId > 0) {
+                $activeGroup = OrderGroup::where('id', $activeGroupId)
+                    ->where('user_id', $request->user()->id)
+                    ->where('status', OrderGroup::STATUS_OPEN)
+                    ->first();
+                if (! $activeGroup) {
+                    $request->session()->forget('order_group_id');
+                }
+            }
+            if (! $activeGroup) {
+                $activeGroup = OrderGroup::where('user_id', $request->user()->id)
+                    ->where('status', OrderGroup::STATUS_OPEN)
+                    ->latest('id')
+                    ->first();
+                if ($activeGroup) {
+                    $request->session()->put('order_group_id', $activeGroup->id);
+                }
+            }
+
             $kdId = trim((string) $request->session()->get('kd_id', ''));
             $customerName = trim((string) $request->session()->get('customer_name', ''));
             $showKdModal = $kdId === '' || $customerName === '';
@@ -106,6 +129,6 @@ class HomeController extends Controller
             $hasDpbvBalance = $dpbvNairaEquivalent > 0; // Show button if user has any DPBV balance
         }
 
-        return view('home', compact('products', 'cartItems', 'cartSubtotal', 'cartBv', 'cartPv', 'cartCount', 'search', 'categories', 'categoryId', 'showKdModal', 'totalDpbv', 'dpbvNairaEquivalent', 'canBuyWithDpbv', 'hasDpbvBalance'));
+        return view('home', compact('products', 'cartItems', 'cartSubtotal', 'cartBv', 'cartPv', 'cartCount', 'search', 'categories', 'categoryId', 'showKdModal', 'totalDpbv', 'dpbvNairaEquivalent', 'canBuyWithDpbv', 'hasDpbvBalance', 'activeGroup'));
     }
 }

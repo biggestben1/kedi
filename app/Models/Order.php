@@ -14,6 +14,7 @@ class Order extends Model
     protected $fillable = [
         'invoice_number',
         'user_id',
+        'order_group_id',
         'branch_user_id',
         'collection_branch_id',
         'collected_at',
@@ -120,6 +121,11 @@ class Order extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function orderGroup(): BelongsTo
+    {
+        return $this->belongsTo(OrderGroup::class);
     }
 
     public function branchUser(): BelongsTo

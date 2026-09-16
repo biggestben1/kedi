@@ -414,7 +414,13 @@
                                             Total due: ₦<span id="split-total-due">{{ number_format($cartTotal, 2) }}</span> • Split total: ₦<span id="split-total-entered">0.00</span> • Remaining: ₦<span id="split-remaining">{{ number_format($cartTotal, 2) }}</span>
                                         </div>
                                             <button type="submit" form="checkout-form" class="btn btn-primary btn-lg w-100 mb-2"><i class="fe fe-check-circle me-2"></i>Place Order</button>
+                                            @if(session('order_group_id'))
+                                            <button type="submit" form="checkout-form" formaction="{{ route('checkout.save-draft') }}" formmethod="POST" class="btn btn-success w-100" formnovalidate><i class="fe fe-layers me-2"></i>Add to Group</button>
+                                            <p class="small text-muted mt-2 mb-0">Group session is active — this saves the order into the group and keeps the session open.</p>
+                                            @else
                                             <button type="submit" form="checkout-form" formaction="{{ route('checkout.save-draft') }}" formmethod="POST" class="btn btn-outline-secondary w-100" formnovalidate><i class="fe fe-save me-2"></i>Save to Draft</button>
+                                            <p class="small text-muted mt-2 mb-0"><a href="{{ route('order-groups.create') }}">Create an order group</a> to add several orders and pay once.</p>
+                                            @endif
                                     </div>
                                 </div>
                             </div>

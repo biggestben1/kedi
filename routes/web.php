@@ -33,6 +33,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\KdInfoController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OrderGroupController;
 use App\Http\Controllers\PharmacyDashboardController;
 use App\Http\Controllers\PharmacyFinancialReportController;
 use App\Http\Controllers\PharmacyJournalController;
@@ -191,6 +192,22 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/restore-draft', [CheckoutController::class, 'restoreDraft'])->name('orders.restore-draft');
     Route::post('/orders/{order}/place-draft-wallet', [CheckoutController::class, 'placeDraftFromWallet'])->name('orders.place-draft-wallet');
     Route::post('/orders/place-all-drafts-wallet', [CheckoutController::class, 'placeAllDraftsFromWallet'])->name('orders.place-all-drafts-wallet');
+
+    // Order groups (multi-order session + pay all at once)
+    Route::get('/order-groups', [OrderGroupController::class, 'index'])->name('order-groups.index');
+    Route::get('/order-groups/create', [OrderGroupController::class, 'create'])->name('order-groups.create');
+    Route::post('/order-groups', [OrderGroupController::class, 'store'])->name('order-groups.store');
+    Route::get('/order-groups/{orderGroup}/edit', [OrderGroupController::class, 'edit'])->name('order-groups.edit');
+    Route::put('/order-groups/{orderGroup}', [OrderGroupController::class, 'update'])->name('order-groups.update');
+    Route::delete('/order-groups/{orderGroup}', [OrderGroupController::class, 'destroy'])->name('order-groups.destroy');
+    Route::get('/order-groups/{orderGroup}', [OrderGroupController::class, 'show'])->name('order-groups.show');
+    Route::post('/order-groups/{orderGroup}/add-cart', [OrderGroupController::class, 'addCart'])->name('order-groups.add-cart');
+    Route::post('/order-groups/{orderGroup}/resume', [OrderGroupController::class, 'resume'])->name('order-groups.resume');
+    Route::post('/order-groups/{orderGroup}/end', [OrderGroupController::class, 'end'])->name('order-groups.end');
+    Route::post('/order-groups/{orderGroup}/cancel', [OrderGroupController::class, 'cancel'])->name('order-groups.cancel');
+    Route::get('/order-groups/{orderGroup}/pay', [OrderGroupController::class, 'payForm'])->name('order-groups.pay-form');
+    Route::post('/order-groups/{orderGroup}/pay', [OrderGroupController::class, 'pay'])->name('order-groups.pay');
+
     Route::get('/wallet', [WalletController::class, 'index'])->name('wallet.index');
     Route::post('/wallet/top-up', [WalletController::class, 'topUp'])->name('wallet.top-up');
 

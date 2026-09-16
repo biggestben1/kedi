@@ -120,7 +120,12 @@ class KdInfoController extends Controller
     {
         $request->session()->forget(['kd_id', 'customer_name']);
 
-        return redirect()->route('shop')->with('message', 'Sales session ended. Enter a KD NO and name to start another sale.');
+        $hasGroup = (int) $request->session()->get('order_group_id', 0) > 0;
+        $message = $hasGroup
+            ? 'KEDI transaction closed. Enter the next KEDI NO and name to add another order to the group.'
+            : 'Sales session ended. Enter a KD NO and name to start another sale.';
+
+        return redirect()->route('shop')->with('message', $message);
     }
 
     /**

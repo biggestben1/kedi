@@ -73,6 +73,7 @@
                                                 <a class="dropdown-item" href="{{ route('dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('my-blog.index') }}"><i class="dropdown-icon fe fe-edit"></i> My Blog</a>
                                                 <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
+                                                <a class="dropdown-item" href="{{ route('order-groups.index') }}"><i class="dropdown-icon fe fe-layers"></i> Order Groups</a>
                                                 <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
                                                 <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
                                                 <a class="dropdown-item" href="{{ route('blog.index') }}"><i class="dropdown-icon fe fe-book-open"></i> Community blog</a>

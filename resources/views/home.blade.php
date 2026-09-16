@@ -167,6 +167,7 @@
                                                 <a class="dropdown-item" href="{{ route('dashboard') }}"><i class="dropdown-icon fe fe-user"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
                                                 <a class="dropdown-item" href="{{ route('orders.index', ['status' => 'draft']) }}"><i class="dropdown-icon fe fe-file-text"></i> My Drafts</a>
+                                                <a class="dropdown-item" href="{{ route('order-groups.index') }}"><i class="dropdown-icon fe fe-layers"></i> Order Groups</a>
                                                 @if(auth()->user()->role?->name === 'service_center')
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="dropdown-icon fe fe-users"></i> Referral Orders</a>
                                                 @endif
@@ -245,6 +246,9 @@
                             @endif
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('orders.index', ['status' => 'draft']) }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Drafts</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('order-groups.index') }}"><i class="side-menu__icon fe fe-layers"></i><span class="side-menu__label">Order Groups</span></a>
                             </li>
                             @if(auth()->user()->role?->name === 'service_center')
                             <li class="slide">
@@ -356,16 +360,66 @@
                             </div>
                         @endif
 
+                        @auth
+                        @php
+                            $activeOrderGroup = $activeGroup ?? null;
+                            if (! $activeOrderGroup && session('order_group_id')) {
+                                $activeOrderGroup = \App\Models\OrderGroup::where('id', session('order_group_id'))
+                                    ->where('user_id', auth()->id())
+                                    ->where('status', 'open')
+                                    ->first();
+                            }
+                        @endphp
+                        @if($activeOrderGroup)
+                        <div class="alert alert-primary mb-3">
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                <div>
+                                    <strong><i class="fe fe-layers me-1"></i> Group open:</strong>
+                                    {{ $activeOrderGroup->displayName() }}
+                                    @if(session('kd_id') && session('customer_name'))
+                                        <span class="text-muted small d-block">
+                                            Current transaction: <strong>{{ session('kd_id') }} — {{ session('customer_name') }}</strong>.
+                                            Shop, then Add to group. That closes this KEDI session so you can start another.
+                                        </span>
+                                    @else
+                                        <span class="text-muted small d-block">
+                                            Enter a <strong>KEDI NO and name</strong> to start the next transaction, then shop and add to this group.
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    @if(!session('kd_id') || !session('customer_name'))
+                                        <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#kdInfoModal">
+                                            <i class="fe fe-user me-1"></i>New KEDI transaction
+                                        </button>
+                                    @endif
+                                    @if(($cartCount ?? 0) > 0 && session('kd_id') && session('customer_name'))
+                                    <form method="POST" action="{{ route('order-groups.add-cart', $activeOrderGroup) }}" class="mb-0">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-success"><i class="fe fe-layers me-1"></i>Add cart to group</button>
+                                    </form>
+                                    @endif
+                                    <a href="{{ route('order-groups.show', $activeOrderGroup) }}" class="btn btn-sm btn-primary">View / Pay group</a>
+                                    <form method="POST" action="{{ route('order-groups.end', $activeOrderGroup) }}" class="mb-0">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Pause group</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+                        @endauth
+
                         @if(session('kd_id') && session('customer_name'))
                         <div class="alert alert-success mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div>
-                                <strong><i class="fe fe-user me-1"></i> Sales session:</strong>
+                                <strong><i class="fe fe-user me-1"></i> Current KEDI transaction:</strong>
                                 {{ session('kd_id') }} — {{ session('customer_name') }}
-                                <span class="text-muted small d-block">Orders in this shop session are recorded under this KD.</span>
+                                <span class="text-muted small d-block">After checkout / Add to group, this KEDI session closes so you can start another.</span>
                             </div>
                             <form method="POST" action="{{ route('kd-info.clear') }}" class="mb-0">
                                 @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-secondary">Change customer</button>
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Change KEDI</button>
                             </form>
                         </div>
                         @elseif($showKdModal ?? false)
@@ -611,6 +665,16 @@
                 <p><strong>Subtotal:</strong> <span id="cartOffcanvasSubtotal">₦{{ number_format($cartSubtotal, 0) }}</span></p>
                 <p class="small text-muted">BV: <span id="cartOffcanvasBv">{{ number_format($cartBv, 1) }}</span> &nbsp; PV: <span id="cartOffcanvasPv">{{ number_format($cartPv, 1) }}</span></p>
                 @auth
+                @if(($activeOrderGroup ?? null) && ($cartCount ?? 0) > 0 && session('kd_id') && session('customer_name'))
+                <form method="POST" action="{{ route('order-groups.add-cart', $activeOrderGroup) }}" class="mb-2">
+                    @csrf
+                    <button type="submit" class="btn btn-success btn-sm w-100"><i class="fe fe-layers me-1"></i>Add cart to group</button>
+                </form>
+                @elseif(($activeOrderGroup ?? null) && (!session('kd_id') || !session('customer_name')))
+                <button type="button" class="btn btn-warning btn-sm w-100 mb-2" data-bs-toggle="modal" data-bs-target="#kdInfoModal">
+                    <i class="fe fe-user me-1"></i>Enter KEDI for next transaction
+                </button>
+                @endif
                 <a href="{{ route('checkout.show') }}" class="btn btn-primary btn-sm w-100 mb-2 js-checkout-link">Checkout</a>
                 @else
                 <a href="{{ route('login') }}" class="btn btn-primary btn-sm w-100 mb-2">Login to Checkout</a>
@@ -636,13 +700,20 @@
     </footer>
     <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
 
-    @if($showKdModal ?? false)
-    <!-- KD NO & Customer Name modal - optional; guests can shop without and add later -->
+    @if(($showKdModal ?? false) || (($activeGroup ?? null) && (!session('kd_id') || !session('customer_name'))))
+    <!-- KD NO & Customer Name modal - per transaction when a group is open -->
     <div class="modal fade" id="kdInfoModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="kdInfoModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="kdInfoModalLabel"><i class="fe fe-user me-2"></i>Start sale — KD NO & name</h5>
+                    <h5 class="modal-title" id="kdInfoModalLabel">
+                        <i class="fe fe-user me-2"></i>
+                        @if($activeGroup ?? null)
+                            New transaction — KEDI NO &amp; name
+                        @else
+                            Start sale — KD NO &amp; name
+                        @endif
+                    </h5>
                 </div>
                 <form action="{{ route('kd-info.store') }}" method="POST" id="kdInfoForm">
                     @csrf

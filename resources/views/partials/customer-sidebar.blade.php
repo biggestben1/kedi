@@ -12,6 +12,9 @@
     <li class="slide">
         <a class="side-menu__item {{ $active === 'orders' ? 'active' : '' }}" href="{{ route('orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Orders</span></a>
     </li>
+    <li class="slide">
+        <a class="side-menu__item {{ $active === 'order-groups' ? 'active' : '' }}" href="{{ route('order-groups.index') }}"><i class="side-menu__icon fe fe-layers"></i><span class="side-menu__label">Order Groups</span></a>
+    </li>
     @if(auth()->user()->role?->name === 'service_center')
     <li class="slide">
         <a class="side-menu__item" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Referral Orders</span></a>

@@ -113,6 +113,9 @@
                                 <a class="side-menu__item active" href="{{ route('orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Orders</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ route('order-groups.index') }}"><i class="side-menu__icon fe fe-layers"></i><span class="side-menu__label">Order Groups</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
                             </li>
                             <li class="slide">

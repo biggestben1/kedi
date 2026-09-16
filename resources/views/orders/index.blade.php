@@ -76,6 +76,7 @@
                                                 <div class="dropdown-divider m-0"></div>
                                                 <a class="dropdown-item" href="{{ route('dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
+                                                <a class="dropdown-item" href="{{ route('order-groups.index') }}"><i class="dropdown-icon fe fe-layers"></i> Order Groups</a>
                                                 <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
                                                 <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
                                                 <a class="dropdown-item" href="{{ route('dpbv.index') }}"><i class="dropdown-icon fe fe-award"></i> My DPBV</a>
@@ -131,6 +132,9 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item active" href="{{ route('orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Orders</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('order-groups.index') }}"><i class="side-menu__icon fe fe-layers"></i><span class="side-menu__label">Order Groups</span></a>
                             </li>
                             @if(auth()->user()->role?->name === 'service_center')
                             <li class="slide">
