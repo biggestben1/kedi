@@ -6,6 +6,15 @@
 @endsection
 
 @section('content')
+@foreach (['success', 'message', 'error'] as $flash)
+    @if(session($flash))
+        <div class="alert alert-{{ $flash === 'error' ? 'danger' : 'success' }} alert-dismissible fade show">
+            {{ session($flash) }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+@endforeach
+
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
     <div>
         <p class="text-muted mb-0">
@@ -36,7 +45,7 @@
             <div class="card-header"><h3 class="card-title mb-0">Orders in this group</h3></div>
             <div class="card-body">
                 @if($group->orders->isEmpty())
-                    <p class="text-muted mb-0">No orders yet. Shop and use <strong>Add to Group</strong> while the session is active.</p>
+                    <p class="text-muted mb-0">No orders yet. Add drafts below, or shop and use <strong>Add to Group</strong> while the session is active.</p>
                 @else
                     <div class="table-responsive">
                         <table class="table mb-0">
@@ -74,6 +83,67 @@
                 @endif
             </div>
         </div>
+
+        @if($group->isOpen() && ($availableDrafts ?? collect())->isNotEmpty())
+        <div class="card mt-3">
+            <div class="card-header"><h3 class="card-title mb-0">Add saved drafts to this group</h3></div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">These drafts were saved earlier and are not in any group yet.</p>
+                <form method="POST" action="{{ route('order-groups.add-drafts', $group) }}" id="add-drafts-form">
+                    @csrf
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                            <tr>
+                                <th style="width:36px;"><input type="checkbox" class="form-check-input" id="select-all-available-drafts" title="Select all"></th>
+                                <th>Invoice / Tracking</th>
+                                <th>KEDI / Customer</th>
+                                <th>Items</th>
+                                <th class="text-end">Total</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($availableDrafts as $draft)
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" class="form-check-input js-available-draft" name="order_ids[]" value="{{ $draft->id }}">
+                                    </td>
+                                    <td>
+                                        <a href="{{ route('orders.show', $draft) }}">{{ $draft->invoice_number ?: $draft->tracking_number }}</a>
+                                        <div class="small text-muted">{{ $draft->created_at->format('M j, Y H:i') }}</div>
+                                    </td>
+                                    <td>
+                                        {{ $draft->kd_id ?: '—' }}
+                                        @if($draft->customer_name)<br><small class="text-muted">{{ $draft->customer_name }}</small>@endif
+                                    </td>
+                                    <td>{{ $draft->items->sum('quantity') }}</td>
+                                    <td class="text-end">₦{{ number_format($draft->subtotal, 0) }}</td>
+                                    <td class="text-end">
+                                        <button type="submit" class="btn btn-sm btn-primary" name="order_ids[]" value="{{ $draft->id }}">
+                                            <i class="fe fe-layers me-1"></i>Add
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary" id="add-selected-drafts-btn" disabled>
+                            <i class="fe fe-layers me-1"></i>Add selected drafts to group
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        @elseif($group->isOpen())
+        <div class="card mt-3">
+            <div class="card-body">
+                <p class="mb-0 text-muted">No ungrouped drafts to add. <a href="{{ route('orders.index', ['status' => 'draft']) }}">View My Drafts</a> or shop to create new ones.</p>
+            </div>
+        </div>
+        @endif
     </div>
 
     <div class="col-lg-5">
@@ -102,7 +172,7 @@
         @elseif($group->isOpen())
         <div class="card">
             <div class="card-body">
-                <p class="mb-3">Session is open. Add orders from the shop, then come back here to pay everything at once.</p>
+                <p class="mb-3">Session is open. Add saved drafts on the left, or shop and add new orders, then pay everything at once.</p>
                 <a href="{{ route('shop') }}" class="btn btn-primary w-100 mb-2">Go to shop</a>
                 <form method="POST" action="{{ route('order-groups.cancel', $group) }}" onsubmit="return confirm('Cancel this empty group?');">
                     @csrf
@@ -114,3 +184,30 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    var selectAll = document.getElementById('select-all-available-drafts');
+    var boxes = document.querySelectorAll('.js-available-draft');
+    var btn = document.getElementById('add-selected-drafts-btn');
+    function refresh() {
+        var n = 0;
+        boxes.forEach(function (b) { if (b.checked) n++; });
+        if (btn) {
+            btn.disabled = n < 1;
+            btn.innerHTML = '<i class="fe fe-layers me-1"></i>Add selected drafts to group' + (n ? ' (' + n + ')' : '');
+        }
+        if (selectAll) selectAll.checked = boxes.length > 0 && n === boxes.length;
+    }
+    if (selectAll) {
+        selectAll.addEventListener('change', function () {
+            boxes.forEach(function (b) { b.checked = selectAll.checked; });
+            refresh();
+        });
+    }
+    boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+    refresh();
+})();
+</script>
+@endpush

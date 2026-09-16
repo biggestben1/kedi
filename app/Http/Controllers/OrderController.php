@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Models\OrderGroup;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -36,12 +37,18 @@ class OrderController extends Controller
 
         $draftTotal = 0;
         $walletBalance = 0;
+        $openGroups = collect();
+        $activeGroupId = (int) $request->session()->get('order_group_id', 0);
         if ($statusFilter === 'draft') {
             $draftTotal = $request->user()->orders()->where('status', Order::STATUS_DRAFT)->sum('subtotal');
             $u = $request->user();
             $u->load(['role', 'createdBy.role']);
             $walletOwner = $u->walletOwnerForShopping();
             $walletBalance = (float) ($walletOwner->wallet_balance ?? 0);
+            $openGroups = $request->user()->orderGroups()
+                ->where('status', OrderGroup::STATUS_OPEN)
+                ->latest()
+                ->get();
         }
 
         return view('orders.index', [
@@ -51,6 +58,8 @@ class OrderController extends Controller
             'draftCount' => $draftCount,
             'draftTotal' => $draftTotal,
             'walletBalance' => $walletBalance,
+            'openGroups' => $openGroups,
+            'activeGroupId' => $activeGroupId,
         ]);
     }
 

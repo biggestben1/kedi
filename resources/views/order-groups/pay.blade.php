@@ -129,36 +129,71 @@
 
                                         <div id="split_box" class="border rounded p-3 mb-3" style="{{ old('split_payment') ? '' : 'display:none;' }}">
                                             <div class="row g-2">
-                                                <div class="col-md-4"><label class="form-label small">Wallet</label><input type="number" step="0.01" min="0" class="form-control split-field" data-target="split_wallet_amount" value="{{ old('split_wallet_amount', 0) }}"></div>
-                                                <div class="col-md-4"><label class="form-label small">KD Credit</label><input type="number" step="0.01" min="0" class="form-control split-field" data-target="split_kd_credit_amount" value="{{ old('split_kd_credit_amount', 0) }}"></div>
-                                                <div class="col-md-4"><label class="form-label small">DPBV</label><input type="number" step="0.01" min="0" class="form-control split-field" data-target="split_dpbv_amount" value="{{ old('split_dpbv_amount', 0) }}"></div>
-                                                <div class="col-md-4"><label class="form-label small">Cash</label><input type="number" step="0.01" min="0" class="form-control split-field" data-target="split_cash_amount" value="{{ old('split_cash_amount', 0) }}"></div>
-                                                <div class="col-md-4"><label class="form-label small">Cheque</label><input type="number" step="0.01" min="0" class="form-control split-field" data-target="split_cheque_amount" value="{{ old('split_cheque_amount', 0) }}"></div>
-                                                <div class="col-md-4"><label class="form-label small">POS amount</label><input type="number" step="0.01" min="0" class="form-control split-field" data-target="pos_amount_paid" value="{{ old('pos_amount_paid', 0) }}"></div>
-                                                <div class="col-md-4"><label class="form-label small">Bank amount</label><input type="number" step="0.01" min="0" class="form-control split-field" data-target="bank_amount_paid" value="{{ old('bank_amount_paid', 0) }}"></div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label small">Wallet</label>
+                                                    <input type="text" inputmode="decimal" class="form-control money-field" data-target="split_wallet_amount" value="{{ old('split_wallet_amount') }}" placeholder="0.00">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label small">KD Credit</label>
+                                                    <input type="text" inputmode="decimal" class="form-control money-field" data-target="split_kd_credit_amount" value="{{ old('split_kd_credit_amount') }}" placeholder="0.00">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label small">DPBV</label>
+                                                    <input type="text" inputmode="decimal" class="form-control money-field" data-target="split_dpbv_amount" value="{{ old('split_dpbv_amount') }}" placeholder="0.00">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label small">Cash</label>
+                                                    <input type="text" inputmode="decimal" class="form-control money-field" data-target="split_cash_amount" value="{{ old('split_cash_amount') }}" placeholder="e.g. 1,000,000">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label small">Cheque</label>
+                                                    <input type="text" inputmode="decimal" class="form-control money-field" data-target="split_cheque_amount" value="{{ old('split_cheque_amount') }}" placeholder="e.g. 1,000,000">
+                                                </div>
                                                 <div class="col-md-6">
                                                     <label class="form-label small">POS machine</label>
                                                     <select class="form-select" id="pos_machine_select">
-                                                        <option value="">Optional</option>
+                                                        <option value="">Select POS machine</option>
                                                         @foreach($posMachines as $m)
-                                                            <option value="{{ $m->id }}" {{ (string) old('pos_machine_id') === (string) $m->id ? 'selected' : '' }}>{{ $m->bank_name ?: 'POS' }}{{ $m->account_number ? ' • '.$m->account_number : '' }}</option>
+                                                            <option value="{{ $m->id }}"
+                                                                data-bank="{{ $m->bank_name ?: 'POS' }}"
+                                                                data-account-number="{{ $m->account_number }}"
+                                                                data-account-name="{{ $m->account_name ?? '' }}"
+                                                                {{ (string) old('pos_machine_id') === (string) $m->id ? 'selected' : '' }}>
+                                                                {{ $m->bank_name ?: 'POS' }}{{ $m->account_number ? ' • '.$m->account_number : '' }}
+                                                            </option>
                                                         @endforeach
                                                     </select>
+                                                    <div class="form-text" id="pos_machine_note"></div>
+                                                </div>
+                                                <div class="col-md-6" id="pos_amount_wrap" style="{{ old('pos_machine_id') ? '' : 'display:none;' }}">
+                                                    <label class="form-label small">POS amount</label>
+                                                    <input type="text" inputmode="decimal" class="form-control money-field" data-target="pos_amount_paid" id="pos_amount_display" value="{{ old('pos_amount_paid') }}" placeholder="e.g. 1,000,000">
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label class="form-label small">Bank account</label>
                                                     <select class="form-select" id="bank_account_select">
-                                                        <option value="">Optional</option>
+                                                        <option value="">Select bank account</option>
                                                         @foreach($banks as $b)
-                                                            <option value="{{ $b->id }}" {{ (string) old('bank_account_id') === (string) $b->id ? 'selected' : '' }}>{{ $b->name }}{{ $b->account_number ? ' • '.$b->account_number : '' }}</option>
+                                                            <option value="{{ $b->id }}"
+                                                                data-bank="{{ $b->name }}"
+                                                                data-account-number="{{ $b->account_number }}"
+                                                                data-account-name="{{ $b->account_name ?? '' }}"
+                                                                {{ (string) old('bank_account_id') === (string) $b->id ? 'selected' : '' }}>
+                                                                {{ $b->name }}{{ $b->account_number ? ' • '.$b->account_number : '' }}
+                                                            </option>
                                                         @endforeach
                                                     </select>
+                                                    <div class="form-text" id="bank_account_note"></div>
+                                                </div>
+                                                <div class="col-md-6" id="bank_amount_wrap" style="{{ old('bank_account_id') ? '' : 'display:none;' }}">
+                                                    <label class="form-label small">Bank amount</label>
+                                                    <input type="text" inputmode="decimal" class="form-control money-field" data-target="bank_amount_paid" id="bank_amount_display" value="{{ old('bank_amount_paid') }}" placeholder="e.g. 1,000,000">
                                                 </div>
                                             </div>
                                             <p class="small mt-2 mb-0">Entered: ₦<span id="split_sum">0.00</span> / Due: ₦{{ number_format($draftTotal, 2) }}</p>
                                         </div>
 
-                                        <button type="submit" class="btn btn-success btn-lg w-100" onclick="return confirm('Pay ₦{{ number_format($draftTotal, 0) }} for all {{ $drafts->count() }} order(s) in this group?');">
+                                        <button type="submit" class="btn btn-success btn-lg w-100" id="group-pay-submit">
                                             <i class="fe fe-credit-card me-1"></i>Pay all ₦{{ number_format($draftTotal, 0) }}
                                         </button>
                                     </form>
@@ -172,24 +207,142 @@
     </div>
 </div>
 <script>
-document.getElementById('split_toggle')?.addEventListener('change', function () {
-    document.getElementById('split_box').style.display = this.checked ? '' : 'none';
-    document.getElementById('split_payment').value = this.checked ? '1' : '0';
-});
-document.querySelectorAll('.split-field').forEach(function (el) {
-    el.addEventListener('input', function () {
-        document.getElementById(el.dataset.target).value = el.value || 0;
-        let sum = 0;
-        document.querySelectorAll('.split-field').forEach(function (f) { sum += parseFloat(f.value || 0); });
-        document.getElementById('split_sum').textContent = sum.toFixed(2);
+(function () {
+    var due = {{ json_encode((float) $draftTotal) }};
+
+    function parseMoney(str) {
+        var cleaned = String(str || '').replace(/,/g, '').replace(/[^0-9.]/g, '');
+        var firstDot = cleaned.indexOf('.');
+        if (firstDot !== -1) {
+            cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+        }
+        var num = Number(cleaned);
+        return Number.isFinite(num) ? num : 0;
+    }
+
+    function fmt(num) {
+        return (parseFloat(num || 0) || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    function syncHidden(el) {
+        var target = document.getElementById(el.dataset.target);
+        if (!target) return;
+        var raw = (el.value || '').trim();
+        target.value = raw === '' ? '0' : parseMoney(raw).toFixed(2);
+    }
+
+    function updateSum() {
+        var sum = 0;
+        document.querySelectorAll('.money-field').forEach(function (f) {
+            sum += parseMoney(f.value);
+        });
+        var el = document.getElementById('split_sum');
+        if (el) el.textContent = fmt(sum);
+        return sum;
+    }
+
+    function accountNote(select, noteEl, fallback) {
+        if (!select || !noteEl) return;
+        var opt = select.options[select.selectedIndex];
+        if (!select.value) {
+            noteEl.textContent = '';
+            return;
+        }
+        var parts = [opt.getAttribute('data-bank') || fallback];
+        if (opt.getAttribute('data-account-number')) parts.push(opt.getAttribute('data-account-number'));
+        if (opt.getAttribute('data-account-name')) parts.push(opt.getAttribute('data-account-name'));
+        noteEl.textContent = parts.join(' • ');
+    }
+
+    function wireMoney(el) {
+        if (!el) return;
+        if ((el.value || '').trim() !== '' && parseMoney(el.value) > 0) {
+            el.value = fmt(parseMoney(el.value));
+        } else {
+            el.value = '';
+        }
+        syncHidden(el);
+
+        el.addEventListener('input', function () {
+            el.value = String(el.value || '').replace(/[^0-9.,]/g, '');
+            syncHidden(el);
+            updateSum();
+        });
+        el.addEventListener('blur', function () {
+            if ((el.value || '').trim() === '') {
+                syncHidden(el);
+                updateSum();
+                return;
+            }
+            el.value = fmt(parseMoney(el.value));
+            syncHidden(el);
+            updateSum();
+        });
+    }
+
+    document.getElementById('split_toggle')?.addEventListener('change', function () {
+        document.getElementById('split_box').style.display = this.checked ? '' : 'none';
+        document.getElementById('split_payment').value = this.checked ? '1' : '0';
     });
-});
-document.getElementById('pos_machine_select')?.addEventListener('change', function () {
-    document.getElementById('pos_machine_id').value = this.value;
-});
-document.getElementById('bank_account_select')?.addEventListener('change', function () {
-    document.getElementById('bank_account_id').value = this.value;
-});
+
+    document.querySelectorAll('.money-field').forEach(wireMoney);
+
+    var posSelect = document.getElementById('pos_machine_select');
+    var bankSelect = document.getElementById('bank_account_select');
+    var posWrap = document.getElementById('pos_amount_wrap');
+    var bankWrap = document.getElementById('bank_amount_wrap');
+    var posDisplay = document.getElementById('pos_amount_display');
+    var bankDisplay = document.getElementById('bank_amount_display');
+
+    function syncPosMachine() {
+        document.getElementById('pos_machine_id').value = posSelect.value || '';
+        accountNote(posSelect, document.getElementById('pos_machine_note'), 'POS');
+        var on = !!posSelect.value;
+        if (posWrap) posWrap.style.display = on ? '' : 'none';
+        if (!on && posDisplay) {
+            posDisplay.value = '';
+            syncHidden(posDisplay);
+            updateSum();
+        }
+    }
+
+    function syncBankAccount() {
+        document.getElementById('bank_account_id').value = bankSelect.value || '';
+        accountNote(bankSelect, document.getElementById('bank_account_note'), 'Bank');
+        var on = !!bankSelect.value;
+        if (bankWrap) bankWrap.style.display = on ? '' : 'none';
+        if (!on && bankDisplay) {
+            bankDisplay.value = '';
+            syncHidden(bankDisplay);
+            updateSum();
+        }
+    }
+
+    posSelect?.addEventListener('change', syncPosMachine);
+    bankSelect?.addEventListener('change', syncBankAccount);
+    syncPosMachine();
+    syncBankAccount();
+    updateSum();
+
+    document.getElementById('group-pay-form')?.addEventListener('submit', function (e) {
+        document.querySelectorAll('.money-field').forEach(syncHidden);
+
+        var splitOn = document.getElementById('split_payment')?.value === '1';
+        if (splitOn) {
+            var sum = updateSum();
+            var rem = due - sum;
+            if (Math.abs(rem) > 0.009) {
+                e.preventDefault();
+                alert('Payment amounts must add up to the group total. Remaining: ₦' + fmt(rem));
+                return;
+            }
+        }
+
+        if (!confirm('Pay ₦' + fmt(due) + ' for all orders in this group?')) {
+            e.preventDefault();
+        }
+    });
+})();
 </script>
 <script src="{{ asset('sash/assets/plugins/bootstrap/js/bootstrap.min.js') }}"></script>
 </body>

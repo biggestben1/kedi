@@ -395,6 +395,31 @@
                                                                     <button type="submit" class="btn btn-sm btn-success"><i class="fe fe-credit-card me-1"></i> Place Order (Wallet)</button>
                                                                 </form>
                                                                 @endif
+                                                                @if(($openGroups ?? collect())->isNotEmpty() && empty($order->order_group_id))
+                                                                <div class="dropdown d-inline-block">
+                                                                    <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                                        <i class="fe fe-layers me-1"></i>Add to group
+                                                                    </button>
+                                                                    <ul class="dropdown-menu dropdown-menu-end">
+                                                                        @foreach($openGroups as $og)
+                                                                            <li>
+                                                                                <form action="{{ route('order-groups.add-drafts', $og) }}" method="POST" class="px-0">
+                                                                                    @csrf
+                                                                                    <input type="hidden" name="order_ids[]" value="{{ $order->id }}">
+                                                                                    <button type="submit" class="dropdown-item {{ (int)($activeGroupId ?? 0) === (int)$og->id ? 'active' : '' }}">
+                                                                                        {{ $og->displayName() }}
+                                                                                        @if((int)($activeGroupId ?? 0) === (int)$og->id) (active)@endif
+                                                                                    </button>
+                                                                                </form>
+                                                                            </li>
+                                                                        @endforeach
+                                                                    </ul>
+                                                                </div>
+                                                                @elseif(!empty($order->order_group_id))
+                                                                    <a href="{{ route('order-groups.show', $order->order_group_id) }}" class="btn btn-sm btn-outline-success"><i class="fe fe-layers me-1"></i>In group</a>
+                                                                @elseif(($openGroups ?? collect())->isEmpty())
+                                                                    <a href="{{ route('order-groups.create') }}" class="btn btn-sm btn-outline-primary"><i class="fe fe-plus me-1"></i>Create group</a>
+                                                                @endif
                                                                 <form action="{{ route('orders.restore-draft', $order) }}" method="POST" class="d-inline">
                                                                     @csrf
                                                                     <button type="submit" class="btn btn-sm btn-primary">Complete</button>

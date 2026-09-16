@@ -202,6 +202,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/order-groups/{orderGroup}', [OrderGroupController::class, 'destroy'])->name('order-groups.destroy');
     Route::get('/order-groups/{orderGroup}', [OrderGroupController::class, 'show'])->name('order-groups.show');
     Route::post('/order-groups/{orderGroup}/add-cart', [OrderGroupController::class, 'addCart'])->name('order-groups.add-cart');
+    Route::post('/order-groups/{orderGroup}/add-drafts', [OrderGroupController::class, 'addDrafts'])->name('order-groups.add-drafts');
     Route::post('/order-groups/{orderGroup}/resume', [OrderGroupController::class, 'resume'])->name('order-groups.resume');
     Route::post('/order-groups/{orderGroup}/end', [OrderGroupController::class, 'end'])->name('order-groups.end');
     Route::post('/order-groups/{orderGroup}/cancel', [OrderGroupController::class, 'cancel'])->name('order-groups.cancel');

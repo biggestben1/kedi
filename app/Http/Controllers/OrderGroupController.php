@@ -257,12 +257,70 @@ class OrderGroupController extends Controller
         $paymentData = $this->groupPaymentViewData($request, $orderGroup);
         $isActive = (int) $request->session()->get('order_group_id') === (int) $orderGroup->id;
 
+        $availableDrafts = collect();
+        if ($orderGroup->isOpen()) {
+            $availableDrafts = $request->user()->orders()
+                ->where('status', Order::STATUS_DRAFT)
+                ->whereNull('order_group_id')
+                ->with('items')
+                ->latest()
+                ->get();
+        }
+
         return view('order-groups.show', array_merge($paymentData, [
             'group' => $orderGroup,
             'isActive' => $isActive,
+            'availableDrafts' => $availableDrafts,
             'pageTitle' => $orderGroup->displayName(),
             'customerMenuActive' => 'order-groups',
         ]));
+    }
+
+    /**
+     * Attach existing draft order(s) that were saved earlier into this open group.
+     */
+    public function addDrafts(Request $request, OrderGroup $orderGroup)
+    {
+        $this->authorizeGroup($request, $orderGroup);
+
+        if (! $orderGroup->isOpen()) {
+            return redirect()->route('order-groups.show', $orderGroup)->with('error', 'This group is closed.');
+        }
+
+        $data = $request->validate([
+            'order_ids' => 'required|array|min:1',
+            'order_ids.*' => 'integer',
+        ]);
+
+        $orderIds = array_values(array_unique(array_map('intval', $data['order_ids'])));
+
+        $drafts = $request->user()->orders()
+            ->where('status', Order::STATUS_DRAFT)
+            ->whereNull('order_group_id')
+            ->whereIn('id', $orderIds)
+            ->get();
+
+        if ($drafts->isEmpty()) {
+            return back()->with('error', 'No matching ungrouped draft orders found to add.');
+        }
+
+        DB::transaction(function () use ($drafts, $orderGroup) {
+            foreach ($drafts as $draft) {
+                $draft->update(['order_group_id' => $orderGroup->id]);
+            }
+
+            $orderGroup->update([
+                'total_amount' => (float) $orderGroup->draftOrders()->sum('subtotal'),
+            ]);
+        });
+
+        $this->activateSession($request, $orderGroup);
+
+        $count = $drafts->count();
+
+        return redirect()
+            ->route('order-groups.show', $orderGroup)
+            ->with('success', $count.' draft order'.($count === 1 ? '' : 's').' added to "'.$orderGroup->displayName().'".');
     }
 
     public function payForm(Request $request, OrderGroup $orderGroup)
