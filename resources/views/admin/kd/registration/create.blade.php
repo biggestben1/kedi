@@ -35,39 +35,6 @@
             <p class="text-muted small">Please fill with BLOCK LETTERS clearly</p>
         </div>
         <div class="card-body">
-            {{-- Wallet Balance Display - Hide if coming from kit purchase --}}
-            @if(!request('from_kit'))
-            <div class="alert alert-info mb-3" id="walletInfo">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div>
-                        <strong>Wallet Balance:</strong> ₦<span id="walletBalanceDisplay">{{ number_format($walletBalance ?? 0, 2) }}</span>
-                    </div>
-                    <div>
-                        <strong>Registration Type:</strong>
-                        <div class="d-inline-flex align-items-center ms-2">
-                            <div class="form-check form-check-inline mb-0">
-                                <input class="form-check-input" type="radio" name="registration_type" id="reg_type_new" value="new" {{ old('registration_type', 'new') === 'new' ? 'checked' : '' }}>
-                                <label class="form-check-label" for="reg_type_new">New (Pay ₦12,000)</label>
-                            </div>
-                            <div class="form-check form-check-inline mb-0">
-                                <input class="form-check-input" type="radio" name="registration_type" id="reg_type_old" value="old" {{ old('registration_type') === 'old' ? 'checked' : '' }}>
-                                <label class="form-check-label" for="reg_type_old">Old (Already Paid)</label>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="feeStatus">
-                        <strong>Registration Fee:</strong>
-                        <span id="feeAmount">₦{{ number_format(12000, 2) }}</span>
-                        @if(($walletBalance ?? 0) < 12000)
-                            <span class="badge bg-danger ms-2" id="feeBadge">Insufficient Balance</span>
-                        @else
-                            <span class="badge bg-success ms-2" id="feeBadge">Sufficient Balance</span>
-                        @endif
-                    </div>
-                </div>
-            </div>
-            @endif
-
             <form method="POST" action="{{ route('admin.kd.registration.store') }}" id="kdRegistrationForm" enctype="multipart/form-data">
                 @csrf
                 @if(request('from_kit'))
@@ -75,6 +42,69 @@
                 @endif
                 @if(request('purchase_id'))
                     <input type="hidden" name="purchase_id" value="{{ request('purchase_id') }}">
+                @endif
+
+                {{-- Wallet Balance Display - Hide if coming from kit purchase --}}
+                @if(!request('from_kit'))
+                <div class="alert alert-info mb-3" id="walletInfo">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <strong>Wallet Balance:</strong> ₦<span id="walletBalanceDisplay">{{ number_format($walletBalance ?? 0, 2) }}</span>
+                        </div>
+                        <div>
+                            <strong>Registration Type:</strong>
+                            <div class="d-inline-flex align-items-center ms-2">
+                                <div class="form-check form-check-inline mb-0">
+                                    <input class="form-check-input" type="radio" name="registration_type" id="reg_type_new" value="new" {{ old('registration_type', 'new') === 'new' ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="reg_type_new">New (Pay ₦{{ number_format($registrationFee ?? 12000, 0) }})</label>
+                                </div>
+                                <div class="form-check form-check-inline mb-0">
+                                    <input class="form-check-input" type="radio" name="registration_type" id="reg_type_old" value="old" {{ old('registration_type') === 'old' ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="reg_type_old">Old (Already Paid)</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="feeStatus">
+                            <strong>Registration Fee:</strong>
+                            <span id="feeAmount">₦{{ number_format($registrationFee ?? 12000, 2) }}</span>
+                            @if(($walletBalance ?? 0) < ($registrationFee ?? 12000))
+                                <span class="badge bg-danger ms-2" id="feeBadge">Insufficient Balance</span>
+                            @else
+                                <span class="badge bg-success ms-2" id="feeBadge">Sufficient Balance</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                @if(($openOrderGroups ?? collect())->isNotEmpty())
+                <div class="alert alert-success mb-3" id="orderGroupInfo">
+                    <div class="d-flex flex-wrap align-items-end justify-content-between gap-3">
+                        <div>
+                            <strong>Add fee to order group (pay all later)</strong>
+                            <p class="mb-2 small text-muted">Register now and add ₦{{ number_format($registrationFee ?? 12000, 0) }} to an open group so you can pay with other transactions.</p>
+                            <label class="form-label mb-1" for="order_group_id">Order group</label>
+                            <select name="order_group_id" id="order_group_id" class="form-select" style="max-width: 360px;">
+                                @foreach($openOrderGroups as $group)
+                                    <option value="{{ $group->id }}" @selected((int) old('order_group_id', optional($activeOrderGroup)->id) === (int) $group->id)>
+                                        {{ $group->displayName() }} — unpaid ₦{{ number_format($group->draftTotal(), 0) }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="text-muted small" id="addToGroupHint">
+                            @if($activeOrderGroup)
+                                Active session: <strong>{{ $activeOrderGroup->displayName() }}</strong>
+                            @else
+                                Select a group, then use <strong>Add to group</strong> below.
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                @else
+                <div class="alert alert-warning mb-3">
+                    No open order group. <a href="{{ route('order-groups.index') }}" class="alert-link">Create or activate a group</a> first if you want to pay the registration fee with other items.
+                </div>
+                @endif
                 @endif
 
                 {{-- KEDI Member Code (KD NO) --}}
@@ -210,9 +240,14 @@
                     <textarea name="notes" class="form-control" rows="3">{{ old('notes') }}</textarea>
                 </div>
 
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fe fe-save me-2"></i>Submit Registration
+                <div class="d-flex flex-wrap gap-2">
+                    @if(!request('from_kit') && ($openOrderGroups ?? collect())->isNotEmpty())
+                        <button type="submit" name="add_to_order_group" value="1" class="btn btn-success" id="addToGroupBtn">
+                            <i class="fe fe-layers me-2"></i>Add ₦{{ number_format($registrationFee ?? 12000, 0) }} to group &amp; register
+                        </button>
+                    @endif
+                    <button type="submit" class="btn btn-primary" id="walletPayBtn">
+                        <i class="fe fe-save me-2"></i>Submit &amp; pay from wallet
                     </button>
                     <a href="{{ route('admin.kd.registration.index') }}" class="btn btn-outline-secondary">Cancel</a>
                 </div>
@@ -241,6 +276,9 @@
             const feeBadgeEl = document.getElementById('feeBadge');
             const walletBalance = {{ (float) ($walletBalance ?? 0) }};
 
+            const registrationFee = {{ (float) ($registrationFee ?? 12000) }};
+            const addToGroupBtn = document.getElementById('addToGroupBtn');
+
             function updateFeeDisplay() {
                 if (!feeAmountEl || !feeBadgeEl || !regTypeNew || !regTypeOld) return;
                 if (regTypeOld.checked) {
@@ -248,10 +286,13 @@
                     feeBadgeEl.classList.remove('bg-danger', 'bg-success');
                     feeBadgeEl.classList.add('bg-secondary');
                     feeBadgeEl.textContent = 'No Payment – Old KD';
+                    if (addToGroupBtn) {
+                        addToGroupBtn.innerHTML = '<i class="fe fe-layers me-2"></i>Register to group (no fee)';
+                    }
                 } else {
-                    feeAmountEl.textContent = '₦12,000.00';
+                    feeAmountEl.textContent = '₦' + registrationFee.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     feeBadgeEl.classList.remove('bg-secondary');
-                    if (walletBalance < 12000) {
+                    if (walletBalance < registrationFee) {
                         feeBadgeEl.classList.remove('bg-success');
                         feeBadgeEl.classList.add('bg-danger');
                         feeBadgeEl.textContent = 'Insufficient Balance';
@@ -259,6 +300,9 @@
                         feeBadgeEl.classList.remove('bg-danger');
                         feeBadgeEl.classList.add('bg-success');
                         feeBadgeEl.textContent = 'Sufficient Balance';
+                    }
+                    if (addToGroupBtn) {
+                        addToGroupBtn.innerHTML = '<i class="fe fe-layers me-2"></i>Add ₦' + registrationFee.toLocaleString('en-NG', { maximumFractionDigits: 0 }) + ' to group & register';
                     }
                 }
             }

@@ -9,6 +9,9 @@ use App\Models\KdRegistrationCredit;
 use App\Models\KediKitItem;
 use App\Models\KediKitPurchase;
 use App\Models\KediCreditTransaction;
+use App\Models\Order;
+use App\Models\OrderGroup;
+use App\Models\OrderItem;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\WalletTransaction;
@@ -17,6 +20,8 @@ use Illuminate\Support\Facades\DB;
 
 class KdRegistrationController extends Controller
 {
+    public const REGISTRATION_FEE = 12000.00;
+
     /**
      * Wallet used for KD registration fees (cashier → parent; distributor → own).
      */
@@ -25,6 +30,28 @@ class KdRegistrationController extends Controller
         $user->loadMissing(['role', 'createdBy.role']);
 
         return $user->walletOwnerForShopping();
+    }
+
+    /**
+     * Active open order group from session, if any.
+     */
+    private function resolveActiveOrderGroup(Request $request, User $user): ?OrderGroup
+    {
+        $groupId = (int) $request->session()->get('order_group_id', 0);
+        if ($groupId < 1) {
+            return null;
+        }
+
+        $group = OrderGroup::where('id', $groupId)
+            ->where('user_id', $user->id)
+            ->where('status', OrderGroup::STATUS_OPEN)
+            ->first();
+
+        if (! $group) {
+            $request->session()->forget('order_group_id');
+        }
+
+        return $group;
     }
 
     /**
@@ -64,16 +91,25 @@ class KdRegistrationController extends Controller
     /**
      * Show the form for creating a new KD registration.
      */
-    public function create()
+    public function create(Request $request)
     {
         $user = auth()->user();
         $walletOwner = $this->resolveWalletOwner($user);
         $walletBalance = $walletOwner->wallet_balance ?? 0;
         $users = User::with('role')->orderBy('name')->get();
+        $activeOrderGroup = $this->resolveActiveOrderGroup($request, $user);
+        $openOrderGroups = OrderGroup::where('user_id', $user->id)
+            ->where('status', OrderGroup::STATUS_OPEN)
+            ->orderByDesc('started_at')
+            ->orderByDesc('id')
+            ->get();
 
         return view('admin.kd.registration.create', [
             'users' => $users,
             'walletBalance' => $walletBalance,
+            'activeOrderGroup' => $activeOrderGroup,
+            'openOrderGroups' => $openOrderGroups,
+            'registrationFee' => self::REGISTRATION_FEE,
         ]);
     }
 
@@ -96,17 +132,38 @@ class KdRegistrationController extends Controller
             'placement_kd_no' => 'nullable|string|max:100',
             'placement_name' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
+            'registration_type' => 'nullable|in:new,old',
+            'add_to_order_group' => 'nullable|boolean',
+            'order_group_id' => 'nullable|integer|exists:order_groups,id',
         ]);
 
         $user = $request->user();
         $user->loadMissing(['role', 'createdBy.role']);
         $walletOwner = $this->resolveWalletOwner($user);
         $registrationType = $request->input('registration_type', 'new');
-        // from_kit OR "old" registration type => no wallet charge
-        $registrationFee = $request->has('from_kit') || $registrationType === 'old' ? 0.00 : 12000.00;
+        $addToOrderGroup = $request->boolean('add_to_order_group') && ! $request->has('from_kit');
+        // from_kit OR "old" registration type => no fee
+        $registrationFee = $request->has('from_kit') || $registrationType === 'old' ? 0.00 : self::REGISTRATION_FEE;
 
-        // Check wallet balance only when a fee is required
-        if ($registrationFee > 0 && ! $walletOwner->canPayWithWallet($registrationFee)) {
+        $orderGroup = null;
+        if ($addToOrderGroup) {
+            $groupId = (int) ($validated['order_group_id'] ?? $request->session()->get('order_group_id', 0));
+            $orderGroup = OrderGroup::where('id', $groupId)
+                ->where('user_id', $user->id)
+                ->where('status', OrderGroup::STATUS_OPEN)
+                ->first();
+
+            if (! $orderGroup) {
+                return back()->withInput()
+                    ->with('error', 'No open order group selected. Create or activate a group first, then add the registration fee to it.');
+            }
+
+            // Fee is collected later via group pay-all (not wallet now).
+            $registrationFee = $registrationType === 'old' ? 0.00 : self::REGISTRATION_FEE;
+        }
+
+        // Check wallet balance only when charging wallet immediately (not when adding to group)
+        if (! $addToOrderGroup && $registrationFee > 0 && ! $walletOwner->canPayWithWallet($registrationFee)) {
             return back()->withInput()
                 ->with('error', 'Insufficient wallet balance. Your balance is ₦'.number_format($walletOwner->wallet_balance ?? 0, 2).' but you need ₦'.number_format($registrationFee, 2).' for registration.');
         }
@@ -154,14 +211,14 @@ class KdRegistrationController extends Controller
                 ]
             );
 
-            // Deduct registration fee from wallet if applicable
-            if ($registrationFee > 0) {
+            if ($addToOrderGroup && $orderGroup && $registrationFee > 0) {
+                $this->attachRegistrationFeeToGroup($user, $orderGroup, $registration, $registrationFee);
+                $request->session()->put('order_group_id', $orderGroup->id);
+            } elseif (! $addToOrderGroup && $registrationFee > 0) {
+                // Deduct registration fee from wallet if paying now
                 $walletOwner->decrement('wallet_balance', $registrationFee);
-            }
-            $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
+                $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
 
-            // Create wallet transaction if a fee was paid
-            if ($registrationFee > 0) {
                 WalletTransaction::create([
                     'user_id' => $walletOwner->id,
                     'type' => WalletTransaction::TYPE_DEBIT,
@@ -234,6 +291,16 @@ class KdRegistrationController extends Controller
                     ->with('success', 'KD registration created successfully. KD NO: '.$registration->kd_no.'. ₦'.number_format($registrationFee, 2).' deducted from your wallet.');
             }
 
+            if ($addToOrderGroup && $orderGroup) {
+                $feeMsg = $registrationFee > 0
+                    ? ' ₦'.number_format($registrationFee, 2).' registration fee added to group "'.$orderGroup->displayName().'". Pay all when ready.'
+                    : ' No fee added (old registration).';
+
+                return redirect()
+                    ->route('order-groups.show', $orderGroup)
+                    ->with('success', 'KD registration created. KD NO: '.$registration->kd_no.'.'.$feeMsg);
+            }
+
             return redirect()->route('admin.kd.registration.index')
                 ->with('success', 'KD registration created successfully. KD NO: '.$registration->kd_no.'. ₦'.number_format($registrationFee, 2).' deducted from your wallet.');
         } catch (\Exception $e) {
@@ -242,6 +309,48 @@ class KdRegistrationController extends Controller
             return back()->withInput()
                 ->with('error', 'Failed to create KD registration: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Attach ₦12,000 KD registration fee as a draft order on the group (pay-all later).
+     */
+    private function attachRegistrationFeeToGroup(User $user, OrderGroup $orderGroup, KdRegistration $registration, float $fee): void
+    {
+        $order = Order::create([
+            'user_id' => $user->id,
+            'order_group_id' => $orderGroup->id,
+            'branch_user_id' => null,
+            'kd_id' => $registration->kd_no,
+            'customer_name' => $registration->full_name,
+            'delivery_type' => Order::DELIVERY_WALK_IN,
+            'invoice_number' => Order::generateOrderNumber(),
+            'subtotal' => $fee,
+            'total_bv' => 0,
+            'total_pv' => 0,
+            'payment_method' => Order::PAYMENT_PAY_ON_DELIVERY,
+            'status' => Order::STATUS_DRAFT,
+            'shipping_address' => 'Walk-in (Pick up)',
+            'shipping_city' => '',
+            'shipping_state' => '',
+            'shipping_postal_code' => '',
+            'shipping_phone' => $user->phone ?? '',
+            'notes' => 'KD Registration Fee - KD NO: '.$registration->kd_no,
+        ]);
+
+        OrderItem::create([
+            'order_id' => $order->id,
+            'item_code' => 'KD-REG-FEE',
+            'product_name' => 'KD Registration Fee – '.$registration->kd_no,
+            'quantity' => 1,
+            'unit_price' => $fee,
+            'line_total' => $fee,
+            'bv' => 0,
+            'pv' => 0,
+        ]);
+
+        $orderGroup->update([
+            'total_amount' => (float) $orderGroup->draftOrders()->sum('subtotal'),
+        ]);
     }
 
     /**
