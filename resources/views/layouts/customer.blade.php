@@ -183,6 +183,8 @@
     </footer>
     <a href="#top" id="back-to-top"><i class="fa fa-angle-up"></i></a>
 
+    @stack('modals')
+
     <script src="{{ asset('sash/assets/js/jquery.min.js') }}"></script>
     <script src="{{ asset('sash/assets/plugins/bootstrap/js/popper.min.js') }}"></script>
     <script src="{{ asset('sash/assets/plugins/bootstrap/js/bootstrap.min.js') }}"></script>

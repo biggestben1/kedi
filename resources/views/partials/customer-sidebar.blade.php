@@ -6,6 +6,22 @@
     <li class="slide">
         <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
     </li>
+    @php
+        $canRegisterKd = auth()->user()->isSuperAdmin()
+            || in_array(auth()->user()->role?->name, ['headquarters', 'branch', 'annex', 'accountant', 'cashier', 'distributor'], true);
+        $canPurchaseKit = auth()->user()->isSuperAdmin()
+            || in_array(auth()->user()->role?->name, ['headquarters', 'branch', 'service_center', 'annex', 'reseller', 'customer', 'cashier', 'distributor'], true);
+    @endphp
+    @if($canRegisterKd)
+    <li class="slide">
+        <a class="side-menu__item {{ $active === 'kd-registration' ? 'active' : '' }}" href="{{ route('admin.kd.registration.create') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">Register KD NO</span></a>
+    </li>
+    @endif
+    @if($canPurchaseKit)
+    <li class="slide">
+        <a class="side-menu__item {{ $active === 'kedi-kits' ? 'active' : '' }}" href="{{ route('admin.kedi-kits.purchase.create') }}"><i class="side-menu__icon fe fe-box"></i><span class="side-menu__label">Purchase KEDI Kit</span></a>
+    </li>
+    @endif
     <li class="slide">
         <a class="side-menu__item {{ $active === 'dashboard' ? 'active' : '' }}" href="{{ route('dashboard') }}"><i class="side-menu__icon fe fe-grid"></i><span class="side-menu__label">Dashboard</span></a>
     </li>

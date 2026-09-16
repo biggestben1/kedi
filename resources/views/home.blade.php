@@ -223,6 +223,17 @@
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
                             </li>
+                            @auth
+                            @php
+                                $canRegisterKd = auth()->user()->isSuperAdmin()
+                                    || in_array(auth()->user()->role?->name, ['headquarters', 'branch', 'annex', 'accountant', 'cashier', 'distributor'], true);
+                            @endphp
+                            @if($canRegisterKd)
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('admin.kd.registration.create') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">Register KD NO</span></a>
+                            </li>
+                            @endif
+                            @endauth
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('blog.index') }}"><i class="side-menu__icon fe fe-book-open"></i><span class="side-menu__label">Community blog</span></a>
                             </li>

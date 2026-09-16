@@ -84,6 +84,12 @@ class KdInfoController extends Controller
             ]);
         }
 
+        $message = 'Registered KEDI '.$kdId.' — '.$customerName.'.';
+        $redirectTo = trim((string) $request->input('redirect_to', ''));
+        if ($redirectTo !== '' && str_starts_with($redirectTo, url('/'))) {
+            return redirect()->to($redirectTo)->with('success', $message);
+        }
+
         return redirect()->route('shop')->with('success', 'Sales session started for '.$kdId.' — '.$customerName.'.');
     }
 
