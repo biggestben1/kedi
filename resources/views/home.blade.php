@@ -369,12 +369,13 @@
                                     ->where('status', 'open')
                                     ->first();
                             }
+                            $openOrderGroups = $openOrderGroups ?? collect();
                         @endphp
                         @if($activeOrderGroup)
                         <div class="alert alert-primary mb-3">
                             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                                 <div>
-                                    <strong><i class="fe fe-layers me-1"></i> Group open:</strong>
+                                    <strong><i class="fe fe-layers me-1"></i> Active group:</strong>
                                     {{ $activeOrderGroup->displayName() }}
                                     @if(session('kd_id') && session('customer_name'))
                                         <span class="text-muted small d-block">
@@ -384,6 +385,11 @@
                                     @else
                                         <span class="text-muted small d-block">
                                             Enter a <strong>KEDI NO and name</strong> to start the next transaction, then shop and add to this group.
+                                        </span>
+                                    @endif
+                                    @if($openOrderGroups->count() > 1)
+                                        <span class="text-muted small d-block mt-1">
+                                            Switch to another group below, or open <a href="{{ route('order-groups.index') }}">Order Groups</a>.
                                         </span>
                                     @endif
                                 </div>
@@ -400,11 +406,48 @@
                                     </form>
                                     @endif
                                     <a href="{{ route('order-groups.show', $activeOrderGroup) }}" class="btn btn-sm btn-primary">View / Pay group</a>
+                                    <a href="{{ route('order-groups.index') }}" class="btn btn-sm btn-outline-primary">Switch group</a>
                                     <form method="POST" action="{{ route('order-groups.end', $activeOrderGroup) }}" class="mb-0">
                                         @csrf
                                         <button type="submit" class="btn btn-sm btn-outline-secondary">Pause group</button>
                                     </form>
                                 </div>
+                            </div>
+                            @if($openOrderGroups->count() > 1)
+                            <div class="d-flex flex-wrap gap-2 mt-3 pt-2 border-top border-primary border-opacity-25">
+                                @foreach($openOrderGroups as $switchGroup)
+                                    @if((int) $switchGroup->id === (int) $activeOrderGroup->id)
+                                        <span class="btn btn-sm btn-success disabled"><i class="fe fe-check me-1"></i>{{ $switchGroup->displayName() }} (active)</span>
+                                    @else
+                                        <form method="POST" action="{{ route('order-groups.resume', $switchGroup) }}" class="mb-0">
+                                            @csrf
+                                            <input type="hidden" name="go_shop" value="1">
+                                            <button type="submit" class="btn btn-sm btn-outline-dark">
+                                                <i class="fe fe-play me-1"></i>Activate {{ $switchGroup->displayName() }}
+                                            </button>
+                                        </form>
+                                    @endif
+                                @endforeach
+                            </div>
+                            @endif
+                        </div>
+                        @elseif($openOrderGroups->isNotEmpty())
+                        <div class="alert alert-warning mb-3">
+                            <div class="mb-2">
+                                <strong><i class="fe fe-layers me-1"></i> No group active.</strong>
+                                Activate a group to add orders to it, or <a href="{{ route('order-groups.create') }}">create a new one</a>.
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach($openOrderGroups as $switchGroup)
+                                    <form method="POST" action="{{ route('order-groups.resume', $switchGroup) }}" class="mb-0">
+                                        @csrf
+                                        <input type="hidden" name="go_shop" value="1">
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <i class="fe fe-play me-1"></i>Activate {{ $switchGroup->displayName() }}
+                                        </button>
+                                    </form>
+                                @endforeach
+                                <a href="{{ route('order-groups.index') }}" class="btn btn-sm btn-outline-secondary">All groups</a>
                             </div>
                         </div>
                         @endif

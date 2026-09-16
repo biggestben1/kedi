@@ -21,11 +21,11 @@
         @endif
         <a href="{{ route('shop') }}" class="btn btn-outline-primary">Continue shopping</a>
         @if($group->isOpen() && !$isActive)
-            <form method="POST" action="{{ route('order-groups.resume', $group) }}">@csrf<button class="btn btn-primary"><i class="fe fe-play me-1"></i>Reactivate session</button></form>
+            <form method="POST" action="{{ route('order-groups.resume', $group) }}">@csrf<input type="hidden" name="go_shop" value="1"><button class="btn btn-primary"><i class="fe fe-play me-1"></i>Activate group</button></form>
         @endif
         @if($isActive)
             <a href="{{ route('shop') }}" class="btn btn-success"><i class="fe fe-shopping-bag me-1"></i>Go to shop</a>
-            <form method="POST" action="{{ route('order-groups.end', $group) }}">@csrf<button class="btn btn-outline-warning">Pause session</button></form>
+            <form method="POST" action="{{ route('order-groups.end', $group) }}">@csrf<button class="btn btn-outline-warning">Pause group</button></form>
         @endif
     </div>
 </div>

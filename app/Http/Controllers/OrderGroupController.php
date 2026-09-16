@@ -35,8 +35,14 @@ class OrderGroupController extends Controller
             ->paginate(20);
 
         $activeGroupId = (int) $request->session()->get('order_group_id', 0);
+        $openGroups = $user->orderGroups()
+            ->where('status', OrderGroup::STATUS_OPEN)
+            ->withCount(['orders', 'draftOrders'])
+            ->latest()
+            ->get();
+        $activeGroup = $openGroups->firstWhere('id', $activeGroupId);
 
-        return view('order-groups.index', compact('groups', 'activeGroupId'));
+        return view('order-groups.index', compact('groups', 'activeGroupId', 'openGroups', 'activeGroup'));
     }
 
     public function create(Request $request)
@@ -54,12 +60,6 @@ class OrderGroupController extends Controller
         ]);
 
         $user = $request->user();
-        $existingOpen = $user->orderGroups()->where('status', OrderGroup::STATUS_OPEN)->first();
-        if ($existingOpen) {
-            return redirect()
-                ->route('order-groups.show', $existingOpen)
-                ->with('error', 'You already have an open group. Finish or cancel it first.');
-        }
 
         $group = OrderGroup::create([
             'user_id' => $user->id,
@@ -298,9 +298,15 @@ class OrderGroupController extends Controller
         $this->activateSession($request, $orderGroup);
         $request->session()->forget(['kd_id', 'customer_name']);
 
+        if ($request->boolean('go_shop') || $request->input('redirect') === 'shop') {
+            return redirect()
+                ->route('shop')
+                ->with('success', 'Group "'.$orderGroup->displayName().'" is now active. Enter a KEDI NO and name for the next transaction.');
+        }
+
         return redirect()
-            ->route('shop')
-            ->with('success', 'Group "'.$orderGroup->displayName().'" reactivated. Enter a KEDI NO and name for the next transaction.');
+            ->route('order-groups.index')
+            ->with('success', 'Switched session to "'.$orderGroup->displayName().'". Orders you add will go into this group.');
     }
 
     public function end(Request $request, OrderGroup $orderGroup)
@@ -311,7 +317,7 @@ class OrderGroupController extends Controller
             $request->session()->forget(['order_group_id']);
         }
 
-        return redirect()->route('order-groups.index')->with('message', 'Session paused. Click Reactivate session when you want to continue.');
+        return redirect()->route('order-groups.index')->with('message', 'Group paused. Click Activate group on any open group to continue.');
     }
 
     public function cancel(Request $request, OrderGroup $orderGroup)

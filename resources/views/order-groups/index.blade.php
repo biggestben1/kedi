@@ -73,6 +73,43 @@
                         @endif
                     @endforeach
 
+                    @if(($openGroups ?? collect())->isNotEmpty())
+                    <div class="card border-primary mb-3">
+                        <div class="card-header bg-primary-transparent">
+                            <h3 class="card-title mb-0"><i class="fe fe-layers me-1"></i> Switch session</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted mb-3">
+                                Only one group is active at a time. Click <strong>Activate</strong> to switch.
+                                @if($activeGroup ?? null)
+                                    Current: <strong>{{ $activeGroup->displayName() }}</strong>
+                                @else
+                                    No group is active right now.
+                                @endif
+                            </p>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach($openGroups as $openGroup)
+                                    @if((int) $activeGroupId === (int) $openGroup->id)
+                                        <div class="btn-group" role="group">
+                                            <span class="btn btn-success disabled">
+                                                <i class="fe fe-check me-1"></i>{{ $openGroup->displayName() }} (active)
+                                            </span>
+                                            <a href="{{ route('shop') }}" class="btn btn-outline-success">Go to shop</a>
+                                        </div>
+                                    @else
+                                        <form action="{{ route('order-groups.resume', $openGroup) }}" method="POST" class="mb-0">
+                                            @csrf
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="fe fe-play me-1"></i>Activate {{ $openGroup->displayName() }}
+                                            </button>
+                                        </form>
+                                    @endif
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
                     <div class="card">
                         <div class="card-body">
                             @if($groups->isEmpty())
@@ -89,6 +126,7 @@
                                             <th class="text-end">Total amount</th>
                                             <th>Status</th>
                                             <th>Started</th>
+                                            <th>Session</th>
                                             <th></th>
                                         </tr>
                                         </thead>
@@ -98,12 +136,13 @@
                                                 $groupTotal = (float) ($group->total_amount > 0
                                                     ? $group->total_amount
                                                     : ($group->orders_sum_subtotal ?? 0));
+                                                $isActive = (int) $activeGroupId === (int) $group->id;
                                             @endphp
-                                            <tr class="{{ (int)$activeGroupId === (int)$group->id ? 'table-success' : '' }}">
+                                            <tr class="{{ $isActive ? 'table-success' : '' }}">
                                                 <td>
                                                     <a href="{{ route('order-groups.show', $group) }}">{{ $group->displayName() }}</a>
-                                                    @if((int)$activeGroupId === (int)$group->id)
-                                                        <span class="badge bg-success ms-1">Active</span>
+                                                    @if($isActive)
+                                                        <span class="badge bg-success ms-1">Active session</span>
                                                     @endif
                                                 </td>
                                                 <td>{{ $group->orders_count }}</td>
@@ -111,17 +150,22 @@
                                                 <td class="text-end text-nowrap">₦{{ number_format($groupTotal, 0) }}</td>
                                                 <td><span class="badge bg-{{ $group->status === 'open' ? 'info' : ($group->status === 'paid' ? 'success' : 'secondary') }}">{{ ucfirst($group->status) }}</span></td>
                                                 <td>{{ optional($group->started_at)->format('M j, Y H:i') ?? $group->created_at->format('M j, Y H:i') }}</td>
-                                                <td class="text-end text-nowrap">
-                                                    @if($group->isOpen() && (int)$activeGroupId === (int)$group->id)
-                                                        <a href="{{ route('shop') }}" class="btn btn-sm btn-success"><i class="fe fe-shopping-bag me-1"></i>Go to shop</a>
+                                                <td class="text-nowrap">
+                                                    @if($group->isOpen() && $isActive)
+                                                        <span class="badge bg-success">Active</span>
+                                                        <a href="{{ route('shop') }}" class="btn btn-sm btn-success ms-1">Shop</a>
                                                     @elseif($group->isOpen())
                                                         <form action="{{ route('order-groups.resume', $group) }}" method="POST" class="d-inline">
                                                             @csrf
                                                             <button type="submit" class="btn btn-sm btn-primary">
-                                                                <i class="fe fe-play me-1"></i>Reactivate session
+                                                                <i class="fe fe-play me-1"></i>Activate
                                                             </button>
                                                         </form>
+                                                    @else
+                                                        <span class="text-muted">—</span>
                                                     @endif
+                                                </td>
+                                                <td class="text-end text-nowrap">
                                                     @if($group->isOpen() && (int) ($group->draft_orders_count ?? 0) > 0)
                                                         <a href="{{ route('order-groups.pay-form', $group) }}" class="btn btn-sm btn-success"><i class="fe fe-credit-card me-1"></i>Pay all</a>
                                                     @endif
