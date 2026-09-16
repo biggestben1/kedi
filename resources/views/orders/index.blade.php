@@ -395,13 +395,16 @@
                                                                     <button type="submit" class="btn btn-sm btn-success"><i class="fe fe-credit-card me-1"></i> Place Order (Wallet)</button>
                                                                 </form>
                                                                 @endif
-                                                                @if(($openGroups ?? collect())->isNotEmpty() && empty($order->order_group_id))
+                                                                @if(($openGroups ?? collect())->isNotEmpty() && (int) ($order->order_group_id ?? 0) !== (int) ($activeGroupId ?? 0))
                                                                 <div class="dropdown d-inline-block">
                                                                     <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                                                        <i class="fe fe-layers me-1"></i>Add to group
+                                                                        <i class="fe fe-layers me-1"></i>{{ $order->order_group_id ? 'Move to group' : 'Add to group' }}
                                                                     </button>
                                                                     <ul class="dropdown-menu dropdown-menu-end">
                                                                         @foreach($openGroups as $og)
+                                                                            @if((int) $order->order_group_id === (int) $og->id)
+                                                                                <li><span class="dropdown-item-text text-success"><i class="fe fe-check me-1"></i>{{ $og->displayName() }} (current)</span></li>
+                                                                            @else
                                                                             <li>
                                                                                 <form action="{{ route('order-groups.add-drafts', $og) }}" method="POST" class="px-0">
                                                                                     @csrf
@@ -412,6 +415,7 @@
                                                                                     </button>
                                                                                 </form>
                                                                             </li>
+                                                                            @endif
                                                                         @endforeach
                                                                     </ul>
                                                                 </div>

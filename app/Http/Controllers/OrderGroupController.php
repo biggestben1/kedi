@@ -259,9 +259,7 @@ class OrderGroupController extends Controller
 
         $availableDrafts = collect();
         if ($orderGroup->isOpen()) {
-            $availableDrafts = $request->user()->orders()
-                ->where('status', Order::STATUS_DRAFT)
-                ->whereNull('order_group_id')
+            $availableDrafts = $this->attachableDraftsQuery($request->user(), $orderGroup)
                 ->with('items')
                 ->latest()
                 ->get();
@@ -287,21 +285,22 @@ class OrderGroupController extends Controller
             return redirect()->route('order-groups.show', $orderGroup)->with('error', 'This group is closed.');
         }
 
-        $data = $request->validate([
-            'order_ids' => 'required|array|min:1',
-            'order_ids.*' => 'integer',
-        ]);
+        $orderIds = $request->input('order_ids', []);
+        if (! is_array($orderIds)) {
+            $orderIds = [$orderIds];
+        }
+        $orderIds = array_values(array_unique(array_filter(array_map('intval', $orderIds))));
 
-        $orderIds = array_values(array_unique(array_map('intval', $data['order_ids'])));
+        if ($orderIds === []) {
+            return back()->with('error', 'Select at least one draft order to add.');
+        }
 
-        $drafts = $request->user()->orders()
-            ->where('status', Order::STATUS_DRAFT)
-            ->whereNull('order_group_id')
+        $drafts = $this->attachableDraftsQuery($request->user(), $orderGroup)
             ->whereIn('id', $orderIds)
             ->get();
 
         if ($drafts->isEmpty()) {
-            return back()->with('error', 'No matching ungrouped draft orders found to add.');
+            return back()->with('error', 'No matching draft orders found to add. They may already be in this group, or belong to another account.');
         }
 
         DB::transaction(function () use ($drafts, $orderGroup) {
@@ -391,11 +390,16 @@ class OrderGroupController extends Controller
             'completed_at' => now(),
         ]);
 
+        // Free drafts so they can be added to another group later.
+        $orderGroup->orders()
+            ->where('status', Order::STATUS_DRAFT)
+            ->update(['order_group_id' => null]);
+
         if ((int) $request->session()->get('order_group_id') === (int) $orderGroup->id) {
             $request->session()->forget('order_group_id');
         }
 
-        return redirect()->route('order-groups.index')->with('success', 'Group cancelled. Draft orders remain in My Drafts.');
+        return redirect()->route('order-groups.index')->with('success', 'Group cancelled. Draft orders are available to add to another group.');
     }
 
     public function pay(Request $request, OrderGroup $orderGroup)
@@ -688,6 +692,44 @@ class OrderGroupController extends Controller
         if ((int) $orderGroup->user_id !== (int) $request->user()->id) {
             abort(404);
         }
+    }
+
+    /**
+     * Drafts the user can move into this group: ungrouped, or linked to another/closed group.
+     */
+    private function attachableDraftsQuery($user, OrderGroup $orderGroup)
+    {
+        $userIds = $this->draftOwnerUserIds($user);
+
+        return Order::query()
+            ->whereIn('user_id', $userIds)
+            ->where('status', Order::STATUS_DRAFT)
+            ->where(function ($q) use ($orderGroup) {
+                $q->whereNull('order_group_id')
+                    ->orWhere('order_group_id', '!=', $orderGroup->id);
+            });
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function draftOwnerUserIds($user): array
+    {
+        $ids = [(int) $user->id];
+
+        // Include drafts created by cashiers/distributors under this account.
+        $childIds = User::query()
+            ->where('created_by_user_id', $user->id)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        // If this user is a cashier/distributor, also include their parent's drafts.
+        if ($user->created_by_user_id) {
+            $ids[] = (int) $user->created_by_user_id;
+        }
+
+        return array_values(array_unique(array_merge($ids, $childIds)));
     }
 
     /**

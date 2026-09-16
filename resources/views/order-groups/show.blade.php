@@ -14,6 +14,12 @@
         </div>
     @endif
 @endforeach
+@if($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show">
+        <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
     <div>
@@ -88,7 +94,7 @@
         <div class="card mt-3">
             <div class="card-header"><h3 class="card-title mb-0">Add saved drafts to this group</h3></div>
             <div class="card-body">
-                <p class="text-muted small mb-3">These drafts were saved earlier and are not in any group yet.</p>
+                <p class="text-muted small mb-3">Drafts saved earlier (including ones from a cancelled group or another open group) can be moved here.</p>
                 <form method="POST" action="{{ route('order-groups.add-drafts', $group) }}" id="add-drafts-form">
                     @csrf
                     <div class="table-responsive">
@@ -112,6 +118,9 @@
                                     <td>
                                         <a href="{{ route('orders.show', $draft) }}">{{ $draft->invoice_number ?: $draft->tracking_number }}</a>
                                         <div class="small text-muted">{{ $draft->created_at->format('M j, Y H:i') }}</div>
+                                        @if($draft->order_group_id)
+                                            <span class="badge bg-warning text-dark">In another group</span>
+                                        @endif
                                     </td>
                                     <td>
                                         {{ $draft->kd_id ?: '—' }}
@@ -119,8 +128,8 @@
                                     </td>
                                     <td>{{ $draft->items->sum('quantity') }}</td>
                                     <td class="text-end">₦{{ number_format($draft->subtotal, 0) }}</td>
-                                    <td class="text-end">
-                                        <button type="submit" class="btn btn-sm btn-primary" name="order_ids[]" value="{{ $draft->id }}">
+                                    <td class="text-end text-nowrap">
+                                        <button type="button" class="btn btn-sm btn-primary js-add-one-draft" value="{{ $draft->id }}">
                                             <i class="fe fe-layers me-1"></i>Add
                                         </button>
                                     </td>
@@ -140,7 +149,7 @@
         @elseif($group->isOpen())
         <div class="card mt-3">
             <div class="card-body">
-                <p class="mb-0 text-muted">No ungrouped drafts to add. <a href="{{ route('orders.index', ['status' => 'draft']) }}">View My Drafts</a> or shop to create new ones.</p>
+                <p class="mb-0 text-muted">No other drafts available to add. <a href="{{ route('orders.index', ['status' => 'draft']) }}">View My Drafts</a> or shop to create new ones.</p>
             </div>
         </div>
         @endif
@@ -188,6 +197,7 @@
 @push('scripts')
 <script>
 (function () {
+    var form = document.getElementById('add-drafts-form');
     var selectAll = document.getElementById('select-all-available-drafts');
     var boxes = document.querySelectorAll('.js-available-draft');
     var btn = document.getElementById('add-selected-drafts-btn');
@@ -207,6 +217,15 @@
         });
     }
     boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+    document.querySelectorAll('.js-add-one-draft').forEach(function (addBtn) {
+        addBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (!form) return;
+            boxes.forEach(function (b) { b.checked = String(b.value) === String(addBtn.value); });
+            refresh();
+            form.requestSubmit ? form.requestSubmit(btn) : form.submit();
+        });
+    });
     refresh();
 })();
 </script>
