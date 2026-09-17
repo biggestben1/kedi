@@ -54,6 +54,7 @@ Route::prefix('v1')->group(function () {
         Route::post('collection-centers/orders/{order}/move', [ApiCollectionCenterController::class, 'moveOrder']);
 
         Route::post('kd-info/search', [ApiKdInfoController::class, 'search']);
+        Route::post('kd-info/store', [ApiKdInfoController::class, 'store']);
         Route::post('kd-info/auto-generate', [ApiKdInfoController::class, 'autoGenerate']);
 
         Route::get('kd-registrations/create-form', [ApiKdRegistrationController::class, 'createForm']);

@@ -11,27 +11,103 @@ use Illuminate\Http\Request;
 class KdInfoController extends Controller
 {
     /**
-     * Auto-generate KD NO for the current user and return it.
+     * Look up a KD NO in kd_customers / kd_registrations (same as web shop).
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        $kdNo = $this->normalizeKdNo((string) $request->input('kd_no', ''));
+        if ($kdNo === '') {
+            return response()->json(['message' => 'Please enter a KD NO.'], 422);
+        }
+
+        $existing = $this->findExistingKd($kdNo);
+        if ($existing) {
+            return response()->json([
+                'found' => true,
+                'can_register' => false,
+                'kd_no' => $existing['kd_no'],
+                'customer_name' => $existing['customer_name'],
+                'message' => 'This KEDI number already exists. Using the saved name.',
+            ]);
+        }
+
+        return response()->json([
+            'found' => false,
+            'can_register' => true,
+            'kd_no' => $kdNo,
+            'message' => 'New KD NO. Enter the customer name to register it.',
+        ]);
+    }
+
+    /**
+     * Register a new KD (or reuse existing) for this sales session — same as web store.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        $data = $request->validate([
+            'kd_id' => 'required|string|max:100',
+            'customer_name' => 'required|string|max:255',
+        ], [
+            'kd_id.required' => 'Enter a KD NO to start this sale.',
+            'customer_name.required' => 'Enter the customer name to register this KD.',
+        ]);
+
+        $kdId = $this->normalizeKdNo($data['kd_id']);
+        $customerName = trim($data['customer_name']);
+
+        $existing = $this->findExistingKd($kdId);
+        if ($existing) {
+            $kdId = $existing['kd_no'];
+            $customerName = $existing['customer_name'];
+        } else {
+            KdCustomer::create([
+                'kd_no' => $kdId,
+                'customer_name' => $customerName,
+                'user_id' => $user->id,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'kd_id' => $kdId,
+            'customer_name' => $customerName,
+            'message' => $existing
+                ? 'Sales session started with existing KEDI.'
+                : 'Registered and sales session started.',
+            'registered' => ! $existing,
+        ]);
+    }
+
+    /**
+     * @deprecated Kept for older app builds; prefer search + store.
      */
     public function autoGenerate(Request $request): JsonResponse
     {
         $user = $request->user();
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $baseKd = 'KD-' . $user->id . '-';
-        $existing = KdCustomer::where('kd_no', 'like', $baseKd . '%')->max('kd_no');
+        $baseKd = 'KD-'.$user->id.'-';
+        $existing = KdCustomer::where('kd_no', 'like', $baseKd.'%')->max('kd_no');
         $seq = 1;
         if ($existing) {
             $parts = explode('-', $existing);
             $seq = (int) (end($parts) ?: 0) + 1;
         }
-        $kdNo = $baseKd . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+        $kdNo = $baseKd.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
         $customerName = trim($user->name ?? $user->email ?? 'Customer');
 
-        // Note: For API, we just return the suggestion. The client will decide to save it/use it.
-        // Or we can save it to kd_customers like the web version does.
         KdCustomer::updateOrCreate(
             ['kd_no' => $kdNo],
             ['customer_name' => $customerName, 'user_id' => $user->id]
@@ -46,59 +122,44 @@ class KdInfoController extends Controller
     }
 
     /**
-     * Search for KD NO in the system.
+     * @return array{kd_no: string, customer_name: string}|null
      */
-    public function search(Request $request): JsonResponse
+    private function findExistingKd(string $kdNo): ?array
     {
-        $user = $request->user();
-        if (!$user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+        if ($kdNo === '') {
+            return null;
         }
 
-        $kdNo = trim((string) $request->input('kd_no', ''));
-        if (empty($kdNo)) {
-            return response()->json(['message' => 'Please enter a KD NO.'], 422);
+        $customer = KdCustomer::query()
+            ->whereRaw("UPPER(REPLACE(kd_no, ' ', '')) = ?", [$kdNo])
+            ->first();
+
+        if ($customer && trim((string) $customer->customer_name) !== '') {
+            return [
+                'kd_no' => strtoupper(trim($customer->kd_no)),
+                'customer_name' => trim($customer->customer_name),
+            ];
         }
 
-        // Normalize KD NO
-        $kdNo = strtoupper($kdNo);
-        if (!str_starts_with($kdNo, 'KN') && !str_starts_with($kdNo, 'KD')) {
-            $kdNoKn = 'KN' . ltrim($kdNo, '-');
-            $kdNoKd = 'KD' . ltrim($kdNo, '-');
-        } else {
-            $kdNoKn = $kdNo;
-            $kdNoKd = $kdNo;
+        $registration = KdRegistration::query()
+            ->whereRaw("UPPER(REPLACE(kd_no, ' ', '')) = ?", [$kdNo])
+            ->first();
+
+        if ($registration && trim((string) $registration->full_name) !== '') {
+            return [
+                'kd_no' => strtoupper(trim($registration->kd_no)),
+                'customer_name' => trim($registration->full_name),
+            ];
         }
 
-        $registration = KdRegistration::where(function($query) use ($kdNoKn, $kdNoKd) {
-            $query->where('kd_no', $kdNoKn)
-                  ->orWhere('kd_no', $kdNoKd);
-        })->first();
+        return null;
+    }
 
-        if (!$registration) {
-            return response()->json([
-                'found' => false,
-                'message' => 'KD NO not found in the system.',
-            ]);
-        }
+    private function normalizeKdNo(string $kdNo): string
+    {
+        $kdNo = strtoupper(trim($kdNo));
+        $kdNo = preg_replace('/\s+/', '', $kdNo) ?? $kdNo;
 
-        // Check if it belongs to the logged-in user
-        $belongsToUser = ($registration->user_id == $user->id || $registration->registered_by_user_id == $user->id);
-
-        if (!$belongsToUser) {
-            return response()->json([
-                'found' => true,
-                'belongs_to_user' => false,
-                'message' => 'KD NO found but does not belong to your account.',
-            ]);
-        }
-
-        return response()->json([
-            'found' => true,
-            'belongs_to_user' => true,
-            'kd_no' => $registration->kd_no,
-            'customer_name' => $registration->full_name,
-            'message' => 'KD NO found and belongs to you.',
-        ]);
+        return $kdNo;
     }
 }
