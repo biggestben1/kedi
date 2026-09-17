@@ -102,6 +102,7 @@ class AuthController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'phone' => $user->phone,
+            'service_center_code' => $user->service_center_code,
             'role' => $user->role?->name,
             'role_label' => match ($user->role?->name) {
                 'cashier' => 'Cashier',

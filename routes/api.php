@@ -1,12 +1,14 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController as ApiAuthController;
+use App\Http\Controllers\Api\CollectionCenterController as ApiCollectionCenterController;
 use App\Http\Controllers\Api\ContactController as ApiContactController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DriverOrderController;
 use App\Http\Controllers\Api\BonusController;
 use App\Http\Controllers\Api\DpbvController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\OrderGroupController as ApiOrderGroupController;
 use App\Http\Controllers\Api\PromoController;
 use App\Http\Controllers\CustomerInvoiceController;
 use App\Http\Controllers\ServiceCenterLookupController;
@@ -40,6 +42,15 @@ Route::prefix('v1')->group(function () {
         Route::get('orders', [OrderController::class, 'index']);
         Route::post('orders', [OrderController::class, 'store']);
         Route::get('orders/{order}', [OrderController::class, 'show']);
+
+        Route::get('order-groups', [ApiOrderGroupController::class, 'index']);
+        Route::post('order-groups', [ApiOrderGroupController::class, 'store']);
+        Route::get('order-groups/{orderGroup}', [ApiOrderGroupController::class, 'show']);
+        Route::post('order-groups/{orderGroup}/move-collection-center', [ApiOrderGroupController::class, 'moveCollectionCenter']);
+
+        Route::get('collection-centers/branches', [ApiCollectionCenterController::class, 'branches']);
+        Route::get('collection-centers/incoming', [ApiCollectionCenterController::class, 'incoming']);
+        Route::post('collection-centers/orders/{order}/move', [ApiCollectionCenterController::class, 'moveOrder']);
 
         Route::post('kd-info/search', [ApiKdInfoController::class, 'search']);
         Route::post('kd-info/auto-generate', [ApiKdInfoController::class, 'autoGenerate']);

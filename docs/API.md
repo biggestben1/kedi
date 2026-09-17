@@ -21,7 +21,7 @@ Authorization: Bearer {token}
 | email    | string | yes      | User email  |
 | password | string | yes      | User password |
 
-**Response:** `token`, `token_type` (`Bearer`), `user` (id, name, email, phone, role, wallet_balance).
+**Response:** `token`, `token_type` (`Bearer`), `user` (id, name, email, phone, service_center_code, role, wallet_balance).
 
 ---
 
@@ -53,7 +53,22 @@ Authorization: Bearer {token}
 
 **Headers:** `Authorization: Bearer {token}`
 
-**Response:** `{ "user": { id, name, email, phone, role, wallet_balance } }`
+**Response:** `{ "user": { id, name, email, phone, service_center_code, role, wallet_balance, ... } }`
+
+---
+
+## Order groups
+
+### GET `/order-groups`
+### POST `/order-groups` — body: `{ "name": "optional" }`
+### GET `/order-groups/{id}` — includes `orders` and `collection_branches`
+### POST `/order-groups/{id}/move-collection-center` — body: `{ "collection_branch_id": 123 }`
+
+## Collection centers
+
+### GET `/collection-centers/branches`
+### GET `/collection-centers/incoming` — branch staff only; includes `other_branches` for moves
+### POST `/collection-centers/orders/{order}/move` — body: `{ "collection_branch_id": 123 }`
 
 ---
 

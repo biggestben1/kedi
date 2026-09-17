@@ -18,7 +18,7 @@ class OrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $orders = Order::with('items')
+        $orders = Order::with(['items', 'collectionBranch:id,name'])
             ->where('user_id', $request->user()->id)
             ->orderByDesc('created_at')
             ->paginate($request->input('per_page', 15));
@@ -34,7 +34,7 @@ class OrderController extends Controller
             return response()->json(['message' => 'Order not found.'], 404);
         }
 
-        $order->load('items');
+        $order->load(['items', 'collectionBranch:id,name']);
 
         return response()->json(['data' => $this->orderResource($order)]);
     }
@@ -221,6 +221,15 @@ class OrderController extends Controller
             'shipping_phone' => $order->shipping_phone,
             'kd_id' => $order->kd_id,
             'customer_name' => $order->customer_name,
+            'order_group_id' => $order->order_group_id,
+            'collection_branch_id' => $order->collection_branch_id,
+            'collection_branch' => $order->relationLoaded('collectionBranch') && $order->collectionBranch
+                ? [
+                    'id' => $order->collectionBranch->id,
+                    'name' => $order->collectionBranch->name,
+                ]
+                : null,
+            'collected_at' => $order->collected_at?->toIso8601String(),
             'created_at' => $order->created_at->toIso8601String(),
             'items' => $order->items->map(fn ($i) => [
                 'item_code' => $i->item_code,
