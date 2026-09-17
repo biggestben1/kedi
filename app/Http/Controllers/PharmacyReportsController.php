@@ -251,13 +251,7 @@ class PharmacyReportsController extends Controller
             $customersQuery->whereIn('id', $allowedUserIds);
         }
         $customers = $customersQuery->orderBy('name')->get(['id', 'name', 'email']);
-        $paymentMethods = [
-            Order::PAYMENT_WALLET => 'Wallet',
-            Order::PAYMENT_PAY_ON_DELIVERY => 'Pay on Delivery',
-            Order::PAYMENT_DPBV => 'DPBV',
-            'kd_credit' => 'KD Credit',
-            'split' => 'Split',
-        ];
+        $paymentMethods = Order::paymentMethodLabels();
 
         $paymentOrdersQuery = Order::with(['user', 'collectionBranch'])
             ->whereNotNull('collected_at');
@@ -287,7 +281,7 @@ class PharmacyReportsController extends Controller
             $invoicesQuery->where('status', $invoiceStatus);
         }
         if ($paymentMethod) {
-            $invoicesQuery->where('payment_method', $paymentMethod);
+            $this->applyPaymentMethodFilter($invoicesQuery, $paymentMethod);
         }
         $invoices = $invoicesQuery
             ->orderByDesc('invoice_date')
@@ -365,7 +359,7 @@ class PharmacyReportsController extends Controller
             $query->where('user_id', $customerId);
         }
         if ($paymentMethod) {
-            $query->where('payment_method', $paymentMethod);
+            $this->applyPaymentMethodFilter($query, $paymentMethod);
         }
         if ($allowedUserIds !== null) {
             $query->where(function ($q) use ($allowedUserIds) {
@@ -374,6 +368,28 @@ class PharmacyReportsController extends Controller
                     ->orWhereIn('collection_branch_id', $allowedUserIds);
             });
         }
+    }
+
+    /**
+     * Match top-level payment_method or split breakdown amounts (cash/cheque/POS/bank from group pay).
+     */
+    private function applyPaymentMethodFilter($query, string $paymentMethod): void
+    {
+        $breakdownKeys = Order::reportablePaymentBreakdownKeys();
+
+        if (in_array($paymentMethod, $breakdownKeys, true)) {
+            $query->where(function ($q) use ($paymentMethod) {
+                $q->where('payment_method', $paymentMethod)
+                    ->orWhere(function ($inner) use ($paymentMethod) {
+                        $inner->where('payment_method', 'split')
+                            ->where("payment_breakdown->{$paymentMethod}", '>', 0);
+                    });
+            });
+
+            return;
+        }
+
+        $query->where('payment_method', $paymentMethod);
     }
 
     public function exportPdf(Request $request): \Illuminate\Http\Response

@@ -173,7 +173,7 @@
                     <tbody>
                         @forelse($byPaymentMethod as $method => $amount)
                             <tr>
-                                <td>{{ str_replace('_', ' ', ucfirst($method)) }}</td>
+                                <td>{{ $method }}</td>
                                 <td class="text-end">₦{{ number_format((float) $amount, 2) }}</td>
                             </tr>
                         @empty
@@ -227,7 +227,7 @@
                                 <td>{{ $row->kd_id ?: '—' }}</td>
                                 <td>{{ $row->name ?? $row->party }}</td>
                                 <td>{{ $row->location ?? '—' }}</td>
-                                <td>{{ $row->method && $row->method !== '—' ? str_replace('_', ' ', ucfirst($row->method)) : '—' }}</td>
+                                <td>{{ $row->method && $row->method !== '—' ? $row->method : '—' }}</td>
                                 <td class="text-end fw-semibold">₦{{ number_format($row->amount, 2) }}</td>
                                 <td class="text-end">
                                     @if(!empty($row->url))

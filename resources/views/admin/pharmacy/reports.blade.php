@@ -291,7 +291,7 @@
                                         <td class="text-end">₦{{ number_format((float) $invoice->tax, 0) }}</td>
                                         <td class="text-end">₦{{ number_format((float) $invoice->discount + (float) ($invoice->coupon_discount_amount ?? 0), 0) }}</td>
                                         <td class="text-end fw-semibold">₦{{ number_format((float) $invoice->total, 0) }}</td>
-                                        <td>{{ $invoice->payment_method ? str_replace('_', ' ', ucfirst($invoice->payment_method)) : '—' }}</td>
+                                        <td>{{ $invoice->payment_method ? (\App\Models\Order::paymentMethodLabels()[$invoice->payment_method] ?? str_replace('_', ' ', ucfirst($invoice->payment_method))) : '—' }}</td>
                                         <td><span class="badge bg-{{ $statusBadge }}">{{ ucfirst($invoice->status) }}</span></td>
                                         <td class="text-end">
                                             <a href="{{ route('admin.invoices.show', $invoice) }}" class="btn btn-sm btn-outline-primary">View</a>

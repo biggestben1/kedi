@@ -73,16 +73,40 @@ class Order extends Model
 
     public function paymentLabel(): string
     {
-        return match ($this->payment_method) {
+        $labels = self::paymentMethodLabels();
+
+        return $labels[$this->payment_method] ?? 'Pay on Delivery / COD';
+    }
+
+    /**
+     * Labels for payment methods used in checkout, group pay, and reports.
+     *
+     * @return array<string, string>
+     */
+    public static function paymentMethodLabels(): array
+    {
+        return [
             self::PAYMENT_WALLET => 'Wallet',
+            self::PAYMENT_PAY_ON_DELIVERY => 'Pay on Delivery / COD',
             self::PAYMENT_DPBV => 'DPBV',
             'kd_credit' => 'KD Credit',
-            'split' => 'Split',
             'cash' => 'Cash',
             'cheque' => 'Cheque',
+            'pos' => 'POS',
+            'bank' => 'Bank Transfer',
+            'split' => 'Split',
             'transfer' => 'Transfer',
-            default => 'Pay on Delivery',
-        };
+        ];
+    }
+
+    /**
+     * Payment breakdown keys that count as money in (group/checkout split).
+     *
+     * @return list<string>
+     */
+    public static function reportablePaymentBreakdownKeys(): array
+    {
+        return ['wallet', 'dpbv', 'kd_credit', 'cash', 'cheque', 'pos', 'bank'];
     }
 
     public function isDelivered(): bool

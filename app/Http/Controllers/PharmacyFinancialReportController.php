@@ -172,12 +172,14 @@ class PharmacyFinancialReportController extends Controller
     private function buildPaymentMethodBreakdown(Collection $invoices, Collection $orders): Collection
     {
         $map = [];
+        $breakdownKeys = Order::reportablePaymentBreakdownKeys();
+        $labels = Order::paymentMethodLabels();
 
         foreach ($invoices as $invoice) {
             $method = $invoice->payment_method ?: 'unspecified';
             if ($method === 'split' && is_array($invoice->payment_breakdown)) {
                 foreach ($invoice->payment_breakdown as $key => $amount) {
-                    if (in_array($key, ['total'], true) || ! is_numeric($amount) || (float) $amount <= 0) {
+                    if (! in_array($key, $breakdownKeys, true) || ! is_numeric($amount) || (float) $amount <= 0) {
                         continue;
                     }
                     $map[$key] = ($map[$key] ?? 0) + (float) $amount;
@@ -192,7 +194,7 @@ class PharmacyFinancialReportController extends Controller
             $amount = (float) $order->subtotal + (float) ($order->shipping_cost ?? 0);
             if ($method === 'split' && is_array($order->payment_breakdown)) {
                 foreach ($order->payment_breakdown as $key => $part) {
-                    if (in_array($key, ['total', 'pos_machine', 'bank_account'], true) || ! is_numeric($part) || (float) $part <= 0) {
+                    if (! in_array($key, $breakdownKeys, true) || ! is_numeric($part) || (float) $part <= 0) {
                         continue;
                     }
                     $map[$key] = ($map[$key] ?? 0) + (float) $part;
@@ -202,7 +204,13 @@ class PharmacyFinancialReportController extends Controller
             $map[$method] = ($map[$method] ?? 0) + $amount;
         }
 
-        return collect($map)->sortDesc();
+        return collect($map)
+            ->sortDesc()
+            ->mapWithKeys(function ($amount, $method) use ($labels) {
+                $label = $labels[$method] ?? str_replace('_', ' ', ucfirst((string) $method));
+
+                return [$label => $amount];
+            });
     }
 
     private function buildLocationBreakdown(
@@ -276,7 +284,9 @@ class PharmacyFinancialReportController extends Controller
                 'name' => $invoice->customer_name ?: ($invoice->user?->name ?? '—'),
                 'party' => $invoice->customer_name ?: ($invoice->user?->name ?? '—'),
                 'location' => $locationLabels[$unit] ?? 'Other',
-                'method' => $invoice->payment_method ?: '—',
+                'method' => $invoice->payment_method
+                    ? (Order::paymentMethodLabels()[$invoice->payment_method] ?? str_replace('_', ' ', ucfirst($invoice->payment_method)))
+                    : '—',
                 'amount' => (float) $invoice->total,
                 'url' => route('admin.invoices.show', $invoice),
             ]);
