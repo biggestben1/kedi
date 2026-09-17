@@ -41,22 +41,39 @@ class OrderController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $addToGroup = $request->boolean('add_to_group');
+
         $request->validate([
             'items' => 'required|array|min:1',
             'items.*.item_code' => 'required|string|max:50',
             'items.*.quantity' => 'required|integer|min:1',
-            'payment_method' => 'required|in:wallet,pay_on_delivery',
-            'shipping_address' => 'required|string|max:500',
-            'shipping_city' => 'required|string|max:100',
+            'payment_method' => $addToGroup ? 'nullable|in:wallet,pay_on_delivery' : 'required|in:wallet,pay_on_delivery',
+            'shipping_address' => $addToGroup ? 'nullable|string|max:500' : 'required|string|max:500',
+            'shipping_city' => $addToGroup ? 'nullable|string|max:100' : 'required|string|max:100',
             'shipping_state' => 'nullable|string|max:100',
             'shipping_postal_code' => 'nullable|string|max:20',
-            'shipping_phone' => 'required|string|max:50',
-            'kd_id' => 'nullable|string|max:100',
-            'customer_name' => 'nullable|string|max:255',
+            'shipping_phone' => $addToGroup ? 'nullable|string|max:50' : 'required|string|max:50',
+            'kd_id' => $addToGroup ? 'required|string|max:100' : 'nullable|string|max:100',
+            'customer_name' => $addToGroup ? 'required|string|max:255' : 'nullable|string|max:255',
             'coupon_code' => 'nullable|string|max:50',
+            'order_group_id' => 'nullable|integer|exists:order_groups,id',
+            'add_to_group' => 'nullable|boolean',
         ]);
 
         $user = $request->user();
+        $orderGroup = null;
+
+        if ($addToGroup) {
+            $groupId = (int) $request->input('order_group_id', 0);
+            $orderGroup = \App\Models\OrderGroup::where('id', $groupId)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (! $orderGroup || ! $orderGroup->isOpen()) {
+                return response()->json(['message' => 'Choose an open order group to add this sale to.'], 422);
+            }
+        }
+
         $context = new ShoppingContext($user);
         $walletOwner = $context->walletOwner;
         $branchUserId = $context->branchUserId;
@@ -109,7 +126,7 @@ class OrderController extends Controller
 
         $coupon = null;
         $discountAmount = 0;
-        if ($request->filled('coupon_code')) {
+        if ($request->filled('coupon_code') && ! $addToGroup) {
             $coupon = \App\Models\Coupon::where('code', strtoupper($request->coupon_code))->first();
             if ($coupon && $coupon->isValid()) {
                 $discountAmount = ($coupon->discount_percentage / 100) * $subtotal;
@@ -124,9 +141,11 @@ class OrderController extends Controller
             return response()->json(['message' => 'No valid items in cart.'], 422);
         }
 
-        $paymentMethod = $request->input('payment_method');
+        $paymentMethod = $addToGroup
+            ? Order::PAYMENT_PAY_ON_DELIVERY
+            : $request->input('payment_method');
 
-        if ($paymentMethod === Order::PAYMENT_WALLET && ! $walletOwner->canPayWithWallet($totalAmount)) {
+        if (! $addToGroup && $paymentMethod === Order::PAYMENT_WALLET && ! $walletOwner->canPayWithWallet($totalAmount)) {
             return response()->json([
                 'message' => 'Insufficient wallet balance.',
                 'available_balance' => (float) ($walletOwner->wallet_balance ?? 0),
@@ -134,21 +153,46 @@ class OrderController extends Controller
         }
 
         $order = null;
-        DB::transaction(function () use ($user, $walletOwner, $cartItems, $subtotal, $totalBv, $totalPv, $paymentMethod, $request, $branchUserId, $totalAmount, $coupon, $discountAmount, &$order) {
+        DB::transaction(function () use (
+            $user,
+            $walletOwner,
+            $cartItems,
+            $subtotal,
+            $totalBv,
+            $totalPv,
+            $paymentMethod,
+            $request,
+            $branchUserId,
+            $totalAmount,
+            $coupon,
+            $discountAmount,
+            $addToGroup,
+            $orderGroup,
+            &$order
+        ) {
             $order = Order::create([
                 'user_id' => $user->id,
+                'order_group_id' => $addToGroup ? $orderGroup->id : null,
                 'branch_user_id' => $branchUserId,
                 'invoice_number' => Order::generateOrderNumber(),
                 'subtotal' => $subtotal,
                 'total_bv' => $totalBv,
                 'total_pv' => $totalPv,
                 'payment_method' => $paymentMethod,
-                'status' => $paymentMethod === Order::PAYMENT_WALLET ? Order::STATUS_PAID : Order::STATUS_PENDING,
-                'shipping_address' => $request->input('shipping_address'),
-                'shipping_city' => $request->input('shipping_city'),
+                'status' => $addToGroup
+                    ? Order::STATUS_DRAFT
+                    : ($paymentMethod === Order::PAYMENT_WALLET ? Order::STATUS_PAID : Order::STATUS_PENDING),
+                'shipping_address' => $addToGroup
+                    ? ($request->input('shipping_address') ?: 'Walk-in (Pick up)')
+                    : $request->input('shipping_address'),
+                'shipping_city' => $addToGroup
+                    ? ($request->input('shipping_city') ?: '')
+                    : $request->input('shipping_city'),
                 'shipping_state' => $request->input('shipping_state'),
                 'shipping_postal_code' => $request->input('shipping_postal_code'),
-                'shipping_phone' => $request->input('shipping_phone'),
+                'shipping_phone' => $addToGroup
+                    ? ($request->input('shipping_phone') ?: ($user->phone ?? ''))
+                    : $request->input('shipping_phone'),
                 'kd_id' => $request->input('kd_id'),
                 'customer_name' => $request->input('customer_name'),
                 'coupon_id' => $coupon ? $coupon->id : null,
@@ -169,7 +213,11 @@ class OrderController extends Controller
                 ]);
             }
 
-            if ($paymentMethod === Order::PAYMENT_WALLET) {
+            if ($addToGroup) {
+                $orderGroup->update([
+                    'total_amount' => (float) $orderGroup->draftOrders()->sum('subtotal'),
+                ]);
+            } elseif ($paymentMethod === Order::PAYMENT_WALLET) {
                 $walletOwner->decrement('wallet_balance', $totalAmount);
                 $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
                 WalletTransaction::create([
@@ -188,15 +236,20 @@ class OrderController extends Controller
 
         $order->load(['user', 'items']);
 
-        try {
-            Mail::to($user->email)->send(new OrderConfirmationMail($order));
-        } catch (\Throwable $e) {
-            \Log::warning('Order confirmation email failed: '.$e->getMessage());
+        if (! $addToGroup) {
+            try {
+                Mail::to($user->email)->send(new OrderConfirmationMail($order));
+            } catch (\Throwable $e) {
+                \Log::warning('Order confirmation email failed: '.$e->getMessage());
+            }
         }
 
         return response()->json([
-            'message' => 'Order placed successfully.',
+            'message' => $addToGroup
+                ? 'Transaction added to group "'.$orderGroup->displayName().'". Enter the next KEDI NO to add another, or pay the group when finished.'
+                : 'Order placed successfully.',
             'data' => $this->orderResource($order),
+            'added_to_group' => $addToGroup,
         ], 201);
     }
 
