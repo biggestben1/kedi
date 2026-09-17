@@ -17,6 +17,7 @@ use App\Models\OrderGroup;
 use App\Models\OrderItem;
 use App\Models\PosMachine;
 use App\Models\Product;
+use App\Models\Role;
 use App\Models\ServiceCenterStock;
 use App\Models\User;
 use App\Models\WalletTransaction;
@@ -254,7 +255,7 @@ class OrderGroupController extends Controller
     {
         $this->authorizeGroup($request, $orderGroup);
 
-        $orderGroup->load(['orders' => fn ($q) => $q->with('items')->latest()]);
+        $orderGroup->load(['orders' => fn ($q) => $q->with(['items', 'collectionBranch'])->latest()]);
         $paymentData = $this->groupPaymentViewData($request, $orderGroup);
         $isActive = (int) $request->session()->get('order_group_id') === (int) $orderGroup->id;
 
@@ -266,13 +267,92 @@ class OrderGroupController extends Controller
                 ->get();
         }
 
+        $collectionBranches = User::whereHas('role', fn ($q) => $q->where('name', Role::BRANCH))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'phone']);
+
+        $currentCollectionBranchIds = $orderGroup->orders
+            ->pluck('collection_branch_id')
+            ->filter()
+            ->unique()
+            ->values();
+        $currentCollectionBranch = $currentCollectionBranchIds->count() === 1
+            ? $collectionBranches->firstWhere('id', (int) $currentCollectionBranchIds->first())
+            : null;
+
         return view('order-groups.show', array_merge($paymentData, [
             'group' => $orderGroup,
             'isActive' => $isActive,
             'availableDrafts' => $availableDrafts,
+            'collectionBranches' => $collectionBranches,
+            'currentCollectionBranch' => $currentCollectionBranch,
+            'currentCollectionBranchIds' => $currentCollectionBranchIds,
             'pageTitle' => $orderGroup->displayName(),
             'customerMenuActive' => 'order-groups',
         ]));
+    }
+
+    /**
+     * Move all uncollected orders in this group to another collection center (branch).
+     */
+    public function moveCollectionCenter(Request $request, OrderGroup $orderGroup)
+    {
+        $this->authorizeGroup($request, $orderGroup);
+
+        $data = $request->validate([
+            'collection_branch_id' => ['required', 'integer'],
+        ]);
+
+        $branch = User::where('id', $data['collection_branch_id'])
+            ->whereHas('role', fn ($q) => $q->where('name', Role::BRANCH))
+            ->first();
+
+        if (! $branch) {
+            return back()->withErrors(['collection_branch_id' => 'Choose a valid collection center (branch).'])->withInput();
+        }
+
+        $orders = $orderGroup->orders()
+            ->whereNull('collected_at')
+            ->where('status', '!=', Order::STATUS_CANCELLED)
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return back()->with('error', 'No movable orders in this group. Collected or cancelled orders cannot be moved.');
+        }
+
+        $blocked = $orders->filter(function (Order $order) {
+            // Already deducted at seller and not routed to a collection center yet —
+            // assigning a center would risk a second stock deduction on collect.
+            return $order->stock_deducted_at && ! $order->collection_branch_id;
+        });
+
+        if ($blocked->isNotEmpty()) {
+            return back()->with(
+                'error',
+                'Cannot move '.$blocked->count().' order(s) that already had stock deducted without a collection center. Contact support or recreate those orders for collection.'
+            );
+        }
+
+        $moved = 0;
+        DB::transaction(function () use ($orders, $branch, &$moved) {
+            foreach ($orders as $order) {
+                if ((int) $order->collection_branch_id === (int) $branch->id) {
+                    continue;
+                }
+                $order->update(['collection_branch_id' => $branch->id]);
+                $moved++;
+            }
+        });
+
+        if ($moved === 0) {
+            return redirect()
+                ->route('order-groups.show', $orderGroup)
+                ->with('message', 'All orders are already at '.$branch->name.'.');
+        }
+
+        return redirect()
+            ->route('order-groups.show', $orderGroup)
+            ->with('success', $moved.' order(s) moved to collection center "'.$branch->name.'".');
     }
 
     /**

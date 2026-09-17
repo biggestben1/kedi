@@ -74,6 +74,32 @@
                                                 <input type="file" name="payment_proof" class="form-control mb-2" accept="image/*,.pdf">
                                             </div>
                                         </form>
+
+                                        @if(($collectionBranches ?? collect())->isNotEmpty())
+                                            <div class="border rounded p-3 mt-3 bg-white">
+                                                <div class="fw-semibold mb-1">Can't fulfill here?</div>
+                                                <p class="small text-muted mb-2">If there is a stock or other error, move this order to another collection center.</p>
+                                                <form method="POST" action="{{ route('collection-centers.move', $order) }}" class="row g-2 align-items-end" onsubmit="return confirm('Move this order to the selected collection center?');">
+                                                    @csrf
+                                                    <div class="col-md-8">
+                                                        <label class="form-label mb-1" for="move-branch-{{ $order->id }}">Move to another collection center</label>
+                                                        <select name="collection_branch_id" id="move-branch-{{ $order->id }}" class="form-select" required>
+                                                            <option value="">— Select branch —</option>
+                                                            @foreach($collectionBranches as $otherBranch)
+                                                                <option value="{{ $otherBranch->id }}">
+                                                                    {{ $otherBranch->name }}@if($otherBranch->phone) — {{ $otherBranch->phone }}@endif
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <button type="submit" class="btn btn-outline-warning w-100">
+                                                            <i class="fe fe-navigation me-1"></i>Move order
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        @endif
                                     @else
                                         <button type="button" class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#payment-{{ $order->id }}">Payment</button>
                                         <div class="collapse mt-2" id="payment-{{ $order->id }}">

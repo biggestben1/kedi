@@ -132,6 +132,10 @@ class CollectionCenterController extends Controller
             'title' => 'Orders sent to '.$branch->name,
             'branch' => $branch,
             'canCollect' => true,
+            'collectionBranches' => $this->branchesQuery()
+                ->where('id', '!=', $branch->id)
+                ->orderBy('name')
+                ->get(['id', 'name', 'phone', 'email']),
         ]);
     }
 
@@ -175,7 +179,10 @@ class CollectionCenterController extends Controller
             }
             $available = BranchStock::getQuantity($branch->id, $product->id);
             if ($available < (int) $item->quantity) {
-                return back()->with('error', "Not enough branch stock for {$item->product_name}. Available: {$available}.");
+                return back()->with(
+                    'error',
+                    "Not enough branch stock for {$item->product_name}. Available: {$available}. Use “Move to another collection center” below to send this order somewhere that can fulfill it."
+                );
             }
         }
 
@@ -184,7 +191,7 @@ class CollectionCenterController extends Controller
                 foreach ($order->items as $item) {
                     $product = Product::where('item_code', $item->item_code)->lockForUpdate()->first();
                     if (! $product || ! BranchStock::decrementStock($branch->id, $product->id, (int) $item->quantity)) {
-                        throw new \RuntimeException('Could not deduct branch stock for '.$item->product_name.'.');
+                        throw new \RuntimeException('Could not deduct branch stock for '.$item->product_name.'. Use “Move to another collection center” if this branch cannot fulfill the order.');
                     }
                 }
 
@@ -205,6 +212,48 @@ class CollectionCenterController extends Controller
         }
 
         return back()->with('success', 'Collected. Stock removed from '.$branch->name.'.');
+    }
+
+    /**
+     * Reassign an uncollected order to a different collection center (branch).
+     */
+    public function moveOrder(Request $request, Order $order)
+    {
+        $branch = $this->viewerBranch($request->user());
+        $user = $request->user();
+        $user->loadMissing('role');
+        $seeAll = $user->isSuperAdmin() || $user->role?->name === Role::HEADQUARTERS;
+
+        abort_unless(
+            $order->collection_branch_id
+            && ! $order->collected_at
+            && ($seeAll || ($branch && (int) $order->collection_branch_id === (int) $branch->id)),
+            403
+        );
+
+        $data = $request->validate([
+            'collection_branch_id' => ['required', 'integer'],
+        ]);
+
+        $destination = User::where('id', $data['collection_branch_id'])
+            ->whereHas('role', fn ($q) => $q->where('name', Role::BRANCH))
+            ->first();
+
+        if (! $destination) {
+            return back()->withErrors(['collection_branch_id' => 'Choose a valid collection center.'])->withInput();
+        }
+
+        if ((int) $destination->id === (int) $order->collection_branch_id) {
+            return back()->with('message', 'Order is already at '.$destination->name.'.');
+        }
+
+        $order->loadMissing('collectionBranch');
+        $fromName = $order->collectionBranch?->name ?: 'current center';
+        $order->update(['collection_branch_id' => $destination->id]);
+
+        return redirect()
+            ->route('collection-centers.incoming')
+            ->with('success', 'Order '.($order->invoice_number ?: '#'.$order->id).' moved from '.$fromName.' to '.$destination->name.'.');
     }
 
     public function collected(Request $request)

@@ -45,6 +45,47 @@
     </div>
 </div>
 
+@if(($collectionBranches ?? collect())->isNotEmpty() && $group->orders->isNotEmpty())
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h3 class="card-title mb-0"><i class="fe fe-map-pin me-1"></i>Collection center</h3>
+            <small class="text-muted">Send or move this group's uncollected orders to a branch for pickup.</small>
+        </div>
+        @if($currentCollectionBranch)
+            <span class="badge bg-info">Current: {{ $currentCollectionBranch->name }}</span>
+        @elseif(($currentCollectionBranchIds ?? collect())->count() > 1)
+            <span class="badge bg-warning text-dark">Mixed centers on orders</span>
+        @else
+            <span class="badge bg-secondary">Not assigned</span>
+        @endif
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ route('order-groups.move-collection-center', $group) }}" class="row g-3 align-items-end">
+            @csrf
+            <div class="col-md-8">
+                <label class="form-label" for="collection_branch_id">Move group to collection center</label>
+                <select name="collection_branch_id" id="collection_branch_id" class="form-select @error('collection_branch_id') is-invalid @enderror" required>
+                    <option value="">— Select branch —</option>
+                    @foreach($collectionBranches as $branch)
+                        <option value="{{ $branch->id }}" @selected((int) old('collection_branch_id', optional($currentCollectionBranch)->id) === (int) $branch->id)>
+                            {{ $branch->name }}@if($branch->phone) — {{ $branch->phone }}@endif
+                        </option>
+                    @endforeach
+                </select>
+                @error('collection_branch_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Move all uncollected orders in this group to the selected collection center?');">
+                    <i class="fe fe-navigation me-1"></i>Move to center
+                </button>
+            </div>
+        </form>
+        <p class="small text-muted mb-0 mt-2">Already collected orders stay at their current center and are not moved.</p>
+    </div>
+</div>
+@endif
+
 <div class="row">
     <div class="col-lg-7">
         @php
@@ -77,13 +118,14 @@
                 <div class="table-responsive">
                     <table class="table mb-0">
                         <thead>
-                        <tr>
-                            <th>Invoice</th>
-                            <th>KD NO / Name</th>
-                            <th>Type</th>
-                            <th>Status</th>
-                            <th class="text-end">Fee</th>
-                        </tr>
+                            <tr>
+                                <th>Invoice</th>
+                                <th>KD NO / Name</th>
+                                <th>Type</th>
+                                <th>Collection</th>
+                                <th>Status</th>
+                                <th class="text-end">Fee</th>
+                            </tr>
                         </thead>
                         <tbody>
                         @foreach($registrationOrders as $order)
@@ -94,6 +136,14 @@
                                     @if($order->customer_name)<br><small class="text-muted">{{ $order->customer_name }}</small>@endif
                                 </td>
                                 <td><span class="badge bg-primary">KD Registration</span></td>
+                                <td>
+                                    @if($order->collectionBranch)
+                                        <small>{{ $order->collectionBranch->name }}</small>
+                                        @if($order->collected_at)<br><span class="badge bg-success">Collected</span>@endif
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
                                 <td><span class="badge bg-secondary">{{ $order->status }}</span></td>
                                 <td class="text-end">₦{{ number_format($order->subtotal, 0) }}</td>
                             </tr>
@@ -101,7 +151,7 @@
                         </tbody>
                         <tfoot>
                         <tr>
-                            <th colspan="4">Registrations total</th>
+                            <th colspan="5">Registrations total</th>
                             <th class="text-end">₦{{ number_format($registrationTotal, 0) }}</th>
                         </tr>
                         </tfoot>
@@ -134,6 +184,7 @@
                                 <th>Invoice</th>
                                 <th>KEDI / Customer</th>
                                 <th>Items</th>
+                                <th>Collection</th>
                                 <th>Status</th>
                                 <th class="text-end">Total</th>
                             </tr>
@@ -147,6 +198,14 @@
                                         @if($order->customer_name)<br><small class="text-muted">{{ $order->customer_name }}</small>@endif
                                     </td>
                                     <td>{{ $order->items->sum('quantity') }}</td>
+                                    <td>
+                                        @if($order->collectionBranch)
+                                            <small>{{ $order->collectionBranch->name }}</small>
+                                            @if($order->collected_at)<br><span class="badge bg-success">Collected</span>@endif
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
                                     <td><span class="badge bg-secondary">{{ $order->status }}</span></td>
                                     <td class="text-end">₦{{ number_format($order->subtotal, 0) }}</td>
                                 </tr>
@@ -154,17 +213,17 @@
                             </tbody>
                             <tfoot>
                             <tr>
-                                <th colspan="4">Products total</th>
+                                <th colspan="5">Products total</th>
                                 <th class="text-end">₦{{ number_format($productTotal, 0) }}</th>
                             </tr>
                             @if($registrationOrders->isNotEmpty())
                             <tr>
-                                <th colspan="4">+ Registrations</th>
+                                <th colspan="5">+ Registrations</th>
                                 <th class="text-end">₦{{ number_format($registrationTotal, 0) }}</th>
                             </tr>
                             @endif
                             <tr>
-                                <th colspan="4">Draft total (unpaid)</th>
+                                <th colspan="5">Draft total (unpaid)</th>
                                 <th class="text-end">₦{{ number_format($draftTotal, 0) }}</th>
                             </tr>
                             </tfoot>

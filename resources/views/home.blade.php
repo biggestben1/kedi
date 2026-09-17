@@ -159,7 +159,12 @@
                                                 @auth
                                                 <div class="drop-heading">
                                                     <div class="text-center">
-                                                        <h5 class="text-dark mb-0 fs-14 fw-semibold">{{ auth()->user()->name }}</h5>
+                                                        <h5 class="text-dark mb-0 fs-14 fw-semibold">
+                                                            {{ auth()->user()->name }}
+                                                            @if(auth()->user()->service_center_code)
+                                                                <span class="text-muted fw-normal">({{ auth()->user()->service_center_code }})</span>
+                                                            @endif
+                                                        </h5>
                                                         <small class="text-muted">{{ auth()->user()->email }}</small>
                                                     </div>
                                                 </div>
@@ -343,11 +348,27 @@
                 <div class="side-app">
                     <div class="main-container container-fluid">
                         <div class="page-header">
-                            <h1 class="page-title">Shop @auth - {{ auth()->user()->name }} @endauth</h1>
+                            <h1 class="page-title">
+                                Shop
+                                @auth
+                                    - {{ auth()->user()->name }}
+                                    @if(auth()->user()->service_center_code)
+                                        ({{ auth()->user()->service_center_code }})
+                                    @endif
+                                @endauth
+                            </h1>
                             <div>
                                 <ol class="breadcrumb">
                                     <li class="breadcrumb-item"><a href="{{ url('/') }}">E-Commerce</a></li>
-                                    <li class="breadcrumb-item active" aria-current="page">Shop @auth - {{ auth()->user()->name }} @endauth</li>
+                                    <li class="breadcrumb-item active" aria-current="page">
+                                        Shop
+                                        @auth
+                                            - {{ auth()->user()->name }}
+                                            @if(auth()->user()->service_center_code)
+                                                ({{ auth()->user()->service_center_code }})
+                                            @endif
+                                        @endauth
+                                    </li>
                                 </ol>
                             </div>
                         </div>
@@ -507,7 +528,12 @@
                         @auth
                         <div class="row">
                             <div class="col-12 text-center mb-4">
-                                <h3 class="fw-bold">Welcome! {{ auth()->user()->name }}</h3>
+                                <h3 class="fw-bold">
+                                    Welcome! {{ auth()->user()->name }}
+                                    @if(auth()->user()->service_center_code)
+                                        ({{ auth()->user()->service_center_code }})
+                                    @endif
+                                </h3>
                             </div>
                         </div>
                         @endauth

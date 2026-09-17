@@ -183,6 +183,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/collection-centers/{branch}/pos', [CollectionCenterController::class, 'storePos'])->name('collection-centers.pos');
     Route::post('/collection-centers/{branch}/proof', [CollectionCenterController::class, 'storeProof'])->name('collection-centers.proof');
     Route::post('/collection-centers/orders/{order}/collect', [CollectionCenterController::class, 'collect'])->name('collection-centers.collect');
+    Route::post('/collection-centers/orders/{order}/move', [CollectionCenterController::class, 'moveOrder'])->name('collection-centers.move');
 
     Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
     Route::post('/checkout', [CheckoutController::class, 'placeOrder'])->name('checkout.place');
@@ -206,6 +207,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/order-groups/{orderGroup}/resume', [OrderGroupController::class, 'resume'])->name('order-groups.resume');
     Route::post('/order-groups/{orderGroup}/end', [OrderGroupController::class, 'end'])->name('order-groups.end');
     Route::post('/order-groups/{orderGroup}/cancel', [OrderGroupController::class, 'cancel'])->name('order-groups.cancel');
+    Route::post('/order-groups/{orderGroup}/move-collection-center', [OrderGroupController::class, 'moveCollectionCenter'])->name('order-groups.move-collection-center');
     Route::get('/order-groups/{orderGroup}/pay', [OrderGroupController::class, 'payForm'])->name('order-groups.pay-form');
     Route::post('/order-groups/{orderGroup}/pay', [OrderGroupController::class, 'pay'])->name('order-groups.pay');
 
