@@ -32,12 +32,12 @@ class OrderGroupController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name' => ['nullable', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
         ]);
 
         $group = OrderGroup::create([
             'user_id' => $request->user()->id,
-            'name' => $data['name'] ?? null,
+            'name' => trim($data['name']),
             'status' => OrderGroup::STATUS_OPEN,
             'started_at' => now(),
             'total_amount' => 0,
