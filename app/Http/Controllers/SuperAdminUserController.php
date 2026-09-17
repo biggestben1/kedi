@@ -277,6 +277,8 @@ class SuperAdminUserController extends Controller
         return view('admin.users.create', [
             'roles' => $roles,
             'defaultRoleId' => $defaultRoleId,
+            'annexRoleId' => $roles->firstWhere('name', Role::ANNEX)?->id,
+            'nextAnnexCode' => User::nextAnnexServiceCenterCode(),
         ]);
     }
 
@@ -342,11 +344,17 @@ class SuperAdminUserController extends Controller
         }
         $data = $request->validate($rules);
 
+        $serviceCenterCode = trim((string) ($data['service_center_code'] ?? ''));
+        $selectedRole = Role::find($data['role_id']);
+        if ($selectedRole?->name === Role::ANNEX && $serviceCenterCode === '') {
+            $serviceCenterCode = User::nextAnnexServiceCenterCode();
+        }
+
         $createData = [
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
-            'service_center_code' => $data['service_center_code'] ?? null,
+            'service_center_code' => $serviceCenterCode !== '' ? $serviceCenterCode : null,
             'role_id' => $data['role_id'],
             'password' => Hash::make($data['password']),
         ];

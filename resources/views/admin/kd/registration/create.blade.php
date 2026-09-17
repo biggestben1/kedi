@@ -139,53 +139,11 @@
                 </div>
 
                 <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Gender <span class="text-danger">*</span></label>
-                        <div class="d-flex gap-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="gender" id="gender_m" value="M" {{ old('gender') === 'M' ? 'checked' : '' }} required>
-                                <label class="form-check-label" for="gender_m">Male (M)</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio" name="gender" id="gender_f" value="F" {{ old('gender') === 'F' ? 'checked' : '' }} required>
-                                <label class="form-check-label" for="gender_f">Female (F)</label>
-                            </div>
-                        </div>
-                        @error('gender')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">State <span class="text-danger">*</span></label>
-                        <input type="text" name="state" class="form-control @error('state') is-invalid @enderror" 
-                               value="{{ old('state') }}" required maxlength="100">
-                        @error('state')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                    </div>
-                </div>
-
-                <div class="row mb-3">
                     <div class="col-md-12">
-                        <label class="form-label">Full Address <span class="text-danger">*</span></label>
-                        <textarea name="full_address" class="form-control @error('full_address') is-invalid @enderror" 
-                                  rows="3" required>{{ old('full_address') }}</textarea>
-                        @error('full_address')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-12">
-                        <label class="form-label">Phone Number <span class="text-danger">*</span> <small class="text-muted">(Compulsory)</small></label>
+                        <label class="form-label">Phone Number <small class="text-muted">(Optional)</small></label>
                         <input type="text" name="phone_number" class="form-control @error('phone_number') is-invalid @enderror" 
-                               value="{{ old('phone_number') }}" required maxlength="50" placeholder="e.g. 08012345678">
+                               value="{{ old('phone_number') }}" maxlength="50" placeholder="e.g. 08012345678">
                         @error('phone_number')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
-                    </div>
-                </div>
-
-                {{-- Registration Date --}}
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Registration Date <span class="text-danger">*</span></label>
-                        <input type="date" name="registration_date" class="form-control @error('registration_date') is-invalid @enderror" 
-                               value="{{ old('registration_date', date('Y-m-d')) }}" required>
-                        @error('registration_date')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                     </div>
                 </div>
 

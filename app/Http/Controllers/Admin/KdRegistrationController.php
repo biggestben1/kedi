@@ -121,11 +121,7 @@ class KdRegistrationController extends Controller
         $validated = $request->validate([
             'kd_no' => 'required|string|max:100|unique:kd_registrations,kd_no',
             'full_name' => 'required|string|max:255',
-            'gender' => 'required|in:M,F',
-            'state' => 'required|string|max:100',
-            'full_address' => 'required|string',
-            'phone_number' => 'required|string|max:50',
-            'registration_date' => 'required|date',
+            'phone_number' => 'nullable|string|max:50',
             'user_id' => 'nullable|integer|exists:users,id',
             'sponsor_kd_no' => 'required|string|max:100',
             'sponsor_name' => 'required|string|max:255',
@@ -188,11 +184,13 @@ class KdRegistrationController extends Controller
             $registration = KdRegistration::create([
                 'kd_no' => strtoupper(trim($validated['kd_no'])),
                 'full_name' => trim($validated['full_name']),
-                'gender' => $validated['gender'],
-                'state' => trim($validated['state']),
-                'full_address' => trim($validated['full_address']),
-                'phone_number' => trim($validated['phone_number']),
-                'registration_date' => $validated['registration_date'],
+                'gender' => null,
+                'state' => null,
+                'full_address' => null,
+                'phone_number' => isset($validated['phone_number']) && trim($validated['phone_number']) !== ''
+                    ? trim($validated['phone_number'])
+                    : null,
+                'registration_date' => now()->toDateString(),
                 'user_id' => $validated['user_id'] ?? null,
                 'sponsor_kd_no' => strtoupper($sponsorKdNo),
                 'sponsor_name' => trim($validated['sponsor_name']),

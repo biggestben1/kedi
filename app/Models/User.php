@@ -62,6 +62,26 @@ class User extends Authenticatable
         return $this->wallet_balance >= $amount;
     }
 
+    /**
+     * Next annex service center code in the form annex-001, annex-002, ...
+     */
+    public static function nextAnnexServiceCenterCode(): string
+    {
+        $prefix = 'annex-';
+        $codes = static::query()
+            ->where('service_center_code', 'like', $prefix.'%')
+            ->pluck('service_center_code');
+
+        $max = 0;
+        foreach ($codes as $code) {
+            if (preg_match('/^annex-(\d+)$/i', (string) $code, $matches)) {
+                $max = max($max, (int) $matches[1]);
+            }
+        }
+
+        return $prefix.str_pad((string) ($max + 1), 3, '0', STR_PAD_LEFT);
+    }
+
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);

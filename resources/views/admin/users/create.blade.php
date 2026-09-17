@@ -49,7 +49,11 @@
 
                 <div class="col-md-6">
                     <label class="form-label">Service Center Code (optional)</label>
-                    <input type="text" name="service_center_code" class="form-control" value="{{ old('service_center_code') }}">
+                    <input type="text" name="service_center_code" id="service_center_code" class="form-control"
+                           value="{{ old('service_center_code') }}"
+                           placeholder="e.g. annex-001"
+                           data-next-annex-code="{{ $nextAnnexCode ?? 'annex-001' }}">
+                    <div class="form-text" id="service_center_code_hint">For Annex, leave blank to auto-generate (e.g. annex-001).</div>
                     @error('service_center_code')<div class="text-danger small">{{ $message }}</div>@enderror
                 </div>
 
@@ -63,7 +67,7 @@
 
                 <div class="col-md-6">
                     <label class="form-label">Role</label>
-                    <select name="role_id" class="form-select" required>
+                    <select name="role_id" id="role_id" class="form-select" required data-annex-role-id="{{ $annexRoleId ?? '' }}">
                         <option value="">-- Select role --</option>
                         @foreach($roles as $role)
                             <option value="{{ $role->id }}" {{ old('role_id', $defaultRoleId ?? '') == $role->id ? 'selected' : '' }}>
@@ -95,3 +99,36 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    const roleSelect = document.getElementById('role_id');
+    const codeInput = document.getElementById('service_center_code');
+    if (!roleSelect || !codeInput) return;
+
+    const annexRoleId = String(roleSelect.dataset.annexRoleId || '');
+    const nextAnnexCode = codeInput.dataset.nextAnnexCode || 'annex-001';
+    let autoFilled = false;
+
+    function syncAnnexCode() {
+        const isAnnex = annexRoleId && String(roleSelect.value) === annexRoleId;
+        if (isAnnex) {
+            if (!codeInput.value.trim() || autoFilled) {
+                codeInput.value = nextAnnexCode;
+                autoFilled = true;
+            }
+        } else if (autoFilled) {
+            codeInput.value = '';
+            autoFilled = false;
+        }
+    }
+
+    roleSelect.addEventListener('change', syncAnnexCode);
+    codeInput.addEventListener('input', function () {
+        autoFilled = codeInput.value.trim() === nextAnnexCode;
+    });
+    syncAnnexCode();
+})();
+</script>
+@endpush
