@@ -162,6 +162,11 @@ class Order extends Model
         return $this->belongsTo(User::class, 'collection_branch_id');
     }
 
+    public function collectionCenterMoves(): HasMany
+    {
+        return $this->hasMany(CollectionCenterMove::class);
+    }
+
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);

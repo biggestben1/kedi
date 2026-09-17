@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Bank;
 use App\Models\BranchStock;
+use App\Models\CollectionCenterMove;
 use App\Models\Order;
+use App\Models\OrderGroup;
 use App\Models\PosMachine;
 use App\Models\Product;
 use App\Models\Role;
@@ -248,8 +250,26 @@ class CollectionCenterController extends Controller
         }
 
         $order->loadMissing('collectionBranch');
+        $fromId = $order->collection_branch_id ? (int) $order->collection_branch_id : null;
         $fromName = $order->collectionBranch?->name ?: 'current center';
-        $order->update(['collection_branch_id' => $destination->id]);
+
+        DB::transaction(function () use ($order, $destination, $fromId, $request) {
+            $order->update(['collection_branch_id' => $destination->id]);
+
+            CollectionCenterMove::create([
+                'order_id' => $order->id,
+                'order_group_id' => $order->order_group_id,
+                'from_branch_user_id' => $fromId,
+                'to_branch_user_id' => $destination->id,
+                'moved_by_user_id' => $request->user()->id,
+                'reason' => 'Moved from collection center (could not fulfill)',
+            ]);
+
+            if ($order->order_group_id) {
+                OrderGroup::where('id', $order->order_group_id)
+                    ->update(['collection_branch_id' => $destination->id]);
+            }
+        });
 
         return redirect()
             ->route('collection-centers.incoming')

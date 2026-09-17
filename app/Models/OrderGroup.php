@@ -14,6 +14,7 @@ class OrderGroup extends Model
 
     protected $fillable = [
         'user_id',
+        'collection_branch_id',
         'name',
         'kd_id',
         'customer_name',
@@ -40,9 +41,19 @@ class OrderGroup extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function collectionBranch(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'collection_branch_id');
+    }
+
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function collectionCenterMoves(): HasMany
+    {
+        return $this->hasMany(CollectionCenterMove::class);
     }
 
     public function draftOrders(): HasMany

@@ -6,6 +6,7 @@ use App\Mail\OrderConfirmationMail;
 use App\Models\AnnexStock;
 use App\Models\Bank;
 use App\Models\BranchStock;
+use App\Models\CollectionCenterMove;
 use App\Models\Coupon;
 use App\Models\DpbvCollection;
 use App\Models\HeadquartersStock;
@@ -255,7 +256,10 @@ class OrderGroupController extends Controller
     {
         $this->authorizeGroup($request, $orderGroup);
 
-        $orderGroup->load(['orders' => fn ($q) => $q->with(['items', 'collectionBranch'])->latest()]);
+        $orderGroup->load([
+            'collectionBranch',
+            'orders' => fn ($q) => $q->with(['items', 'collectionBranch'])->latest(),
+        ]);
         $paymentData = $this->groupPaymentViewData($request, $orderGroup);
         $isActive = (int) $request->session()->get('order_group_id') === (int) $orderGroup->id;
 
@@ -276,9 +280,10 @@ class OrderGroupController extends Controller
             ->filter()
             ->unique()
             ->values();
-        $currentCollectionBranch = $currentCollectionBranchIds->count() === 1
-            ? $collectionBranches->firstWhere('id', (int) $currentCollectionBranchIds->first())
-            : null;
+        $currentCollectionBranch = $orderGroup->collectionBranch
+            ?: ($currentCollectionBranchIds->count() === 1
+                ? $collectionBranches->firstWhere('id', (int) $currentCollectionBranchIds->first())
+                : null);
 
         return view('order-groups.show', array_merge($paymentData, [
             'group' => $orderGroup,
@@ -334,12 +339,27 @@ class OrderGroupController extends Controller
         }
 
         $moved = 0;
-        DB::transaction(function () use ($orders, $branch, &$moved) {
+        $moverId = $request->user()->id;
+        DB::transaction(function () use ($orders, $branch, $orderGroup, $moverId, &$moved) {
+            $orderGroup->update(['collection_branch_id' => $branch->id]);
+
             foreach ($orders as $order) {
-                if ((int) $order->collection_branch_id === (int) $branch->id) {
+                $fromId = $order->collection_branch_id ? (int) $order->collection_branch_id : null;
+                if ($fromId === (int) $branch->id) {
                     continue;
                 }
+
                 $order->update(['collection_branch_id' => $branch->id]);
+
+                CollectionCenterMove::create([
+                    'order_id' => $order->id,
+                    'order_group_id' => $orderGroup->id,
+                    'from_branch_user_id' => $fromId,
+                    'to_branch_user_id' => $branch->id,
+                    'moved_by_user_id' => $moverId,
+                    'reason' => 'Moved via order group',
+                ]);
+
                 $moved++;
             }
         });
