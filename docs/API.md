@@ -57,6 +57,16 @@ Authorization: Bearer {token}
 
 ---
 
+## KD Registration
+
+### GET `/kd-registrations/create-form`
+Returns wallet balance, registration fee (₦12,000), linked user, and open order groups.
+
+### POST `/kd-registrations`
+Body: `kd_no`, `full_name`, `phone_number` (optional), `sponsor_kd_no`, `sponsor_name`, `placement_kd_no` / `placement_name` (optional), `notes`, `registration_type` (`new`|`old`), `add_to_order_group`, `order_group_id`.
+
+---
+
 ## Order groups
 
 ### GET `/order-groups`

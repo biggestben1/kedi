@@ -8,12 +8,13 @@ use App\Http\Controllers\Api\DriverOrderController;
 use App\Http\Controllers\Api\BonusController;
 use App\Http\Controllers\Api\DpbvController;
 use App\Http\Controllers\Api\InvoiceController;
+use App\Http\Controllers\Api\KdInfoController as ApiKdInfoController;
+use App\Http\Controllers\Api\KdRegistrationController as ApiKdRegistrationController;
 use App\Http\Controllers\Api\OrderGroupController as ApiOrderGroupController;
 use App\Http\Controllers\Api\PromoController;
 use App\Http\Controllers\CustomerInvoiceController;
 use App\Http\Controllers\ServiceCenterLookupController;
 use App\Http\Controllers\Api\OrderController;
-use App\Http\Controllers\Api\KdInfoController as ApiKdInfoController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\StorageController;
 use App\Http\Controllers\Api\WalletController;
@@ -54,6 +55,9 @@ Route::prefix('v1')->group(function () {
 
         Route::post('kd-info/search', [ApiKdInfoController::class, 'search']);
         Route::post('kd-info/auto-generate', [ApiKdInfoController::class, 'autoGenerate']);
+
+        Route::get('kd-registrations/create-form', [ApiKdRegistrationController::class, 'createForm']);
+        Route::post('kd-registrations', [ApiKdRegistrationController::class, 'store']);
 
         Route::get('wallet', [WalletController::class, 'balance']);
         Route::get('wallet/transactions', [WalletController::class, 'transactions']);
