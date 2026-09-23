@@ -54,7 +54,7 @@
                                         <div class="dropdown-divider m-0"></div>
                                         <a class="dropdown-item" href="{{ route('dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
                                         <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
-                                        <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
+                                        <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> Special Sales</a>
                                         <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
                                         <form method="POST" action="{{ route('logout') }}">
                                             @csrf
@@ -90,7 +90,7 @@
                             <a class="side-menu__item" href="{{ route('orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Orders</span></a>
                         </li>
                         <li class="slide">
-                            <a class="side-menu__item active" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
+                            <a class="side-menu__item active" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
                         </li>
                         <li class="sub-category"><h3>Account</h3></li>
                         <li class="slide">
@@ -112,7 +112,7 @@
                         <div>
                             <ol class="breadcrumb">
                                 <li class="breadcrumb-item"><a href="{{ url('/') }}">Home</a></li>
-                                <li class="breadcrumb-item"><a href="{{ route('invoices.index') }}">My Invoices</a></li>
+                                <li class="breadcrumb-item"><a href="{{ route('invoices.index') }}">Special Sales</a></li>
                                 <li class="breadcrumb-item active" aria-current="page">{{ $invoice->invoice_number }}</li>
                             </ol>
                         </div>
@@ -347,7 +347,7 @@
                             @endif
                         </div>
                         <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <a href="{{ route('invoices.index') }}" class="btn btn-outline-secondary">Back to My Invoices</a>
+                            <a href="{{ route('invoices.index') }}" class="btn btn-outline-secondary">Back to Special Sales</a>
                             <a href="{{ route('invoices.create') }}" class="btn btn-success"><i class="fe fe-plus me-1"></i>Create New</a>
                         </div>
                     </div>

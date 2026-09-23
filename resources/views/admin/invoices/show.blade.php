@@ -8,11 +8,7 @@
         <div>
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ route('admin') }}">Admin</a></li>
-                @if(auth()->user()->role?->name === 'accountant')
-                    <li class="breadcrumb-item"><a href="{{ route('admin.pharmacy.financial') }}">Financial Report</a></li>
-                @else
-                    <li class="breadcrumb-item"><a href="{{ route('admin.invoices.index') }}">Invoices</a></li>
-                @endif
+                <li class="breadcrumb-item"><a href="{{ route('admin.invoices.index') }}">Invoices</a></li>
                 <li class="breadcrumb-item active" aria-current="page">View</li>
             </ol>
         </div>
@@ -32,6 +28,11 @@
                         <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Are you sure you want to approve this invoice? Stock will be deducted and an order will be created for the customer.');">
                             <i class="fe fe-check me-1"></i>Approve Invoice
                         </button>
+                    </form>
+                @elseif(($canMoveToDispatch ?? false) && !($canApprove ?? false))
+                    <form action="{{ route('admin.invoices.move-to-dispatch', $invoice) }}" method="POST" class="d-inline" onsubmit="return confirm('Move this invoice to dispatch? An order will be created for the dispatcher to process.');">
+                        @csrf
+                        <button type="submit" class="btn btn-sm btn-success"><i class="fe fe-truck me-1"></i>Move to dispatch</button>
                     </form>
                 @endif
             </div>
@@ -76,7 +77,11 @@
             @if(isset($existingOrder) && $existingOrder)
                 <div class="row g-3 mb-4">
                     <div class="col-md-12">
-                        <a href="{{ route('admin.dispatch.orders.show', $existingOrder) }}" class="btn btn-sm btn-outline-success"><i class="fe fe-truck me-1"></i>View dispatch order</a>
+                        @if(auth()->user()->role?->name === 'accountant')
+                            <span class="badge bg-info">Moved to dispatch</span>
+                        @else
+                            <a href="{{ route('admin.dispatch.orders.show', $existingOrder) }}" class="btn btn-sm btn-outline-success"><i class="fe fe-truck me-1"></i>View dispatch order</a>
+                        @endif
                     </div>
                 </div>
             @endif

@@ -799,11 +799,14 @@ class CustomerInvoiceController extends Controller
             }
         }
 
-        // When user chose to use Service Center details, apply them to customer fields (where possible)
+        // When user chose to use Service Center details, apply contact fields.
+        // Keep the entered buyer name on the invoice when provided.
         if ($useScReferral) {
             $serviceCenter = $serviceCenter ?: $this->resolveServiceCenterByCode($scReferralCode);
             if ($serviceCenter) {
-                $data['customer_name'] = $serviceCenter->name;
+                if ($buyerName === '') {
+                    $data['customer_name'] = $serviceCenter->name;
+                }
                 $data['customer_email'] = $serviceCenter->email;
                 $data['customer_phone'] = $serviceCenter->phone ?? null;
                 $data['customer_address'] = $serviceCenter->address ?? null;
@@ -1101,6 +1104,7 @@ class CustomerInvoiceController extends Controller
 
         $data = $request->validate([
             'customer_name' => ['nullable', 'string', 'max:255'],
+            'buyer_name' => ['nullable', 'string', 'max:255'],
             'sc_referral_code' => ['nullable', 'string', 'max:100'],
             'coupon_code' => ['nullable', 'string', 'max:100'],
             'customer_email' => ['nullable', 'email', 'max:255'],
@@ -1133,6 +1137,11 @@ class CustomerInvoiceController extends Controller
             'items.*.unit' => ['nullable', 'string', 'max:50'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
         ]);
+
+        $buyerName = trim((string) ($data['buyer_name'] ?? ''));
+        if ($buyerName !== '') {
+            $data['customer_name'] = $buyerName;
+        }
 
         $items = null; // null = keep existing items
 
@@ -1221,10 +1230,13 @@ class CustomerInvoiceController extends Controller
         $totalDiscount = $discount + $couponDiscountAmount;
         $total = $subtotal + $tax - $totalDiscount;
 
+        // Keep the entered buyer name; only fall back to SC name when buyer name is empty.
         if ($useScReferral) {
             $serviceCenter = $this->resolveServiceCenterByCode($data['sc_referral_code'] ?? null);
             if ($serviceCenter) {
-                $data['customer_name'] = $serviceCenter->name;
+                if ($buyerName === '') {
+                    $data['customer_name'] = $serviceCenter->name;
+                }
                 $data['customer_email'] = $serviceCenter->email;
                 $data['customer_phone'] = $serviceCenter->phone ?? null;
                 $data['customer_address'] = $serviceCenter->address ?? null;

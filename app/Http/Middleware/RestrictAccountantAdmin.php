@@ -7,8 +7,9 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Accountant can access: office reports hub, pharmacy reports, financial report, invoice view/PDF,
- * wallet management, banks, user management (cashiers/distributors), KD tools, and kit purchase.
+ * Accountant can access: office reports hub, pharmacy reports, financial report,
+ * invoice list/view/PDF/move-to-dispatch, wallet management, banks, user management
+ * (cashiers/distributors), KD tools, and kit purchase.
  */
 class RestrictAccountantAdmin
 {
@@ -24,7 +25,12 @@ class RestrictAccountantAdmin
             || str_starts_with($routeName, 'admin.pharmacy.reports')
             || str_starts_with($routeName, 'admin.pharmacy.financial')
             || str_starts_with($routeName, 'admin.accountant.office-reports')
-            || in_array($routeName, ['admin.invoices.show', 'admin.invoices.pdf'], true)
+            || in_array($routeName, [
+                'admin.invoices.index',
+                'admin.invoices.show',
+                'admin.invoices.pdf',
+                'admin.invoices.move-to-dispatch',
+            ], true)
             || str_starts_with($routeName, 'admin.accountant.wallet')
             || str_starts_with($routeName, 'admin.wallet_topups')
             || str_starts_with($routeName, 'admin.banks')

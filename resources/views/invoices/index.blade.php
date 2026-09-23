@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>My Invoices – {{ config('app.name') }}</title>
+    <title>Special Sales – {{ config('app.name') }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
     @include('partials.pwa-head')
     <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
@@ -58,7 +58,7 @@
                                                 <div class="dropdown-divider m-0"></div>
                                                 <a class="dropdown-item" href="{{ route('dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
-                                                <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
+                                                <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> Special Sales</a>
                                                 <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
                                                 <a class="dropdown-item" href="{{ route('dpbv.index') }}"><i class="dropdown-icon fe fe-award"></i> My DPBV</a>
                                                 <a class="dropdown-item" href="{{ route('promo.index') }}"><i class="dropdown-icon fe fe-gift"></i> My Promo</a>
@@ -116,7 +116,7 @@
                                 <a class="side-menu__item" href="{{ route('orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">My Orders</span></a>
                             </li>
                             <li class="slide">
-                                <a class="side-menu__item active" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
+                                <a class="side-menu__item active" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Wallet</span></a>
@@ -167,10 +167,10 @@
                         <div class="page-header">
                             <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
                                 <div>
-                                    <h1 class="page-title mb-1">My Invoices</h1>
+                                    <h1 class="page-title mb-1">Special Sales</h1>
                                     <ol class="breadcrumb mb-0">
                                         <li class="breadcrumb-item"><a href="{{ url('/') }}">Home</a></li>
-                                        <li class="breadcrumb-item active" aria-current="page">My Invoices</li>
+                                        <li class="breadcrumb-item active" aria-current="page">Special Sales</li>
                                     </ol>
                                 </div>
                                 <div class="d-flex flex-wrap align-items-center gap-2">

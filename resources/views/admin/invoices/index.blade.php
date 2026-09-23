@@ -85,7 +85,9 @@
                         <a href="{{ route('admin.invoices.index') }}" class="btn btn-sm btn-outline-secondary">Clear all</a>
                     @endif
                 </form>
+                @if(auth()->user()->role?->name !== 'accountant')
                 <a href="{{ route('admin.invoices.create') }}" class="btn btn-primary btn-sm"><i class="fe fe-plus me-1"></i>New Invoice</a>
+                @endif
             </div>
         </div>
         <div class="card-body p-0">
@@ -139,20 +141,26 @@
                                             </form>
                                         @endif
                                     @elseif($invoice->order)
+                                    @if(auth()->user()->role?->name === 'accountant')
+                                    <span class="badge bg-info me-1">In dispatch</span>
+                                    @else
                                     <a href="{{ route('admin.dispatch.orders.show', $invoice->order) }}" class="btn btn-sm btn-outline-success"><i class="fe fe-truck me-1"></i>In dispatch</a>
+                                    @endif
                                     @endif
                                     <a href="{{ route('admin.invoices.show', $invoice) }}" class="btn btn-sm btn-outline-info" title="View"><i class="fe fe-eye me-1"></i>View</a>
                                     <a href="{{ route('admin.invoices.pdf', $invoice) }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener" title="Download PDF"><i class="fe fe-file-text me-1"></i>PDF</a>
+                                    @if(auth()->user()->role?->name !== 'accountant')
                                     <a href="{{ route('admin.invoices.edit', $invoice) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                                     <form action="{{ route('admin.invoices.destroy', $invoice) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this invoice?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                     </form>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="text-center text-muted p-4">No invoices. <a href="{{ route('admin.invoices.create') }}">Create one</a>.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted p-4">No invoices.@if(auth()->user()->role?->name !== 'accountant') <a href="{{ route('admin.invoices.create') }}">Create one</a>.@endif</td></tr>
                         @endforelse
                     </tbody>
                 </table>

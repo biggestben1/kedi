@@ -78,7 +78,7 @@
                                                 <a class="dropdown-item" href="{{ route('dashboard') }}"><i class="dropdown-icon fe fe-grid"></i> Dashboard</a>
                                                 <a class="dropdown-item" href="{{ route('orders.index') }}"><i class="dropdown-icon fe fe-package"></i> My Orders</a>
                                                 <a class="dropdown-item" href="{{ route('order-groups.index') }}"><i class="dropdown-icon fe fe-layers"></i> Order Groups</a>
-                                                <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
+                                                <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> Special Sales</a>
                                                 <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
                                                 <a class="dropdown-item" href="{{ route('dpbv.index') }}"><i class="dropdown-icon fe fe-award"></i> My DPBV</a>
                                                 <a class="dropdown-item" href="{{ route('promo.index') }}"><i class="dropdown-icon fe fe-gift"></i> My Promo</a>
@@ -156,7 +156,7 @@
                             </li>
                             @endif
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
+                                <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('my-blog.index') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">My Blog</span></a>
@@ -263,7 +263,7 @@
                                         @if(auth()->user()->role?->name === 'service_center')
                                         <a href="{{ route('admin.pharmacy.referred-orders') }}" class="btn btn-outline-success me-2"><i class="fe fe-users me-1"></i>Referral Orders</a>
                                         @endif
-                                        <a href="{{ route('invoices.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-file-text me-1"></i>My Invoices</a>
+                                        <a href="{{ route('invoices.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-file-text me-1"></i>Special Sales</a>
                                         <a href="{{ route('my-blog.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-edit me-1"></i>My Blog</a>
                                         <a href="{{ route('blog.index') }}" class="btn btn-outline-secondary me-2"><i class="fe fe-book-open me-1"></i>Community blog</a>
                                         <a href="{{ route('wallet.index') }}" class="btn btn-outline-primary me-2"><i class="fe fe-dollar-sign me-2"></i>Wallet</a>

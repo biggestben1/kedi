@@ -237,7 +237,7 @@ Route::middleware('auth')->group(function () {
     // My Bonus (user view their bonus records)
     Route::get('/bonus', [BonusController::class, 'index'])->name('bonus.index');
 
-    // My Invoices (customer view their invoices)
+    // Special Sales (customer invoices)
     Route::get('/my-invoices', [CustomerInvoiceController::class, 'index'])->name('invoices.index');
     Route::get('/my-invoices/create', [CustomerInvoiceController::class, 'create'])->name('invoices.create');
     Route::post('/my-invoices/validate-coupon', [CustomerInvoiceController::class, 'validateCoupon'])->name('invoices.validate-coupon');

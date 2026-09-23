@@ -176,7 +176,7 @@
                                                 @if(auth()->user()->role?->name === 'service_center')
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="dropdown-icon fe fe-users"></i> Referral Orders</a>
                                                 @endif
-                                                <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
+                                                <a class="dropdown-item" href="{{ route('invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> Special Sales</a>
                                                 <a class="dropdown-item" href="{{ route('wallet.index') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Wallet</a>
                                                 <a class="dropdown-item" href="{{ route('password.change') }}"><i class="dropdown-icon fe fe-lock"></i> Change Password</a>
                                                 @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center')
@@ -272,7 +272,7 @@
                             </li>
                             @endif
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
+                                <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('my-blog.index') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">My Blog</span></a>

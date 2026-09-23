@@ -172,13 +172,14 @@
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.reports') }}"><i class="dropdown-icon fe fe-bar-chart-2"></i> Reports</a>
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.financial') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Financial Report</a>
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Admin</a>
-                                                <a class="dropdown-item" href="{{ route('admin.invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> My Invoices</a>
+                                                <a class="dropdown-item" href="{{ route('admin.invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> Special Sales</a>
                                                 <a class="dropdown-item" href="{{ route('admin.products.index') }}"><i class="dropdown-icon fe fe-grid"></i> Products</a>
                                                 @elseif(auth()->user()->role?->name === 'accountant')
                                                 <a class="dropdown-item" href="{{ route('admin') }}"><i class="dropdown-icon fe fe-settings"></i> Admin</a>
                                                 <a class="dropdown-item" href="{{ route('admin.accountant.office-reports') }}"><i class="dropdown-icon fe fe-layers"></i> Office Reports</a>
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.reports') }}"><i class="dropdown-icon fe fe-bar-chart-2"></i> Reports</a>
                                                 <a class="dropdown-item" href="{{ route('admin.pharmacy.financial') }}"><i class="dropdown-icon fe fe-dollar-sign"></i> Financial Report</a>
+                                                <a class="dropdown-item" href="{{ route('admin.invoices.index') }}"><i class="dropdown-icon fe fe-file-text"></i> Invoices</a>
                                                 <a class="dropdown-item" href="{{ route('admin.users.create', ['role' => 'cashier']) }}"><i class="dropdown-icon fe fe-user-plus"></i> Create Cashier</a>
                                                 <a class="dropdown-item" href="{{ route('admin.banks.index') }}"><i class="dropdown-icon fe fe-credit-card"></i> Banks</a>
                                                 <a class="dropdown-item" href="{{ route('admin.accountant.wallet.index') }}"><i class="dropdown-icon fe fe-wallet"></i> Wallet Management</a>
@@ -611,7 +612,7 @@
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
                             </li>
                             <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Invoices</span></a>
+                                <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.back_orders*') ? 'active' : '' }}" href="{{ route('admin.back_orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">Back Orders</span></a>
@@ -663,6 +664,9 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Invoices</span></a>
                             </li>
                             <li class="slide {{ request()->routeIs('admin.users*') ? 'is-expanded' : '' }}">
                                 <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Cashiers</span><i class="angle fe fe-chevron-right"></i></a>

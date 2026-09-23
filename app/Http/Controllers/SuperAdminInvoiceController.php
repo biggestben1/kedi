@@ -29,6 +29,7 @@ class SuperAdminInvoiceController extends Controller
         $headquartersOnly = $request->user()?->role?->name === 'headquarters';
         $serviceCenterOnly = $request->user()?->role?->name === 'service_center';
         $annexOnly = $request->user()?->role?->name === 'annex';
+        $accountantOnly = $request->user()?->role?->name === 'accountant';
 
         $customerIds = $resellerOnly ? $request->user()->createdUsers()->pluck('id')->all() : null;
         $branchCustomerIds = $branchOnly ? $request->user()->createdUsers()->pluck('id')->all() : null;
@@ -64,7 +65,12 @@ class SuperAdminInvoiceController extends Controller
                 ->all();
         }
 
-        $applyUserInvoiceScope = function ($query) use ($customerIds, $branchCustomerIds, $serviceCenterUserIds, $headquartersUserIds, $annexOwnInvoiceIds) {
+        // Accountant: invoices belonging to their organization (same scope as financial reports)
+        $accountantOrgUserIds = $accountantOnly
+            ? OrgUserScope::allowedUserIds($request->user())
+            : null;
+
+        $applyUserInvoiceScope = function ($query) use ($customerIds, $branchCustomerIds, $serviceCenterUserIds, $headquartersUserIds, $annexOwnInvoiceIds, $accountantOrgUserIds) {
             return $query
                 ->when($customerIds !== null, function ($q) use ($customerIds) {
                     $q->whereIn('user_id', $customerIds);
@@ -80,6 +86,12 @@ class SuperAdminInvoiceController extends Controller
                 })
                 ->when($annexOwnInvoiceIds !== null, function ($q) use ($annexOwnInvoiceIds) {
                     $q->whereIn('user_id', $annexOwnInvoiceIds);
+                })
+                ->when($accountantOrgUserIds !== null, function ($q) use ($accountantOrgUserIds) {
+                    $q->where(function ($inner) use ($accountantOrgUserIds) {
+                        $inner->whereIn('user_id', $accountantOrgUserIds)
+                            ->orWhereIn('branch_user_id', $accountantOrgUserIds);
+                    });
                 });
         };
 
@@ -875,6 +887,7 @@ class SuperAdminInvoiceController extends Controller
     {
         $resellerOnly = $request->user()?->role?->name === 'reseller';
         $branchOnly = $request->user()?->role?->name === 'branch';
+        $accountantOnly = $request->user()?->role?->name === 'accountant';
         if ($resellerOnly) {
             $customerIds = $request->user()->createdUsers()->pluck('id')->all();
             if (! $invoice->user_id || ! in_array((int) $invoice->user_id, $customerIds, true)) {
@@ -885,6 +898,12 @@ class SuperAdminInvoiceController extends Controller
             $customerIds = $request->user()->createdUsers()->pluck('id')->all();
             if (! $invoice->user_id || ! in_array((int) $invoice->user_id, $customerIds, true)) {
                 abort(403, 'Access denied.');
+            }
+        }
+        if ($accountantOnly) {
+            $allowedUserIds = OrgUserScope::allowedUserIds($request->user());
+            if ($allowedUserIds !== null && ! $this->invoiceBelongsToOrg($invoice, $allowedUserIds)) {
+                abort(403, 'Access denied. You can only push invoices for your organization.');
             }
         }
 
@@ -1023,6 +1042,12 @@ class SuperAdminInvoiceController extends Controller
         $msg = 'Invoice moved to dispatch. You can now process it.';
         if ($backOrderCount > 0) {
             $msg .= ' '.$backOrderCount.' back order(s) saved against the customer for when you receive more stock.';
+        }
+
+        if ($request->user()?->role?->name === 'accountant') {
+            return redirect()
+                ->route('admin.invoices.show', $invoice)
+                ->with('success', $msg);
         }
 
         return redirect()
