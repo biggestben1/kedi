@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Bank;
 use App\Models\BranchStock;
 use App\Models\CollectionCenterMove;
+use App\Models\CollectionInvoice;
 use App\Models\Order;
 use App\Models\OrderGroup;
 use App\Models\PosMachine;
@@ -126,6 +127,7 @@ class CollectionCenterController extends Controller
         $orders = Order::with(['user', 'items'])
             ->where('collection_branch_id', $branch->id)
             ->whereNull('collected_at')
+            ->whereDoesntHave('collectionInvoice')
             ->orderByDesc('id')
             ->paginate(20);
 
@@ -134,6 +136,34 @@ class CollectionCenterController extends Controller
             'title' => 'Orders sent to '.$branch->name,
             'branch' => $branch,
             'canCollect' => true,
+            'collectionBranches' => $this->branchesQuery()
+                ->where('id', '!=', $branch->id)
+                ->orderBy('name')
+                ->get(['id', 'name', 'phone', 'email']),
+        ]);
+    }
+
+    public function incomingInvoices(Request $request)
+    {
+        $branch = $this->viewerBranch($request->user());
+        abort_unless($branch, 403, 'Only a branch can see invoices sent for collection.');
+
+        $collected = $request->query('status') === 'collected';
+
+        $invoices = CollectionInvoice::with(['user', 'items', 'order.items', 'order.collectionBranch'])
+            ->whereHas('order', function ($q) use ($branch, $collected) {
+                $q->withoutTrashed()
+                    ->where('collection_branch_id', $branch->id)
+                    ->when($collected, fn ($q) => $q->whereNotNull('collected_at'), fn ($q) => $q->whereNull('collected_at'));
+            })
+            ->orderByDesc('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('collection-centers.invoices', [
+            'invoices' => $invoices,
+            'branch' => $branch,
+            'collected' => $collected,
             'collectionBranches' => $this->branchesQuery()
                 ->where('id', '!=', $branch->id)
                 ->orderBy('name')
@@ -174,7 +204,10 @@ class CollectionCenterController extends Controller
         ]);
 
         $order->load('items');
-        foreach ($order->items as $item) {
+        $stockItems = $order->items->reject(
+            fn ($item) => str_starts_with((string) $item->item_code, CollectionInvoice::NON_STOCK_ITEM_PREFIX)
+        );
+        foreach ($stockItems as $item) {
             $product = Product::where('item_code', $item->item_code)->first();
             if (! $product) {
                 return back()->with('error', 'Product not found for '.$item->product_name.'.');
@@ -189,8 +222,8 @@ class CollectionCenterController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($order, $branch, $request) {
-                foreach ($order->items as $item) {
+            DB::transaction(function () use ($order, $stockItems, $branch, $request) {
+                foreach ($stockItems as $item) {
                     $product = Product::where('item_code', $item->item_code)->lockForUpdate()->first();
                     if (! $product || ! BranchStock::decrementStock($branch->id, $product->id, (int) $item->quantity)) {
                         throw new \RuntimeException('Could not deduct branch stock for '.$item->product_name.'. Use “Move to another collection center” if this branch cannot fulfill the order.');
@@ -291,7 +324,8 @@ class CollectionCenterController extends Controller
             ->orderByDesc('collected_at');
 
         if (! $seeAll) {
-            $query->where('collection_branch_id', $branch->id);
+            $query->where('collection_branch_id', $branch->id)
+                ->whereDoesntHave('collectionInvoice');
         }
 
         return view('collection-centers.orders', [

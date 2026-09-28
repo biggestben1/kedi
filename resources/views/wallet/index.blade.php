@@ -121,6 +121,9 @@
                                 <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('checkout.show') }}"><i class="side-menu__icon fe fe-credit-card"></i><span class="side-menu__label">Checkout</span></a>
                             </li>
                             <li class="slide">

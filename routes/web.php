@@ -24,6 +24,7 @@ use App\Http\Controllers\BranchStockController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CollectionCenterController;
+use App\Http\Controllers\CollectionInvoiceController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CustomerInvoiceController;
 use App\Http\Controllers\DashboardController;
@@ -172,6 +173,7 @@ Route::middleware('auth')->group(function () {
     // Customer: Checkout & Wallet
     Route::get('/collection-centers', [CollectionCenterController::class, 'index'])->name('collection-centers.index');
     Route::get('/collection-centers/orders', [CollectionCenterController::class, 'incoming'])->name('collection-centers.incoming');
+    Route::get('/collection-centers/invoices', [CollectionCenterController::class, 'incomingInvoices'])->name('collection-centers.invoices');
     Route::get('/collection-centers/orders/{order}/invoice', [CollectionCenterController::class, 'invoice'])->name('collection-centers.invoice');
     Route::get('/collection-centers/orders/{order}/proof', [CollectionCenterController::class, 'proof'])->name('collection-centers.proof.show');
     Route::get('/collection-centers/proof', [CollectionCenterController::class, 'sessionProof'])->name('collection-centers.proof.preview');
@@ -247,6 +249,13 @@ Route::middleware('auth')->group(function () {
     Route::put('/my-invoices/{invoice}', [CustomerInvoiceController::class, 'update'])->name('invoices.update');
     Route::delete('/my-invoices/{invoice}', [CustomerInvoiceController::class, 'destroy'])->name('invoices.destroy');
     Route::get('/my-invoices/{invoice}/pdf', [CustomerInvoiceController::class, 'pdf'])->name('invoices.pdf');
+
+    // Invoice (no stock check; pushed to a collection center, stock deducted on collection)
+    Route::get('/collection-invoices', [CollectionInvoiceController::class, 'index'])->name('collection-invoices.index');
+    Route::get('/collection-invoices/create', [CollectionInvoiceController::class, 'create'])->name('collection-invoices.create');
+    Route::post('/collection-invoices', [CollectionInvoiceController::class, 'store'])->name('collection-invoices.store');
+    Route::get('/collection-invoices/{collectionInvoice}', [CollectionInvoiceController::class, 'show'])->name('collection-invoices.show');
+    Route::delete('/collection-invoices/{collectionInvoice}', [CollectionInvoiceController::class, 'destroy'])->name('collection-invoices.destroy');
 
     // Service Center lookup (wallet + DPBV)
     Route::post('/service-center/resolve', [ServiceCenterLookupController::class, 'resolve'])->name('service-center.resolve');

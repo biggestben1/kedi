@@ -115,6 +115,9 @@
                         <li class="slide">
                             <a class="side-menu__item active" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
                         </li>
+                        <li class="slide">
+                            <a class="side-menu__item" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
+                        </li>
                         <li class="sub-category"><h3>Account</h3></li>
                         <li class="slide">
                             <form method="POST" action="{{ route('logout') }}" class="d-inline">

@@ -259,6 +259,9 @@
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('collection-centers.incoming') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">Orders sent here</span></a>
                             </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('collection-centers.invoices') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoices sent here</span></a>
+                            </li>
                             @endif
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('orders.index', ['status' => 'draft']) }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">My Drafts</span></a>
@@ -273,6 +276,9 @@
                             @endif
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('my-blog.index') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">My Blog</span></a>

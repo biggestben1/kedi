@@ -119,6 +119,9 @@
                                 <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Wallet</span></a>
                             </li>
                             @if(auth()->user()->isSuperAdmin() || auth()->user()->role?->name === 'wholesale_staff' || auth()->user()->role?->name === 'reseller' || auth()->user()->role?->name === 'accountant' || auth()->user()->role?->name === 'dispatch' || auth()->user()->role?->name === 'headquarters' || auth()->user()->role?->name === 'branch' || auth()->user()->role?->name === 'service_center' || auth()->user()->role?->name === 'annex')
