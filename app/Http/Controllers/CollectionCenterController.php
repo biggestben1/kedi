@@ -154,6 +154,7 @@ class CollectionCenterController extends Controller
             ->whereHas('order', function ($q) use ($branch, $collected) {
                 $q->withoutTrashed()
                     ->where('collection_branch_id', $branch->id)
+                    ->where('status', '!=', Order::STATUS_DRAFT)
                     ->when($collected, fn ($q) => $q->whereNotNull('collected_at'), fn ($q) => $q->whereNull('collected_at'));
             })
             ->orderByDesc('id')

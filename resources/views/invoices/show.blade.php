@@ -171,6 +171,24 @@
                                     <label class="form-label text-muted small">Total</label>
                                     <p class="mb-0 fw-semibold">₦{{ preg_replace('/\.00$/', '', number_format($invoice->total ?? 0, 2)) }}</p>
                                 </div>
+                                <div class="col-md-3">
+                                    <label class="form-label text-muted small">Kedi number</label>
+                                    <p class="mb-0">{{ $invoice->kd_id ?: '—' }}</p>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label text-muted small">Group</label>
+                                    <p class="mb-0">
+                                        @if($invoice->orderGroup)
+                                            <a href="{{ route('order-groups.show', $invoice->orderGroup) }}">{{ $invoice->orderGroup->displayName() }}</a>
+                                        @else
+                                            —
+                                        @endif
+                                    </p>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label text-muted small">Collection center</label>
+                                    <p class="mb-0">{{ $invoice->collectionBranch?->name ?: '—' }}</p>
+                                </div>
                             </div>
 
                             <div class="mb-4">

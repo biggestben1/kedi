@@ -10,7 +10,11 @@ use App\Models\DpbvCollection;
 use App\Models\HeadquartersStock;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\KdCustomer;
 use App\Models\KediCreditTransaction;
+use App\Models\Order;
+use App\Models\OrderGroup;
+use App\Models\OrderItem;
 use App\Models\PosMachine;
 use App\Models\Product;
 use App\Models\Role;
@@ -478,7 +482,7 @@ class CustomerInvoiceController extends Controller
             $request->session()->forget('added_items');
         }
 
-        return view('invoices.create', [
+        return view('invoices.create', array_merge($this->saleSpotViewData($request), [
             'user' => $user,
             'products' => $products,
             'productStocks' => $productStocks,
@@ -493,7 +497,7 @@ class CustomerInvoiceController extends Controller
                 ->groupBy('status')
                 ->pluck('total', 'status')
                 ->toArray(),
-        ]);
+        ]));
     }
 
     public function createFormData(Request $request): JsonResponse
@@ -625,6 +629,10 @@ class CustomerInvoiceController extends Controller
                 'split_cheque_amount' => ['nullable', 'numeric', 'min:0'],
                 'status' => ['required', 'string', Rule::in(['draft', 'sent', 'paid', 'overdue', 'cancelled'])],
                 'notes' => ['nullable', 'string'],
+                'kd_id' => ['nullable', 'string', 'max:100'],
+                'order_group_id' => ['nullable', 'integer'],
+                'collection_branch_id' => ['nullable', 'integer'],
+                'add_to_group' => ['nullable'],
                 'use_sc_referral' => ['nullable'],
                 'use_product_quantities' => ['nullable'],
                 'product_quantities' => ['required', 'array'],
@@ -682,6 +690,10 @@ class CustomerInvoiceController extends Controller
                 'split_cheque_amount' => ['nullable', 'numeric', 'min:0'],
                 'status' => ['required', 'string', Rule::in(['draft', 'sent', 'paid', 'overdue', 'cancelled'])],
                 'notes' => ['nullable', 'string'],
+                'kd_id' => ['nullable', 'string', 'max:100'],
+                'order_group_id' => ['nullable', 'integer'],
+                'collection_branch_id' => ['nullable', 'integer'],
+                'add_to_group' => ['nullable'],
                 'use_sc_referral' => ['nullable'],
                 'items' => ['required', 'array', 'min:1'],
                 'items.*.item_name' => ['nullable', 'string', 'max:255'],
@@ -720,6 +732,14 @@ class CustomerInvoiceController extends Controller
         $buyerName = trim((string) ($data['buyer_name'] ?? ''));
         if ($buyerName !== '') {
             $data['customer_name'] = $buyerName;
+        }
+
+        $saleSpot = $this->resolveSaleSpot($request, $user, $data);
+        if ($saleSpot instanceof RedirectResponse || $saleSpot instanceof JsonResponse) {
+            return $saleSpot;
+        }
+        if ($saleSpot['add_to_group']) {
+            $data['status'] = 'draft';
         }
 
         $data['invoice_number'] = $this->generateInvoiceNumber();
@@ -867,7 +887,7 @@ class CustomerInvoiceController extends Controller
         }
 
         $invoice = null;
-        DB::transaction(function () use ($data, $items, $subtotal, $tax, $discount, $couponCode, $couponIdToConsume, $couponDiscountAmount, $total, $user, $paymentMethod, $paymentBreakdown, $serviceCenter, $kediCreditOwner, $splitPayment, $shouldDeduct, $productQuantitiesForStock, &$invoice) {
+        DB::transaction(function () use ($data, $items, $subtotal, $tax, $discount, $couponCode, $couponIdToConsume, $couponDiscountAmount, $total, $user, $paymentMethod, $paymentBreakdown, $serviceCenter, $kediCreditOwner, $splitPayment, $shouldDeduct, $productQuantitiesForStock, $saleSpot, &$invoice) {
             if ($shouldDeduct && $couponCode && $couponIdToConsume) {
                 // Consume coupon (single-use) safely inside transaction
                 $locked = Coupon::where('id', $couponIdToConsume)->lockForUpdate()->first();
@@ -882,6 +902,9 @@ class CustomerInvoiceController extends Controller
                 'user_id' => $data['user_id'],
                 'branch_user_id' => $serviceCenter?->id,
                 'customer_name' => $data['customer_name'] ?? $user->name ?? null,
+                'kd_id' => $saleSpot['kd_id'],
+                'order_group_id' => $saleSpot['order_group_id'],
+                'collection_branch_id' => $saleSpot['collection_branch_id'],
                 'sc_referral_code' => $data['sc_referral_code'] ?? null,
                 'coupon_code' => $couponCode,
                 'customer_email' => $data['customer_email'] ?? $user->email ?? null,
@@ -975,6 +998,10 @@ class CustomerInvoiceController extends Controller
                 ]);
                 }
             }
+
+            if ($saleSpot['add_to_group']) {
+                $this->createInvoiceGroupDraft($invoice, $user, $saleSpot);
+            }
         });
 
         if ($request->expectsJson()) {
@@ -983,6 +1010,15 @@ class CustomerInvoiceController extends Controller
                 'message' => 'Invoice created successfully.',
                 'data' => $this->invoiceToApiArray($invoice),
             ], 201);
+        }
+
+        if ($saleSpot['add_to_group'] && $saleSpot['order_group_id']) {
+            $request->session()->put('order_group_id', $saleSpot['order_group_id']);
+            $request->session()->forget(['kd_id', 'customer_name']);
+
+            return redirect()
+                ->route('order-groups.show', $saleSpot['order_group_id'])
+                ->with('success', 'Invoice '.$invoice->invoice_number.' added to the group.');
         }
 
         return redirect()
@@ -1015,7 +1051,7 @@ class CustomerInvoiceController extends Controller
     {
         $this->assertOwner($request, $invoice);
 
-        $invoice->load('items', 'user');
+        $invoice->load('items', 'user', 'orderGroup', 'collectionBranch');
         $cartCount = array_sum($request->session()->get('cart', []));
 
         return view('invoices.show', [
@@ -1080,7 +1116,7 @@ class CustomerInvoiceController extends Controller
             $prefillQuantities[$product->id] = ($prefillQuantities[$product->id] ?? 0) + (float) $item->quantity;
         }
 
-        return view('invoices.edit', [
+        return view('invoices.edit', array_merge($this->saleSpotViewData($request, $invoice), [
             'invoice' => $invoice,
             'user' => $user,
             'products' => $products,
@@ -1089,7 +1125,7 @@ class CustomerInvoiceController extends Controller
             'prefillQuantities' => $prefillQuantities,
             'posMachines' => $posMachines,
             'banks' => $banks,
-        ]);
+        ]));
     }
 
     public function update(Request $request, Invoice $invoice)
@@ -1125,6 +1161,10 @@ class CustomerInvoiceController extends Controller
             'split_cheque_amount' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'string', Rule::in(['draft', 'sent', 'paid', 'overdue', 'cancelled'])],
             'notes' => ['nullable', 'string'],
+            'kd_id' => ['nullable', 'string', 'max:100'],
+            'order_group_id' => ['nullable', 'integer'],
+            'collection_branch_id' => ['nullable', 'integer'],
+            'add_to_group' => ['nullable'],
             'use_sc_referral' => ['nullable'],
             'use_product_quantities' => ['nullable'],
             // optional item inputs; if empty, keep existing items
@@ -1141,6 +1181,19 @@ class CustomerInvoiceController extends Controller
         $buyerName = trim((string) ($data['buyer_name'] ?? ''));
         if ($buyerName !== '') {
             $data['customer_name'] = $buyerName;
+        }
+
+        $saleSpot = $this->resolveSaleSpot($request, $user, $data);
+        if ($saleSpot instanceof RedirectResponse || $saleSpot instanceof JsonResponse) {
+            return $saleSpot;
+        }
+        if ($saleSpot['add_to_group']) {
+            if ($invoice->stock_deducted_at) {
+                return $this->invoiceFormError($request, [
+                    'order_group_id' => 'This invoice has already been paid, so it cannot be added to a group.',
+                ]);
+            }
+            $data['status'] = 'draft';
         }
 
         $items = null; // null = keep existing items
@@ -1374,7 +1427,7 @@ class CustomerInvoiceController extends Controller
         }
 
         try {
-            DB::transaction(function () use ($invoice, $data, $items, $subtotal, $tax, $discount, $couponCode, $couponIdToConsume, $previousCouponCode, $couponDiscountAmount, $total, $user, $splitPayment, $paymentMethod, $paymentBreakdown, $shouldDeductStock, $shouldDeductPayment, $productQuantitiesForStock, $serviceCenter, $kediCreditOwner) {
+            DB::transaction(function () use ($invoice, $data, $items, $subtotal, $tax, $discount, $couponCode, $couponIdToConsume, $previousCouponCode, $couponDiscountAmount, $total, $user, $splitPayment, $paymentMethod, $paymentBreakdown, $shouldDeductStock, $shouldDeductPayment, $productQuantitiesForStock, $serviceCenter, $kediCreditOwner, $saleSpot) {
                 // Adjust coupon usage counts if coupon changed
                 if ($previousCouponCode !== (string) ($couponCode ?? '')) {
                     if ($previousCouponCode !== '') {
@@ -1394,6 +1447,9 @@ class CustomerInvoiceController extends Controller
 
                 $updatePayload = [
                     'customer_name' => $data['customer_name'] ?? $user->name ?? null,
+                    'kd_id' => $saleSpot['kd_id'],
+                    'order_group_id' => $saleSpot['order_group_id'],
+                    'collection_branch_id' => $saleSpot['collection_branch_id'],
                     'sc_referral_code' => $data['sc_referral_code'] ?? null,
                     'coupon_code' => $couponCode,
                     'customer_email' => $data['customer_email'] ?? $user->email ?? null,
@@ -1492,9 +1548,21 @@ class CustomerInvoiceController extends Controller
                         ]);
                     }
                 }
+
+                if ($saleSpot['add_to_group']) {
+                    $this->createInvoiceGroupDraft($invoice->fresh(), $user, $saleSpot);
+                }
             });
         } catch (\RuntimeException $e) {
             return redirect()->back()->withInput()->withErrors(['status' => $e->getMessage()]);
+        }
+
+        if ($saleSpot['add_to_group'] && $saleSpot['order_group_id']) {
+            $request->session()->put('order_group_id', $saleSpot['order_group_id']);
+
+            return redirect()
+                ->route('order-groups.show', $saleSpot['order_group_id'])
+                ->with('success', 'Invoice '.$invoice->invoice_number.' added to the group.');
         }
 
         return redirect()
@@ -1514,5 +1582,168 @@ class CustomerInvoiceController extends Controller
         return redirect()
             ->route('invoices.index')
             ->with('success', 'Invoice deleted successfully.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function saleSpotViewData(Request $request, ?Invoice $invoice = null): array
+    {
+        $user = $request->user();
+
+        return [
+            'collectionBranches' => User::whereHas('role', fn ($q) => $q->where('name', Role::BRANCH))
+                ->orderBy('name')
+                ->get(['id', 'name', 'phone']),
+            'openOrderGroups' => OrderGroup::where('user_id', $user->id)
+                ->where('status', OrderGroup::STATUS_OPEN)
+                ->orderByDesc('id')
+                ->get(),
+            'selectedKd' => old('kd_id', $invoice->kd_id ?? $request->session()->get('kd_id', '')),
+            'selectedGroupId' => (int) old('order_group_id', $invoice->order_group_id ?? 0),
+            'activeGroupId' => (int) $request->session()->get('order_group_id', 0),
+            'selectedBranchId' => (int) old('collection_branch_id', $invoice->collection_branch_id ?? $request->session()->get('collection_branch_id', 0)),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{add_to_group: bool, kd_id: ?string, order_group_id: ?int, collection_branch_id: ?int}|RedirectResponse|JsonResponse
+     */
+    private function resolveSaleSpot(Request $request, User $user, array &$data): array|RedirectResponse|JsonResponse
+    {
+        $addToGroup = $request->boolean('add_to_group');
+        $kdId = strtoupper(trim((string) ($data['kd_id'] ?? '')));
+        $groupId = (int) ($data['order_group_id'] ?? 0);
+        if ($addToGroup && $groupId === 0) {
+            $groupId = (int) $request->session()->get('order_group_id', 0);
+        }
+        $branchId = (int) ($data['collection_branch_id'] ?? 0);
+        $errors = [];
+
+        if ($addToGroup && $kdId === '') {
+            $errors['kd_id'] = 'Enter a Kedi number before adding this invoice to a group.';
+        }
+
+        $group = null;
+        if ($groupId > 0) {
+            $group = OrderGroup::where('id', $groupId)
+                ->where('user_id', $user->id)
+                ->where('status', OrderGroup::STATUS_OPEN)
+                ->first();
+            if (! $group) {
+                $errors['order_group_id'] = 'Choose an open order group.';
+            }
+        } elseif ($addToGroup) {
+            $errors['order_group_id'] = 'Choose an open order group.';
+        }
+
+        $branch = null;
+        if ($branchId > 0) {
+            $branch = User::where('id', $branchId)
+                ->whereHas('role', fn ($q) => $q->where('name', Role::BRANCH))
+                ->first();
+            if (! $branch) {
+                $errors['collection_branch_id'] = 'Choose a valid collection center.';
+            }
+        }
+
+        if ($errors !== []) {
+            return $this->invoiceFormError($request, $errors);
+        }
+
+        if ($kdId !== '') {
+            $customerName = trim((string) ($data['customer_name'] ?? $data['buyer_name'] ?? ''));
+            $existing = KdCustomer::query()
+                ->whereRaw("UPPER(REPLACE(kd_no, ' ', '')) = ?", [$kdId])
+                ->first();
+            if ($existing) {
+                $kdId = strtoupper(trim((string) $existing->kd_no));
+                if ($customerName === '' && trim((string) $existing->customer_name) !== '') {
+                    $data['customer_name'] = trim((string) $existing->customer_name);
+                }
+            } else {
+                KdCustomer::create([
+                    'kd_no' => $kdId,
+                    'customer_name' => $customerName !== '' ? $customerName : ($user->name ?: 'Customer'),
+                    'user_id' => $user->id,
+                ]);
+            }
+        }
+
+        return [
+            'add_to_group' => $addToGroup && $group !== null,
+            'kd_id' => $kdId !== '' ? $kdId : null,
+            'order_group_id' => $group?->id,
+            'collection_branch_id' => $branch?->id,
+        ];
+    }
+
+    /**
+     * @param  array{add_to_group: bool, kd_id: ?string, order_group_id: ?int, collection_branch_id: ?int}  $saleSpot
+     */
+    private function createInvoiceGroupDraft(Invoice $invoice, User $user, array $saleSpot): void
+    {
+        $invoice->load('items');
+        $products = Product::where('is_active', true)->get();
+        $existing = Order::where('invoice_id', $invoice->id)->first();
+        $payload = [
+            'user_id' => $user->id,
+            'order_group_id' => $saleSpot['order_group_id'],
+            'collection_branch_id' => $saleSpot['collection_branch_id'],
+            'kd_id' => $saleSpot['kd_id'],
+            'customer_name' => $invoice->customer_name,
+            'delivery_type' => Order::DELIVERY_WALK_IN,
+            'subtotal' => $invoice->subtotal,
+            'payment_method' => Order::PAYMENT_PAY_ON_DELIVERY,
+            'status' => Order::STATUS_DRAFT,
+            'shipping_address' => 'Walk-in (Pick up)',
+            'shipping_phone' => $invoice->customer_phone,
+            'notes' => 'Invoice '.$invoice->invoice_number,
+        ];
+
+        if ($existing) {
+            $existing->items()->delete();
+            $existing->update($payload);
+            $order = $existing;
+        } else {
+            $order = Order::create($payload + [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => Order::generateOrderNumber(),
+                'total_bv' => 0,
+                'total_pv' => 0,
+            ]);
+        }
+
+        $totalBv = 0.0;
+        $totalPv = 0.0;
+        foreach ($invoice->items as $index => $item) {
+            $product = $products->first(function (Product $product) use ($item) {
+                return mb_strtolower((string) $product->display_name) === mb_strtolower((string) $item->item_name)
+                    || mb_strtolower((string) $product->name) === mb_strtolower((string) $item->item_name);
+            });
+            $quantity = (int) round((float) $item->quantity);
+            OrderItem::create([
+                'order_id' => $order->id,
+                'item_code' => $product?->item_code ?: 'INV-'.$invoice->id.'-'.($index + 1),
+                'product_name' => $item->item_name,
+                'quantity' => max(1, $quantity),
+                'unit_price' => $item->unit_price,
+                'line_total' => $item->line_total,
+                'bv' => $product?->bv ?? 0,
+                'pv' => $product?->pv ?? 0,
+            ]);
+            $totalBv += (float) ($product?->bv ?? 0) * $quantity;
+            $totalPv += (float) ($product?->pv ?? 0) * $quantity;
+        }
+        $order->update(['total_bv' => $totalBv, 'total_pv' => $totalPv]);
+
+        $group = OrderGroup::find($saleSpot['order_group_id']);
+        if ($group) {
+            $group->update([
+                'total_amount' => (float) $group->draftOrders()->sum('subtotal'),
+                'collection_branch_id' => $group->collection_branch_id ?: $saleSpot['collection_branch_id'],
+            ]);
+        }
     }
 }

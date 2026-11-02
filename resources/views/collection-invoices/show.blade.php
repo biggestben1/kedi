@@ -25,6 +25,8 @@
                     <span class="badge bg-success fs-6">Collected {{ $order->collected_at->format('M d, Y H:i') }}</span>
                 @elseif($cancelled)
                     <span class="badge bg-secondary fs-6">Cancelled</span>
+                @elseif($order?->status === \App\Models\Order::STATUS_DRAFT && $order->order_group_id)
+                    <span class="badge bg-info fs-6">In group</span>
                 @else
                     <span class="badge bg-warning text-dark fs-6">Waiting for collection</span>
                 @endif
@@ -38,6 +40,20 @@
                     @if($invoice->customer_phone)
                         <div>{{ $invoice->customer_phone }}</div>
                     @endif
+                </div>
+                <div class="col-md-4">
+                    <div class="text-muted small">Kedi number</div>
+                    <div class="fw-semibold">{{ $order?->kd_id ?: '—' }}</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-muted small">Group</div>
+                    <div class="fw-semibold">
+                        @if($order?->orderGroup)
+                            <a href="{{ route('order-groups.show', $order->orderGroup) }}">{{ $order->orderGroup->displayName() }}</a>
+                        @else
+                            —
+                        @endif
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <div class="text-muted small">Collection center</div>

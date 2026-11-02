@@ -3,6 +3,7 @@
 use App\Models\BranchStock;
 use App\Models\CollectionInvoice;
 use App\Models\Order;
+use App\Models\OrderGroup;
 use App\Models\Product;
 use App\Models\Role;
 use App\Models\User;
@@ -107,6 +108,36 @@ it('blocks collection when the center does not have enough stock', function () {
 
     expect(BranchStock::getQuantity($this->branch->id, $this->product->id))->toBe(1)
         ->and($order->fresh()->collected_at)->toBeNull();
+});
+
+it('adds a kedi number and holds the invoice in a group until the group is paid', function () {
+    $creator = userWithRole(Role::RESELLER);
+    $group = OrderGroup::create([
+        'user_id' => $creator->id,
+        'name' => 'Morning sales',
+        'status' => OrderGroup::STATUS_OPEN,
+    ]);
+
+    $this->actingAs($creator)
+        ->post(route('collection-invoices.store'), [
+            'customer_name' => 'Ada Buyer',
+            'kd_id' => 'kd-200',
+            'order_group_id' => $group->id,
+            'collection_branch_id' => $this->branch->id,
+            'items' => [['item_name' => 'Vitamin C', 'quantity' => 1, 'unit_price' => 1000]],
+        ])
+        ->assertRedirect(route('order-groups.show', $group));
+
+    $order = CollectionInvoice::sole()->order;
+    expect($order->kd_id)->toBe('KD-200')
+        ->and($order->order_group_id)->toBe($group->id)
+        ->and($order->collection_branch_id)->toBe($this->branch->id)
+        ->and($order->status)->toBe(Order::STATUS_DRAFT);
+
+    $this->actingAs($this->branch)
+        ->get(route('collection-centers.invoices'))
+        ->assertOk()
+        ->assertDontSee('Ada Buyer');
 });
 
 it('rejects a collection center that is not a branch', function () {

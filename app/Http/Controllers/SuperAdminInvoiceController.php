@@ -998,7 +998,9 @@ class SuperAdminInvoiceController extends Controller
                 'shipping_address' => $invoice->customer_address,
                 'shipping_phone' => $invoice->customer_phone,
                 'customer_name' => $invoice->customer_name,
-                'kd_id' => null,
+                'kd_id' => $invoice->kd_id,
+                'order_group_id' => $invoice->order_group_id,
+                'collection_branch_id' => $invoice->stock_deducted_at ? null : $invoice->collection_branch_id,
             ]);
 
             foreach ($itemQuantities as $index => $row) {
@@ -1282,7 +1284,8 @@ class SuperAdminInvoiceController extends Controller
                         'shipping_address' => $invoice->customer_address,
                         'shipping_phone' => $invoice->customer_phone,
                         'customer_name' => $invoice->customer_name,
-                        'kd_id' => null,
+                        'kd_id' => $invoice->kd_id,
+                        'order_group_id' => $invoice->order_group_id,
                     ]);
                     foreach ($stockUpdates as $index => $row) {
                         $givingNow = $row['quantity'];

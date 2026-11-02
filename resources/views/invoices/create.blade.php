@@ -228,6 +228,7 @@
                             <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
                                 <h3 class="card-title mb-0">New Invoice</h3>
                                 <div class="d-flex align-items-center gap-2">
+                                    @include('invoices.partials.sale-spots', ['part' => 'buttons'])
                                     <a href="javascript:void(0)" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#customerModal">
                                         Customer
                                     </a>
@@ -242,6 +243,7 @@
                             <div class="card-body">
                                 <form method="POST" action="{{ route('invoices.store') }}" id="invoice-form">
                                     @csrf
+                                    @include('invoices.partials.sale-spots', ['part' => 'fields'])
 
                                     <div class="row g-3 mb-4">
                                         <div class="col-md-6">
@@ -738,6 +740,8 @@
                                 </div>
                             </div>
                         </div>
+
+                        @include('invoices.partials.sale-spots', ['part' => 'modals'])
 
                         <div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true">
                             <div class="modal-dialog modal-md modal-dialog-scrollable">

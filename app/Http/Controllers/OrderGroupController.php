@@ -75,6 +75,19 @@ class OrderGroupController extends Controller
         // Each transaction needs its own KEDI session — clear any previous one.
         $request->session()->forget(['kd_id', 'customer_name']);
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'id' => $group->id,
+                'name' => $group->displayName(),
+            ]);
+        }
+
+        if ($request->input('return_to') === 'collection-invoices.create') {
+            return redirect()
+                ->route('collection-invoices.create', ['order_group_id' => $group->id])
+                ->with('success', 'Group "'.$group->displayName().'" created. It is selected under Add to group.');
+        }
+
         return redirect()
             ->route('shop')
             ->with('success', 'Group "'.$group->displayName().'" started. Enter a KEDI NO and name for the first transaction, then shop and add to group.');

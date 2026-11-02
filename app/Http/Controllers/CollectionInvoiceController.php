@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\CollectionInvoice;
+use App\Models\KdCustomer;
 use App\Models\Order;
+use App\Models\OrderGroup;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Role;
@@ -24,7 +26,7 @@ class CollectionInvoiceController extends Controller
     public function index(Request $request)
     {
         $invoices = $this->visibleQuery($request->user())
-            ->with(['user', 'items', 'order.collectionBranch'])
+            ->with(['user', 'items', 'order.collectionBranch', 'order.orderGroup'])
             ->orderByDesc('id')
             ->paginate(20);
 
@@ -51,6 +53,10 @@ class CollectionInvoiceController extends Controller
         return view('collection-invoices.create', $this->viewData($request, 'New Invoice', [
             'productOptions' => $productOptions,
             'collectionBranches' => $this->branchesQuery()->orderBy('name')->get(['id', 'name', 'phone']),
+            'openOrderGroups' => OrderGroup::where('user_id', $user->id)
+                ->where('status', OrderGroup::STATUS_OPEN)
+                ->orderByDesc('id')
+                ->get(),
         ]));
     }
 
@@ -66,6 +72,8 @@ class CollectionInvoiceController extends Controller
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
+            'kd_id' => ['nullable', 'string', 'max:100'],
+            'order_group_id' => ['nullable', 'integer'],
             'collection_branch_id' => ['required', 'integer'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'items' => ['required', 'array', 'min:1'],
@@ -77,6 +85,36 @@ class CollectionInvoiceController extends Controller
         $branch = $this->branchesQuery()->find($data['collection_branch_id']);
         if (! $branch) {
             return back()->withErrors(['collection_branch_id' => 'Choose a valid collection center.'])->withInput();
+        }
+
+        $kdId = strtoupper(trim((string) ($data['kd_id'] ?? '')));
+        $group = null;
+        $groupId = (int) ($data['order_group_id'] ?? 0);
+        if ($groupId > 0) {
+            $group = OrderGroup::where('id', $groupId)
+                ->where('user_id', $request->user()->id)
+                ->where('status', OrderGroup::STATUS_OPEN)
+                ->first();
+            if (! $group) {
+                return back()->withErrors(['order_group_id' => 'Choose an open order group.'])->withInput();
+            }
+            if ($kdId === '') {
+                return back()->withErrors(['kd_id' => 'Enter a Kedi number before adding this invoice to a group.'])->withInput();
+            }
+        }
+        if ($kdId !== '') {
+            $existingKd = KdCustomer::query()
+                ->whereRaw("UPPER(REPLACE(kd_no, ' ', '')) = ?", [$kdId])
+                ->first();
+            if ($existingKd) {
+                $kdId = strtoupper(trim((string) $existingKd->kd_no));
+            } else {
+                KdCustomer::create([
+                    'kd_no' => $kdId,
+                    'customer_name' => $data['customer_name'],
+                    'user_id' => $request->user()->id,
+                ]);
+            }
         }
 
         $products = Product::where('is_active', true)->get();
@@ -96,7 +134,7 @@ class CollectionInvoiceController extends Controller
         $subtotal = round(array_sum(array_column($lines, 'line_total')), 2);
         $user = $request->user();
 
-        $invoice = DB::transaction(function () use ($data, $lines, $subtotal, $branch, $user) {
+        $invoice = DB::transaction(function () use ($data, $lines, $subtotal, $branch, $user, $kdId, $group) {
             $invoice = CollectionInvoice::create([
                 'user_id' => $user->id,
                 'customer_name' => $data['customer_name'],
@@ -113,7 +151,9 @@ class CollectionInvoiceController extends Controller
 
             $order = Order::create([
                 'user_id' => $user->id,
+                'order_group_id' => $group?->id,
                 'collection_branch_id' => $branch->id,
+                'kd_id' => $kdId !== '' ? $kdId : null,
                 'customer_name' => $data['customer_name'],
                 'delivery_type' => Order::DELIVERY_WALK_IN,
                 'invoice_number' => Order::generateOrderNumber(),
@@ -121,7 +161,7 @@ class CollectionInvoiceController extends Controller
                 'total_bv' => 0,
                 'total_pv' => 0,
                 'payment_method' => Order::PAYMENT_PAY_ON_DELIVERY,
-                'status' => Order::STATUS_PENDING,
+                'status' => $group ? Order::STATUS_DRAFT : Order::STATUS_PENDING,
                 'shipping_address' => 'Walk-in (Pick up)',
                 'shipping_phone' => $data['customer_phone'] ?? null,
                 'notes' => $notes,
@@ -160,9 +200,21 @@ class CollectionInvoiceController extends Controller
 
             $order->update(['total_bv' => $totalBv, 'total_pv' => $totalPv]);
             $invoice->update(['order_id' => $order->id]);
+            if ($group) {
+                $group->update([
+                    'total_amount' => (float) $group->draftOrders()->sum('subtotal'),
+                    'collection_branch_id' => $group->collection_branch_id ?: $branch->id,
+                ]);
+            }
 
             return $invoice;
         });
+
+        if ($group) {
+            return redirect()
+                ->route('order-groups.show', $group)
+                ->with('success', 'Invoice '.$invoice->invoice_number.' added to group "'.$group->displayName().'". It goes to '.$branch->name.' when the group is paid.');
+        }
 
         return redirect()
             ->route('collection-invoices.show', $invoice)
@@ -172,7 +224,7 @@ class CollectionInvoiceController extends Controller
     public function show(Request $request, CollectionInvoice $collectionInvoice)
     {
         $this->authorizeInvoice($request->user(), $collectionInvoice);
-        $collectionInvoice->load(['user', 'items.product', 'order.collectionBranch']);
+        $collectionInvoice->load(['user', 'items.product', 'order.collectionBranch', 'order.orderGroup']);
 
         return view('collection-invoices.show', $this->viewData($request, 'Invoice '.$collectionInvoice->invoice_number, [
             'invoice' => $collectionInvoice,

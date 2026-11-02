@@ -25,6 +25,8 @@
                             <th>Invoice</th>
                             <th>Date</th>
                             <th>Customer</th>
+                            <th>Kedi number</th>
+                            <th>Group</th>
                             <th>Collection center</th>
                             <th class="text-end">Total</th>
                             <th>Status</th>
@@ -43,6 +45,8 @@
                                         <br><small class="text-muted">{{ $invoice->customer_phone }}</small>
                                     @endif
                                 </td>
+                                <td>{{ $invoice->order?->kd_id ?: '—' }}</td>
+                                <td>{{ $invoice->order?->orderGroup?->displayName() ?: '—' }}</td>
                                 <td>{{ $invoice->order?->collectionBranch?->name ?: '—' }}</td>
                                 <td class="text-end">₦{{ number_format($invoice->subtotal, 2) }}</td>
                                 <td>
@@ -50,6 +54,8 @@
                                         <span class="badge bg-success">Collected {{ $invoice->order->collected_at->format('M d, Y') }}</span>
                                     @elseif($invoice->order?->trashed() || ! $invoice->order)
                                         <span class="badge bg-secondary">Cancelled</span>
+                                    @elseif($invoice->order->status === \App\Models\Order::STATUS_DRAFT && $invoice->order->order_group_id)
+                                        <span class="badge bg-info">In group</span>
                                     @else
                                         <span class="badge bg-warning text-dark">Waiting for collection</span>
                                     @endif
@@ -60,7 +66,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="text-muted p-4">No invoices yet.</td></tr>
+                            <tr><td colspan="10" class="text-muted p-4">No invoices yet.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

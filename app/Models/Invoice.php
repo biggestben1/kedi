@@ -20,6 +20,9 @@ class Invoice extends Model
         'user_id',
         'branch_user_id',
         'customer_name',
+        'kd_id',
+        'order_group_id',
+        'collection_branch_id',
         'sc_referral_code',
         'coupon_code',
         'customer_email',
@@ -68,6 +71,16 @@ class Invoice extends Model
     public function branchUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'branch_user_id');
+    }
+
+    public function orderGroup(): BelongsTo
+    {
+        return $this->belongsTo(OrderGroup::class);
+    }
+
+    public function collectionBranch(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'collection_branch_id');
     }
 
     public function items(): HasMany
