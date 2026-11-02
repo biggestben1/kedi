@@ -1,108 +1,73 @@
 <!doctype html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="ltr">
-
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Login – {{ config('app.name') }}</title>
-
-    <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') }}?v=3" />
+    <link rel="shortcut icon" href="{{ asset('images/logo.png') }}?v=3">
     @include('partials.pwa-head')
-    <link id="style" href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
-    <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
-    <link href="{{ asset('sash/assets/css/dark-style.css') }}" rel="stylesheet" />
-    <link href="{{ asset('sash/assets/css/transparent-style.css') }}" rel="stylesheet">
-    <link href="{{ asset('sash/assets/css/skin-modes.css') }}" rel="stylesheet" />
-    <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
-    <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
-    <style>
-        .col-login .header-brand-img {
-            background-color: #fff !important;
-            max-width: 200px;
-            max-height: 80px;
-            width: auto;
-            height: auto;
-            object-fit: contain;
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+    <link href="{{ asset('css/kedi-pos.css') }}?v=3" rel="stylesheet">
 </head>
-
-<body class="app sidebar-mini ltr">
-
-    <div class="login-img">
-        <div class="page">
-            <div class="">
-                <div class="col col-login mx-auto mt-7">
-                    <div class="text-center">
-                        <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img" alt="{{ config('app.name') }}">
-                    </div>
-                </div>
-
-                <div class="container-login100">
-                    <div class="wrap-login100 p-6">
-                        <form class="login100-form validate-form" method="POST" action="{{ route('login') }}">
-                            @csrf
-                            <span class="login100-form-title pb-5">Login</span>
-
-                            @if (session('status'))
-                                <div class="alert alert-success mb-3">{{ session('status') }}</div>
-                            @endif
-                            @if ($errors->any())
-                                <div class="alert alert-danger mb-3">
-                                    @foreach ($errors->all() as $error)
-                                        <div>{{ $error }}</div>
-                                    @endforeach
-                                </div>
-                            @endif
-
-                            <div class="panel panel-primary">
-                                <div class="panel-body p-0 pt-3">
-                                            <div class="wrap-input100 validate-input input-group">
-                                                <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
-                                                    <i class="zmdi zmdi-email text-muted" aria-hidden="true"></i>
-                                                </a>
-                                                <input class="input100 border-start-0 form-control ms-0" type="email" name="email" placeholder="Email" value="{{ old('email') }}" required autofocus>
-                                            </div>
-                                            <div class="wrap-input100 validate-input input-group" id="Password-toggle">
-                                                <a href="javascript:void(0)" class="input-group-text bg-white text-muted">
-                                                    <i class="zmdi zmdi-eye text-muted" aria-hidden="true"></i>
-                                                </a>
-                                                <input class="input100 border-start-0 form-control ms-0" type="password" name="password" placeholder="Password" required>
-                                            </div>
-                                            <div class="form-check mb-3">
-                                                <input class="form-check-input" type="checkbox" name="remember" id="remember">
-                                                <label class="form-check-label" for="remember">Remember me</label>
-                                            </div>
-                                            <div class="text-end pt-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                                <div>
-                                                    <a href="{{ route('admin.staff.create') }}" class="text-primary small">Staff Register</a> |
-                                                    <a href="{{ route('admin.sc-annex.create') }}" class="text-primary small">SC/Annex Register</a>
-                                                </div>
-                                                <p class="mb-0"><a href="{{ route('password.request') }}" class="text-primary ms-1">Forgot Password?</a></p>
-                                            </div>
-                                            <div class="container-login100-form-btn">
-                                                <button type="submit" class="login100-form-btn btn-primary w-100">Login</button>
-                                            </div>
-
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+<body class="kedi-pos kedi-auth">
+    <main class="kedi-auth-panel">
+        <div class="kedi-auth-logo">
+            <img src="{{ asset('images/logo.png') }}?v=3" alt="{{ config('app.name') }}">
+        </div>
+        <div class="kedi-brand" style="justify-content:center; height:auto; padding:0;">
+            <div style="text-align:center;">
+                <strong>KEDI POS</strong>
+                <span>HEALTHCARE</span>
             </div>
         </div>
-    </div>
+        <h1>Login</h1>
 
-    <script src="{{ asset('sash/assets/js/jquery.min.js') }}"></script>
-    <script src="{{ asset('sash/assets/plugins/bootstrap/js/popper.min.js') }}"></script>
-    <script src="{{ asset('sash/assets/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ asset('sash/assets/js/show-password.min.js') }}"></script>
-    <script src="{{ asset('sash/assets/plugins/p-scroll/perfect-scrollbar.js') }}"></script>
-    <script src="{{ asset('sash/assets/js/themeColors.js') }}"></script>
-    <script src="{{ asset('sash/assets/js/custom.js') }}"></script>
+        @if (session('status'))
+            <div class="kedi-banner" style="margin-bottom:0.75rem;">{{ session('status') }}</div>
+        @endif
+        @if ($errors->any())
+            <div class="kedi-error">
+                @foreach ($errors->all() as $error)
+                    <div>{{ $error }}</div>
+                @endforeach
+            </div>
+        @endif
+
+        <form method="POST" action="{{ route('login') }}">
+            @csrf
+            <label>
+                <span class="kedi-label">Email</span>
+                <span class="kedi-field">
+                    <span class="material-symbols-outlined lead">mail</span>
+                    <input class="kedi-input iconed" type="email" name="email" placeholder="Email" value="{{ old('email') }}" required autofocus>
+                </span>
+            </label>
+            <label>
+                <span class="kedi-label">Password</span>
+                <span class="kedi-field">
+                    <span class="material-symbols-outlined lead">lock</span>
+                    <input class="kedi-input iconed" type="password" name="password" placeholder="Password" required>
+                </span>
+            </label>
+            <label class="kedi-check">
+                <input type="checkbox" name="remember" id="remember">
+                Remember me
+            </label>
+            <div class="kedi-auth-links">
+                <div>
+                    <a href="{{ route('admin.staff.create') }}">Staff Register</a>
+                    ·
+                    <a href="{{ route('admin.sc-annex.create') }}">SC/Annex Register</a>
+                </div>
+                <a href="{{ route('password.request') }}">Forgot Password?</a>
+            </div>
+            <button type="submit" class="kedi-btn primary">Login</button>
+        </form>
+    </main>
     @include('partials.pwa-scripts')
 </body>
-
 </html>

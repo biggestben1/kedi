@@ -20,6 +20,7 @@
     <link href="{{ asset('sash/assets/css/skin-modes.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
+    @include('partials.kedi-theme')
     <style>
         .app-header .logo-horizontal { display: none !important; }
         .app-header .logo-horizontal img { max-height: 52px; max-width: 200px; width: auto; height: auto; object-fit: contain; display: block !important; visibility: visible !important; }

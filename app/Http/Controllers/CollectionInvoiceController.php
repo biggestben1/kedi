@@ -25,13 +25,53 @@ class CollectionInvoiceController extends Controller
 {
     public function index(Request $request)
     {
-        $invoices = $this->visibleQuery($request->user())
-            ->with(['user', 'items', 'order.collectionBranch', 'order.orderGroup'])
-            ->orderByDesc('id')
-            ->paginate(20);
+        $query = $this->visibleQuery($request->user())
+            ->with(['user', 'items', 'order.collectionBranch', 'order.orderGroup']);
+
+        $search = trim((string) $request->query('q', ''));
+        if ($search !== '') {
+            $query->where(function (Builder $inner) use ($search) {
+                $inner->where('invoice_number', 'like', '%'.$search.'%')
+                    ->orWhere('customer_name', 'like', '%'.$search.'%')
+                    ->orWhereHas('order', fn (Builder $order) => $order->where('kd_id', 'like', '%'.$search.'%'));
+            });
+        }
+
+        $center = (int) $request->query('center', 0);
+        if ($center > 0) {
+            $query->whereHas('order', fn (Builder $order) => $order->where('collection_branch_id', $center));
+        }
+
+        $status = (string) $request->query('status', '');
+        if ($status === 'collected') {
+            $query->whereHas('order', fn (Builder $order) => $order->whereNotNull('collected_at'));
+        } elseif ($status === 'in_group') {
+            $query->whereHas('order', fn (Builder $order) => $order
+                ->where('status', Order::STATUS_DRAFT)
+                ->whereNotNull('order_group_id')
+                ->whereNull('collected_at'));
+        } elseif ($status === 'waiting') {
+            $query->whereHas('order', fn (Builder $order) => $order->whereNull('collected_at')->where(function (Builder $order) {
+                $order->where('status', '!=', Order::STATUS_DRAFT)->orWhereNull('order_group_id');
+            }));
+        }
+
+        $invoices = $query->orderByDesc('id')->paginate(20)->withQueryString();
+        $visible = $this->visibleQuery($request->user());
 
         return view('collection-invoices.index', $this->viewData($request, 'Invoice', [
             'invoices' => $invoices,
+            'centers' => $this->branchesQuery()->orderBy('name')->get(['id', 'name']),
+            'filters' => ['q' => $search, 'center' => $center, 'status' => $status],
+            'stats' => [
+                'total' => (clone $visible)->count(),
+                'pending' => (clone $visible)->whereHas('order', fn (Builder $order) => $order->whereNull('collected_at')->where(function (Builder $order) {
+                    $order->where('status', '!=', Order::STATUS_DRAFT)->orWhereNull('order_group_id');
+                }))->count(),
+                'collectedToday' => (clone $visible)->whereHas('order', fn (Builder $order) => $order->whereDate('collected_at', now()->toDateString()))->count(),
+                'todaySales' => (float) (clone $visible)->whereDate('created_at', now()->toDateString())->sum('subtotal'),
+                'todayCount' => (clone $visible)->whereDate('created_at', now()->toDateString())->count(),
+            ],
         ]));
     }
 
@@ -252,10 +292,45 @@ class CollectionInvoiceController extends Controller
 
     private function viewData(Request $request, string $title, array $data): array
     {
+        $user = $request->user();
+        $user->loadMissing('role');
+        $role = $user->role?->name;
+        $canRegisterKd = $user->isSuperAdmin() || in_array($role, ['headquarters', 'branch', 'annex', 'accountant', 'cashier', 'distributor'], true);
+        $canPurchaseKit = $user->isSuperAdmin() || in_array($role, ['headquarters', 'branch', 'service_center', 'annex', 'reseller', 'customer', 'cashier', 'distributor'], true);
+
+        $nav = [
+            ['label' => 'Shop', 'href' => route('shop'), 'icon' => 'storefront'],
+        ];
+        if ($canRegisterKd) {
+            $nav[] = ['label' => 'Register KD NO', 'href' => route('admin.kd.registration.create'), 'icon' => 'person_add'];
+        }
+        if ($canPurchaseKit) {
+            $nav[] = ['label' => 'Purchase KEDI Kit', 'href' => route('admin.kedi-kits.purchase.create'), 'icon' => 'medical_services'];
+        }
+        array_push(
+            $nav,
+            ['label' => 'Dashboard', 'href' => route('dashboard'), 'icon' => 'dashboard'],
+            ['label' => 'My Orders', 'href' => route('orders.index'), 'icon' => 'receipt_long'],
+            ['label' => 'Order Groups', 'href' => route('order-groups.index'), 'icon' => 'group_work'],
+            ['label' => 'Special Sales', 'href' => route('invoices.index'), 'icon' => 'loyalty'],
+            ['label' => 'Invoice', 'href' => route('collection-invoices.index'), 'icon' => 'description', 'active' => true],
+            ['label' => 'My Blog', 'href' => route('my-blog.index'), 'icon' => 'article'],
+            ['label' => 'Wallet', 'href' => route('wallet.index'), 'icon' => 'account_balance_wallet'],
+        );
+
         return array_merge($data, [
-            'layout' => $request->user()->isAdmin() ? 'layouts.admin' : 'layouts.customer',
             'pageTitle' => $title,
             'customerMenuActive' => 'collection-invoices',
+            'pos' => [
+                'userName' => $user->name,
+                'userInitial' => strtoupper(substr((string) $user->name, 0, 1)),
+                'logo' => asset('images/logo.png').'?v=3',
+                'csrf' => csrf_token(),
+                'logoutUrl' => route('logout'),
+                'nav' => $nav,
+                'flash' => session('success') ?: session('error'),
+                'flashType' => session('error') ? 'error' : 'success',
+            ],
         ]);
     }
 

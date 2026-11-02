@@ -15,6 +15,7 @@
     <link href="{{ asset('sash/assets/css/skin-modes.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
+    @include('partials.kedi-theme')
     <style>
         /* Admin: single logo in sidebar only; hide header logo */
         .app-header .logo-horizontal {
@@ -78,7 +79,7 @@
         }
     </style>
 </head>
-<body class="app sidebar-mini ltr light-mode">
+<body class="app sidebar-mini ltr light-mode kedi-admin-app">
     <div class="page">
         <div class="page-main">
             <!-- app-Header -->
@@ -86,6 +87,23 @@
                 <div class="container-fluid main-container">
                     <div class="d-flex">
                         <a aria-label="Hide Sidebar" class="app-sidebar__toggle" data-bs-toggle="sidebar" href="javascript:void(0)"></a>
+                        @php
+                            $adminRoleName = auth()->user()->isSuperAdmin() ? 'super_admin' : (auth()->user()->role?->name ?? 'staff');
+                            $adminRoleLabel = [
+                                'super_admin' => 'Super Admin',
+                                'headquarters' => 'Headquarters',
+                                'branch' => 'Branch',
+                                'service_center' => 'Service Center',
+                                'annex' => 'Annex',
+                                'accountant' => 'Accountant',
+                                'cashier' => 'Cashier',
+                                'distributor' => 'Distributor',
+                                'dispatch' => 'Dispatch',
+                                'reseller' => 'Reseller',
+                                'wholesale_staff' => 'Wholesale Staff',
+                            ][$adminRoleName] ?? ucwords(str_replace('_', ' ', $adminRoleName));
+                        @endphp
+                        <a class="kedi-admin-chip" href="{{ route('admin') }}">Admin · {{ $adminRoleLabel }}</a>
                         <a class="logo-horizontal" href="{{ route('admin') }}">
                             <img src="{{ asset('images/logo.png') }}?v=3" class="header-brand-img light-logo1" alt="{{ config('app.name') }}" onerror="this.onerror=null;this.src='{{ asset('sash/assets/images/brand/logo.png') }}?v=3';">
                         </a>
@@ -213,6 +231,14 @@
                         <a class="header-brand1" href="{{ route('admin') }}">
                             <img src="{{ asset('images/logo.png') }}?v=3" class="header-brand-img light-logo1" alt="{{ config('app.name') }}" onerror="this.onerror=null;this.src='{{ asset('sash/assets/images/brand/logo.png') }}?v=3';">
                         </a>
+                    </div>
+                    <div class="kedi-admin-mark">
+                        <div class="kedi-admin-mark-top">
+                            <span class="kedi-admin-pill">Admin</span>
+                            <strong>{{ $adminRoleLabel }}</strong>
+                        </div>
+                        <p>You are in the admin area. Sales and the shop menu stay separate.</p>
+                        <a class="kedi-admin-exit" href="{{ route('shop') }}">Back to shop</a>
                     </div>
                     <div class="main-sidemenu">
                         <div class="slide-left disabled" id="slide-left"><svg xmlns="http://www.w3.org/2000/svg" fill="#7b8191" width="24" height="24" viewBox="0 0 24 24"><path d="M13.293 6.293 7.586 12l5.707 5.707 1.414-1.414L10.414 12l4.293-4.293z"/></svg></div>

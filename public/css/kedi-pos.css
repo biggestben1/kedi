@@ -1,0 +1,178 @@
+:root {
+    --bg: #faf8ff;
+    --surface: #ffffff;
+    --low: #f2f3ff;
+    --container: #eaedff;
+    --high: #e2e7ff;
+    --ink: #131b2e;
+    --muted: #556158;
+    --variant: #3f493f;
+    --primary: #00652c;
+    --primary-container: #15803d;
+    --on-primary: #ffffff;
+    --primary-fixed: #95f8a7;
+    --secondary-container: #d9e6da;
+    --tertiary: #854600;
+    --tertiary-container: #a95b00;
+    --tertiary-fixed: #ffdcc3;
+    --error: #ba1a1a;
+    --error-container: #ffdad6;
+    --shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+    --sidebar: 16rem;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body.kedi-pos {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Manrope, sans-serif;
+    font-size: 14px;
+    line-height: 20px;
+}
+.kedi-sidebar {
+    position: fixed; inset: 0 auto 0 0; width: var(--sidebar);
+    background: var(--surface); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; justify-content: space-between; z-index: 40;
+}
+.kedi-brand { height: 4rem; padding: 0 1rem; display: flex; align-items: center; gap: 0.5rem; }
+.kedi-brand img { height: 2rem; width: auto; }
+.kedi-brand strong { color: var(--primary); font-size: 16px; display: block; line-height: 1; }
+.kedi-brand span { color: var(--muted); font-size: 11px; letter-spacing: 0.05em; font-weight: 700; }
+.kedi-online { margin: 0.5rem 1rem; background: var(--low); border-radius: 0.5rem; padding: 0.5rem; display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; }
+.kedi-dot { width: 8px; height: 8px; border-radius: 99px; background: var(--primary); display: inline-block; margin-right: 6px; }
+.kedi-nav { padding: 0 0.5rem; display: flex; flex-direction: column; gap: 2px; overflow: auto; }
+.kedi-nav a {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 1rem;
+    border-radius: 0.5rem; color: var(--variant); text-decoration: none; font-weight: 600; font-size: 14px;
+}
+.kedi-nav a.active { background: var(--secondary-container); color: var(--primary); position: relative; }
+.kedi-nav a.active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; background: var(--primary); border-radius: 0 4px 4px 0; }
+.kedi-nav a:hover { background: var(--low); color: var(--ink); }
+.kedi-side-foot { padding: 1rem; }
+.kedi-logout { width: 100%; border: 0; background: var(--low); border-radius: 0.75rem; padding: 0.6rem 0.75rem; display: flex; align-items: center; gap: 0.5rem; color: var(--ink); font-weight: 600; cursor: pointer; }
+.kedi-main { margin-left: var(--sidebar); min-height: 100vh; }
+.kedi-top {
+    position: sticky; top: 0; height: 4rem; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 1.5rem; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); box-shadow: var(--shadow); z-index: 30;
+}
+.kedi-chip, .kedi-cashier { display: flex; align-items: center; gap: 0.4rem; background: var(--low); border-radius: 999px; padding: 0.25rem 0.8rem; font-weight: 600; font-size: 12px; }
+.kedi-cashier { border-radius: 0.5rem; }
+.kedi-cashier small { display: block; color: var(--muted); font-weight: 400; }
+.kedi-avatar { width: 2rem; height: 2rem; border-radius: 99px; background: var(--primary); color: white; display: grid; place-items: center; font-weight: 700; }
+.kedi-stats { display: flex; gap: 1.5rem; color: var(--muted); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; margin-left: 1rem; }
+.kedi-stats b { color: var(--ink); font-size: 16px; letter-spacing: 0; text-transform: none; }
+.kedi-stats b.green { color: var(--primary); }
+.kedi-page { padding: 0 1.5rem 2rem; }
+.kedi-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-end; padding: 1rem 0; }
+.kedi-crumb { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; display: flex; gap: 0.25rem; align-items: center; }
+.kedi-crumb a { color: var(--muted); text-decoration: none; }
+.kedi-title { font-family: "Space Grotesk", Manrope, sans-serif; font-size: 32px; line-height: 40px; margin: 4px 0; }
+.kedi-live { background: var(--high); border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+.kedi-sub { color: var(--muted); margin: 0; }
+.kedi-actions { display: flex; gap: 0.5rem; }
+.kedi-btn {
+    border: 0; border-radius: 0.5rem; padding: 0.6rem 1rem; font-weight: 700; font-size: 14px;
+    display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; text-decoration: none; font-family: inherit;
+}
+.kedi-btn.ghost { background: var(--container); color: var(--ink); }
+.kedi-btn.primary { background: var(--primary-container); color: white; box-shadow: 0 4px 12px rgba(21,128,61,0.25); }
+.kedi-btn.soft { background: var(--low); color: var(--primary); }
+.kedi-btn.mint { background: var(--secondary-container); color: var(--primary); }
+.kedi-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.kedi-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.kedi-card { background: var(--surface); border-radius: 0.75rem; box-shadow: var(--shadow); padding: 1rem 1.25rem; position: relative; overflow: hidden; }
+.kedi-card .label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.kedi-card .num { font-family: "Space Grotesk", sans-serif; font-size: 28px; font-weight: 700; display: block; margin-top: 4px; }
+.kedi-card .hint { color: var(--muted); font-size: 12px; }
+.kedi-card .icon { width: 48px; height: 48px; border-radius: 0.75rem; display: grid; place-items: center; background: var(--low); color: var(--primary); position: absolute; right: 1rem; top: 1rem; }
+.kedi-filters { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+.kedi-field { position: relative; }
+.kedi-field .material-symbols-outlined.lead { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 20px; }
+.kedi-input, .kedi-select, .kedi-area {
+    width: 100%; border: 0; background: var(--surface); color: var(--ink); border-radius: 0.5rem;
+    box-shadow: var(--shadow); font: inherit; padding: 0.65rem 0.75rem;
+}
+.kedi-input.iconed, .kedi-select.iconed { padding-left: 2.4rem; background: var(--low); box-shadow: none; }
+.kedi-select { appearance: none; }
+.kedi-table-wrap { overflow: auto; }
+table.kedi-table { width: 100%; border-collapse: collapse; text-align: left; }
+table.kedi-table th { background: var(--low); color: var(--variant); font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; padding: 0.75rem 1rem; }
+table.kedi-table td { padding: 1rem; vertical-align: middle; }
+table.kedi-table tbody tr:hover { background: rgba(242,243,255,0.7); }
+.kedi-inv { color: var(--primary); font-weight: 700; display: flex; align-items: center; gap: 0.35rem; }
+.material-symbols-outlined { font-size: 20px; line-height: 1; vertical-align: middle; user-select: none; }
+.kedi-pill { display: inline-flex; align-items: center; gap: 0.3rem; border-radius: 999px; padding: 0.2rem 0.55rem; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.kedi-pill i { width: 6px; height: 6px; border-radius: 99px; background: currentColor; display: inline-block; }
+.kedi-pill.wait i { animation: kedi-pulse 1.4s infinite; }
+@keyframes kedi-pulse { 50% { opacity: 0.35; } }
+.kedi-pill.kd { background: var(--container); color: var(--primary); letter-spacing: 0; text-transform: none; }
+.kedi-pill.group { background: #dae2fd; color: var(--primary); }
+.kedi-pill.wait { background: var(--tertiary-fixed); color: #2f1500; }
+.kedi-pill.done { background: var(--primary-fixed); color: #00210a; }
+.kedi-pill.cancel { background: var(--error-container); color: var(--error); }
+.kedi-view { background: var(--container); color: var(--primary); border-radius: 0.5rem; padding: 0.35rem 0.7rem; text-decoration: none; font-weight: 700; font-size: 12px; display: inline-flex; gap: 0.25rem; align-items: center; }
+.kedi-view:hover { background: var(--primary); color: white; }
+.kedi-pager { display: flex; justify-content: space-between; align-items: center; background: var(--low); padding: 0.8rem 1rem; color: var(--muted); font-size: 12px; }
+.kedi-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+.kedi-banner { background: rgba(217,230,218,0.55); border-radius: 0.75rem; padding: 1rem; display: flex; gap: 0.8rem; margin-bottom: 1rem; }
+.kedi-banner .mark { width: 36px; height: 36px; border-radius: 0.5rem; background: var(--primary-container); color: #d3ffd5; display: grid; place-items: center; flex: none; }
+.kedi-banner b { color: var(--primary); font-size: 11px; letter-spacing: 0.05em; }
+.kedi-grid { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 1.5rem; }
+.kedi-section h2 { font-family: "Space Grotesk", sans-serif; font-size: 20px; margin: 0; }
+.kedi-section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
+.kedi-bar { width: 6px; height: 20px; border-radius: 99px; background: var(--primary); display: inline-block; margin-right: 0.5rem; }
+.kedi-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.kedi-label { font-weight: 700; font-size: 14px; display: block; margin-bottom: 0.35rem; }
+.kedi-req { color: var(--error); }
+.kedi-help { color: var(--muted); font-size: 12px; }
+.kedi-ok { color: var(--primary); font-size: 12px; font-weight: 700; display: flex; gap: 0.3rem; align-items: center; margin-top: 0.3rem; }
+.kedi-row { display: flex; gap: 0.5rem; align-items: center; }
+.kedi-summary { background: rgba(242,243,255,0.7); border-radius: 0.75rem; padding: 1rem; margin-top: 1rem; }
+.kedi-summary .total { display: flex; justify-content: space-between; align-items: center; font-family: "Space Grotesk", sans-serif; font-size: 20px; font-weight: 700; }
+.kedi-summary .total b { color: var(--primary); font-size: 28px; }
+.kedi-line { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 0.35rem; }
+.kedi-line span:last-child { color: var(--ink); font-weight: 700; }
+.kedi-foot-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem; }
+.kedi-modal { position: fixed; inset: 0; background: rgba(40,48,68,0.4); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 1rem; }
+.kedi-dialog { background: white; border-radius: 1rem; max-width: 28rem; width: 100%; padding: 1.5rem; box-shadow: 0 20px 50px rgba(0,0,0,0.18); }
+.kedi-error { background: var(--error-container); color: #93000a; border-radius: 0.5rem; padding: 0.7rem 1rem; margin-bottom: 0.8rem; }
+.kedi-toast { position: fixed; right: 1.5rem; bottom: 1.5rem; background: #283044; color: #eef0ff; border-radius: 0.75rem; padding: 0.8rem 1rem; display: flex; gap: 0.5rem; align-items: center; z-index: 70; }
+.qty { width: 4rem; text-align: center; }
+.warn { color: var(--tertiary); font-size: 11px; }
+@media (max-width: 1100px) {
+    .kedi-grid, .kedi-cards, .kedi-filters, .kedi-notes, .kedi-form-grid { grid-template-columns: 1fr; }
+    .kedi-stats { display: none; }
+    .kedi-sidebar { position: relative; width: 100%; height: auto; }
+    .kedi-main { margin-left: 0; }
+    .kedi-nav { max-height: 16rem; }
+    .kedi-title { font-size: 24px; line-height: 32px; }
+}
+@media print {
+    .kedi-sidebar, .kedi-top, .kedi-foot-actions, .kedi-logout { display: none !important; }
+    .kedi-main { margin: 0; }
+}
+body.kedi-auth {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 2rem 1rem;
+    background:
+        radial-gradient(circle at 0% 0%, #d9e6da 0, transparent 42%),
+        radial-gradient(circle at 100% 100%, #e2e7ff 0, transparent 46%),
+        var(--bg);
+}
+.kedi-auth-panel {
+    width: min(28rem, 100%);
+    background: var(--surface);
+    border-radius: 1rem;
+    box-shadow: 0 16px 40px rgba(19, 27, 46, 0.08);
+    padding: 2rem 1.5rem 1.5rem;
+}
+.kedi-auth-logo { display: flex; justify-content: center; margin-bottom: 0.75rem; }
+.kedi-auth-logo img { height: 3.25rem; width: auto; background: white; }
+.kedi-auth-panel h1 { font-family: "Space Grotesk", Manrope, sans-serif; font-size: 28px; text-align: center; margin: 0.25rem 0 1.25rem; }
+.kedi-auth-panel .kedi-label { margin-top: 0.75rem; }
+.kedi-auth-links { display: flex; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin: 0.9rem 0 1rem; font-size: 13px; }
+.kedi-auth-links a { color: var(--primary); font-weight: 700; text-decoration: none; }
+.kedi-auth-panel .kedi-btn.primary { width: 100%; justify-content: center; }
+.kedi-check { display: flex; align-items: center; gap: 0.45rem; margin-top: 0.85rem; color: var(--muted); font-weight: 600; }

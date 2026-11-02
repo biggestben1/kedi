@@ -11,6 +11,7 @@
     <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
+    @include('partials.kedi-theme')
 </head>
 <body class="bg-light">
     <div class="page">

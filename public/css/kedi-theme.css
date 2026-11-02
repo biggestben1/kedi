@@ -1,0 +1,310 @@
+:root {
+    --primary-bg-color: #15803d;
+    --primary-bg-hover: #00652c;
+    --primary-bg-border: #00652c;
+    --dark-primary: #15803d;
+    --transparent-primary: #15803d;
+    --dark-primary-hover: #00652c;
+    --primary-transparentcolor: #d9e6da;
+    --primary: #00652c;
+    --green: #15803d;
+}
+body {
+    font-family: Manrope, "IBM Plex Sans", sans-serif;
+    background: #faf8ff;
+    color: #131b2e;
+}
+.page-title, .card-title, h1, h2, h3.card-title {
+    font-family: "Space Grotesk", Manrope, sans-serif;
+}
+.app-header.header, .app-header {
+    background: rgba(255, 255, 255, 0.94) !important;
+    border-bottom: 0 !important;
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+}
+.app-sidebar {
+    background: #fff;
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+    border-right: 0;
+}
+.side-menu__item {
+    border-radius: 0.5rem;
+    font-weight: 600;
+    color: #3f493f;
+}
+.side-menu__item.active,
+.side-menu__item.active:hover,
+.side-menu__item.active:focus {
+    background: #d9e6da;
+    color: #00652c !important;
+    font-weight: 700;
+}
+.side-menu__item.active .side-menu__icon,
+.side-menu__item.active .side-menu__label {
+    color: #00652c !important;
+}
+.side-menu__item:hover,
+.side-menu__item:focus {
+    background: #f2f3ff;
+    color: #131b2e;
+}
+.card {
+    border: 0;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
+}
+.btn-primary, .login100-form-btn {
+    background: #15803d !important;
+    border-color: #15803d !important;
+    border-radius: 0.5rem;
+    font-weight: 700;
+}
+.btn-primary:hover, .login100-form-btn:hover {
+    background: #00652c !important;
+    border-color: #00652c !important;
+}
+.login-img {
+    background: #faf8ff !important;
+    background-image: none !important;
+}
+.login-img::before {
+    background: radial-gradient(circle at 0% 0%, #d9e6da 0, transparent 42%),
+        radial-gradient(circle at 100% 100%, #e2e7ff 0, transparent 46%) !important;
+}
+.wrap-login100 {
+    border-radius: 1rem;
+    box-shadow: 0 16px 40px rgba(19, 27, 46, 0.08);
+}
+.login100-form-title {
+    font-family: "Space Grotesk", Manrope, sans-serif;
+    color: #131b2e;
+}
+.header-brand-img, .header-brand1 img {
+    background: #fff;
+}
+.footer {
+    background: transparent;
+    border-top: 0;
+    color: #556158;
+}
+a, .text-primary {
+    color: #00652c;
+}
+.bg-primary {
+    background: #15803d !important;
+}
+.badge.bg-primary, .badge-primary {
+    background: #15803d !important;
+}
+.form-control:focus, .form-select:focus {
+    border-color: #15803d;
+    box-shadow: 0 0 0 0.2rem rgba(21, 128, 61, 0.15);
+}
+.nav-link.active, .slide-item.active {
+    color: #00652c !important;
+}
+.kedi-admin-chip {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.75rem;
+    background: #00652c;
+    color: #fff !important;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.kedi-admin-chip:hover { color: #fff !important; background: #15803d; }
+.kedi-admin-app { background: #faf8ff; }
+.kedi-admin-app .app-content,
+.kedi-admin-app .page,
+.kedi-admin-app .page-main { background: #faf8ff; }
+.kedi-admin-app .app-header {
+    background: rgba(255, 255, 255, 0.94) !important;
+    border-bottom: 0 !important;
+    box-shadow: 0 1px 8px rgba(19, 27, 46, 0.06);
+}
+.kedi-admin-app .app-sidebar {
+    background: #f4f6fb;
+    border-right: 0;
+    border-top: 0;
+    box-shadow: 8px 0 24px rgba(19, 27, 46, 0.04);
+}
+.kedi-admin-app .side-header {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+}
+.kedi-admin-app .main-sidemenu { padding-bottom: 1.5rem; }
+.kedi-admin-app .slide-left,
+.kedi-admin-app .slide-right { display: none !important; }
+.kedi-admin-app .side-menu { padding: 0.25rem 0.7rem 1rem; }
+.kedi-admin-app .side-menu__item {
+    border-radius: 0.85rem;
+    margin: 6px 0;
+    padding: 0.55rem 0.65rem;
+    background: #fff;
+    color: #131b2e;
+    font-family: Manrope, sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: 0 1px 4px rgba(19, 27, 46, 0.05);
+}
+.kedi-admin-app .side-menu__item:hover,
+.kedi-admin-app .side-menu__item:focus {
+    background: #fff;
+    color: #131b2e;
+}
+.kedi-admin-app .side-menu__item.active,
+.kedi-admin-app .side-menu__item.active:hover,
+.kedi-admin-app .side-menu__item.active:focus {
+    background: #d9e6da !important;
+    color: #00652c !important;
+    box-shadow: none;
+}
+.kedi-admin-app .side-menu__icon {
+    width: 34px;
+    height: 34px;
+    margin-right: 0.7rem;
+    border-radius: 0.65rem;
+    background: #e7f6ec;
+    color: #15803d !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 4px rgba(19, 27, 46, 0.06);
+    line-height: 34px;
+}
+.kedi-admin-app .side-menu__item.active .side-menu__icon,
+.kedi-admin-app .side-menu__item.active .side-menu__label {
+    color: #00652c !important;
+}
+.kedi-admin-app .side-menu__item.active .side-menu__icon {
+    background: #00652c;
+    color: #fff !important;
+}
+.kedi-admin-app .side-menu .sub-category {
+    border: 0;
+    margin: 0.85rem 0.2rem 0.25rem;
+    padding: 0.15rem 0.45rem 0;
+}
+.kedi-admin-app .side-menu .sub-category h3 {
+    color: #556158;
+    font-family: Manrope, sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+.kedi-admin-app .slide-menu {
+    background: #fff;
+    border-radius: 0.85rem;
+    margin: 0.2rem 0 0.45rem 1.6rem;
+    padding: 0.35rem;
+    box-shadow: 0 1px 8px rgba(19, 27, 46, 0.05);
+}
+.kedi-admin-app .slide-menu li .slide-item:before { content: none !important; }
+.kedi-admin-app .slide-item {
+    display: block;
+    border-radius: 0.55rem;
+    padding: 0.45rem 0.7rem !important;
+    color: #3f493f !important;
+    font-weight: 650;
+    font-size: 13px;
+}
+.kedi-admin-app .slide-item:hover,
+.kedi-admin-app .slide-item.active {
+    background: #eef8f1;
+    color: #00652c !important;
+}
+.kedi-admin-app .angle { margin-left: auto; opacity: 0.55; }
+.kedi-admin-app .card {
+    border: 0;
+    border-radius: 1rem;
+    box-shadow: 0 1px 8px rgba(19, 27, 46, 0.06);
+}
+.kedi-admin-app .page-title,
+.kedi-admin-app .card-title {
+    font-family: "Space Grotesk", Manrope, sans-serif;
+}
+.kedi-admin-mark {
+    margin: 0.75rem 0.75rem 0.25rem;
+    padding: 0.85rem;
+    border-radius: 0.75rem;
+    background: #00652c;
+    color: #fff;
+}
+.kedi-admin-mark-top { display: flex; align-items: center; gap: 0.5rem; }
+.kedi-admin-pill {
+    background: #95f8a7;
+    color: #00210a;
+    border-radius: 999px;
+    padding: 0.15rem 0.5rem;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.kedi-admin-mark strong { font-size: 14px; }
+.kedi-admin-mark p { margin: 0.45rem 0 0.7rem; font-size: 12px; line-height: 1.4; color: #d3ffd5; }
+.kedi-admin-exit {
+    display: inline-flex;
+    background: #fff;
+    color: #00652c !important;
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.7rem;
+    font-size: 12px;
+    font-weight: 800;
+    text-decoration: none;
+}
+@media (max-width: 991px) {
+    .kedi-admin-mark { display: block; }
+}
+@media (min-width: 992px) {
+    body.app.sidebar-mini.sidenav-toggled .app-sidebar .side-header .header-brand-img.light-logo1 {
+        display: block !important;
+        visibility: visible !important;
+        width: 46px !important;
+        height: 46px !important;
+        max-width: 46px !important;
+        max-height: 46px !important;
+        margin: 0 auto !important;
+        object-fit: contain;
+    }
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .side-header {
+        width: 80px !important;
+        padding: 10px 8px !important;
+        justify-content: center;
+    }
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .kedi-admin-mark {
+        margin: 0.35rem 0.3rem;
+        padding: 0.35rem 0.15rem;
+        text-align: center;
+    }
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .kedi-admin-mark-top { justify-content: center; }
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .kedi-admin-mark p,
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .kedi-admin-mark strong,
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .kedi-admin-exit { display: none !important; }
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .side-menu { padding: 0.2rem 0.35rem 1rem; }
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .side-menu__item {
+        justify-content: center;
+        padding: 6px !important;
+        margin: 6px 0;
+    }
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .side-menu .side-menu__icon {
+        display: inline-flex !important;
+        width: 36px !important;
+        height: 36px !important;
+        margin: 0 !important;
+        background: #e7f6ec !important;
+        color: #15803d !important;
+        overflow: visible !important;
+        font-size: 18px !important;
+    }
+    .kedi-admin-app.sidebar-mini.sidenav-toggled .side-menu__item.active .side-menu__icon {
+        background: #00652c !important;
+        color: #fff !important;
+    }
+}

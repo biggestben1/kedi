@@ -19,6 +19,7 @@
     <link href="{{ asset('sash/assets/css/skin-modes.css') }}" rel="stylesheet" />
     <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <link id="theme" rel="stylesheet" type="text/css" media="all" href="{{ asset('sash/assets/colors/color1.css') }}" />
+    @include('partials.kedi-theme')
     @include('partials.blog-rich-content-css')
     @include('partials.blog-details-sash-css')
     @stack('styles')

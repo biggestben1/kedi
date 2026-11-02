@@ -52,6 +52,10 @@
         }
 
         /* --- NAVIGATION --- */
+        #kedi-landing-nav {
+            width: 100%;
+        }
+
         nav {
             position: fixed;
             top: 0;
@@ -91,6 +95,43 @@
 
         .nav-links a:hover {
             color: var(--primary);
+        }
+
+        .nav-mobile-only {
+            display: none;
+        }
+
+        .nav-toggle {
+            display: none;
+            width: 44px;
+            height: 44px;
+            border: 0;
+            background: transparent;
+            padding: 10px;
+            flex-direction: column;
+            justify-content: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+
+        .nav-toggle span {
+            display: block;
+            height: 2px;
+            width: 22px;
+            background: var(--text-dark);
+            border-radius: 2px;
+        }
+
+        body.nav-open .nav-toggle span:nth-child(1) {
+            transform: translateY(7px) rotate(45deg);
+        }
+
+        body.nav-open .nav-toggle span:nth-child(2) {
+            opacity: 0;
+        }
+
+        body.nav-open .nav-toggle span:nth-child(3) {
+            transform: translateY(-7px) rotate(-45deg);
         }
 
         /* --- HERO SECTION --- */
@@ -320,24 +361,48 @@
         @media (max-width: 768px) {
             .hero h1 { font-size: 2.5rem; }
             .content-flex { flex-direction: column; }
+            .nav-toggle { display: flex; }
             .nav-links { display: none; }
+            .nav-links.is-open {
+                display: flex;
+                flex-direction: column;
+                position: fixed;
+                top: 80px;
+                left: 0;
+                right: 0;
+                background: #fff;
+                padding: 0.5rem 1.5rem 1rem;
+                box-shadow: var(--shadow);
+                z-index: 1000;
+            }
+            .nav-links.is-open a,
+            .nav-links.is-open .nav-mobile-only {
+                display: block;
+                margin: 0;
+                padding: 0.9rem 0;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+                font-size: 1rem;
+            }
         }
     </style>
 </head>
 <body>
 
     <nav>
-        <div class="container nav-content">
-            <div class="logo">Optimal Consult</div>
-            <div class="nav-links">
-                <a href="/shop">Shop Products</a>
-                <a href="/blog">Blog</a>
-                <a href="#services">Services</a>
-                <a href="#about">About</a>
-                <a href="#contact">Contact</a>
-            </div>
-        </div>
+        <div class="container" id="kedi-landing-nav"></div>
     </nav>
+    @php
+        $landingNav = [
+            ['label' => 'Shop Products', 'href' => route('shop')],
+            ['label' => 'Blog', 'href' => route('blog.index')],
+            ['label' => 'Services', 'href' => '#services'],
+            ['label' => 'About', 'href' => '#about'],
+            ['label' => 'Contact', 'href' => '#contact'],
+            ['label' => 'Patient Login', 'href' => route('login'), 'mobileOnly' => true],
+        ];
+    @endphp
+    <script>window.__KEDI_LANDING_NAV__ = @json($landingNav);</script>
+    <script src="{{ asset('js/kedi-landing.js') }}?v=1"></script>
 
     <header class="hero">
         <div class="swiper myHeroSwiper">
