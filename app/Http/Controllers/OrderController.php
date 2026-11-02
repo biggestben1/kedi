@@ -84,34 +84,41 @@ class OrderController extends Controller
         if ($order->user_id != $request->user()->id) {
             abort(404);
         }
-        if ($order->status === Order::STATUS_DRAFT) {
-            return redirect()->route('orders.index')->with('error', 'Draft orders do not have a receipt.');
+
+        // Single-invoice print: this order only (from My Orders / invoice number click).
+        $singleOnly = $request->boolean('single');
+
+        if ($order->status === Order::STATUS_DRAFT && ! $singleOnly) {
+            return redirect()->route('orders.index')->with('error', 'Draft orders do not have a receipt. Open the invoice number to print this draft only.');
         }
 
         $order->load(['user', 'items', 'orderGroup']);
 
         $placedOrdersFull = collect();
-        $placedOrderIds = session('placed_order_ids', []);
-        if (count($placedOrderIds) > 0) {
-            $placedOrdersFull = Order::with(['user', 'items', 'orderGroup'])
-                ->whereIn('id', $placedOrderIds)
-                ->where('user_id', $request->user()->id)
-                ->where('status', '!=', Order::STATUS_DRAFT)
-                ->orderBy('id')
-                ->get();
-        } elseif ($order->order_group_id) {
-            // Reprint: one combined POS slip for the whole paid group.
-            $placedOrdersFull = Order::with(['user', 'items', 'orderGroup'])
-                ->where('order_group_id', $order->order_group_id)
-                ->where('user_id', $request->user()->id)
-                ->where('status', '!=', Order::STATUS_DRAFT)
-                ->orderBy('id')
-                ->get();
+        if (! $singleOnly) {
+            $placedOrderIds = session('placed_order_ids', []);
+            if (count($placedOrderIds) > 0) {
+                $placedOrdersFull = Order::with(['user', 'items', 'orderGroup'])
+                    ->whereIn('id', $placedOrderIds)
+                    ->where('user_id', $request->user()->id)
+                    ->where('status', '!=', Order::STATUS_DRAFT)
+                    ->orderBy('id')
+                    ->get();
+            } elseif ($order->order_group_id) {
+                // Reprint: one combined POS slip for the whole paid group.
+                $placedOrdersFull = Order::with(['user', 'items', 'orderGroup'])
+                    ->where('order_group_id', $order->order_group_id)
+                    ->where('user_id', $request->user()->id)
+                    ->where('status', '!=', Order::STATUS_DRAFT)
+                    ->orderBy('id')
+                    ->get();
+            }
         }
 
         return view('orders.receipt', [
             'order' => $order,
             'placedOrdersFull' => $placedOrdersFull,
+            'singleOnly' => $singleOnly,
         ]);
     }
 

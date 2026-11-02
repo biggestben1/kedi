@@ -360,7 +360,11 @@
                                                     </td>
                                                     @endif
                                                     <td class="align-middle">{{ $order->created_at->format('M d, Y H:i') }}</td>
-                                                    <td class="align-middle"><code class="bg-light px-2 py-1 rounded">{{ $order->tracking_number }}</code></td>
+                                                    <td class="align-middle">
+                                                        <a href="{{ route('orders.receipt', ['order' => $order, 'single' => 1]) }}" class="text-decoration-none" title="Print this invoice only">
+                                                            <code class="bg-light px-2 py-1 rounded">{{ $order->invoice_number ?? $order->tracking_number }}</code>
+                                                        </a>
+                                                    </td>
                                                     <td class="align-middle">
                                                         @if($order->status === 'draft')
                                                             <span class="badge bg-secondary">Draft</span>

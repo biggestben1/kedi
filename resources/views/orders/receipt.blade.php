@@ -171,38 +171,49 @@
 <body>
 @php
     $appName = config('app.name');
-    $orders = ($placedOrdersFull ?? collect())->isNotEmpty()
+    $singleOnly = (bool) ($singleOnly ?? false);
+    $orders = (! $singleOnly && ($placedOrdersFull ?? collect())->isNotEmpty())
         ? $placedOrdersFull
         : collect([$order]);
     $first = $orders->first();
-    $group = $first?->orderGroup;
+    $group = $singleOnly ? null : $first?->orderGroup;
     $breakdown = $first?->payment_breakdown ?? [];
     $grandSubtotal = (float) $orders->sum('subtotal');
-    $discount = (float) ($breakdown['discount'] ?? $orders->sum('discount_amount'));
-    $grandTotal = isset($breakdown['total'])
-        ? (float) $breakdown['total']
-        : max(0, $grandSubtotal - $discount);
+    // For a single invoice reprint, show this order's total only (not the whole group payment).
+    if ($singleOnly || $orders->count() === 1) {
+        $discount = (float) ($first->discount_amount ?? 0);
+        $grandTotal = max(0, $grandSubtotal - $discount);
+    } else {
+        $discount = (float) ($breakdown['discount'] ?? $orders->sum('discount_amount'));
+        $grandTotal = isset($breakdown['total'])
+            ? (float) $breakdown['total']
+            : max(0, $grandSubtotal - $discount);
+    }
 
     $money = static function (float $amount): string {
         return 'N'.number_format($amount, 2, '.', ',');
     };
 
     $paymentParts = [];
-    foreach (['wallet' => 'Wallet', 'kd_credit' => 'KD Credit', 'dpbv' => 'DPBV', 'cash' => 'Cash', 'cheque' => 'Cheque', 'pos' => 'POS', 'bank' => 'Bank'] as $key => $label) {
-        $amt = (float) ($breakdown[$key] ?? 0);
-        if ($amt > 0) {
-            $paymentParts[] = $label.': '.$money($amt);
+    if (! $singleOnly) {
+        foreach (['wallet' => 'Wallet', 'kd_credit' => 'KD Credit', 'dpbv' => 'DPBV', 'cash' => 'Cash', 'cheque' => 'Cheque', 'pos' => 'POS', 'bank' => 'Bank'] as $key => $label) {
+            $amt = (float) ($breakdown[$key] ?? 0);
+            if ($amt > 0) {
+                $paymentParts[] = $label.': '.$money($amt);
+            }
         }
     }
     if ($paymentParts === []) {
         $paymentParts[] = $first?->paymentLabel() ?? '—';
     }
+    $slipTitle = $singleOnly ? 'Invoice' : 'Sales receipt';
 @endphp
 
     <div class="no-print no-print-bar">
         <button type="button" class="btn-primary" onclick="window.print()">Print</button>
+        <a href="{{ route('orders.show', $order) }}">Back to order</a>
         <a href="{{ route('orders.index') }}">My Orders</a>
-        @if($group)
+        @if(! $singleOnly && $group)
             <a href="{{ route('order-groups.show', $group) }}">Order Group</a>
         @endif
     </div>
@@ -214,7 +225,10 @@
     <div class="pos-slip" id="pos-receipt">
         <div class="center">
             <div class="brand">{{ $appName }}</div>
-            <div class="muted">Sales receipt</div>
+            <div class="muted">{{ $slipTitle }}</div>
+            @if($singleOnly && $first?->status === \App\Models\Order::STATUS_DRAFT)
+                <div class="muted">DRAFT</div>
+            @endif
         </div>
         <hr class="line">
 
@@ -224,7 +238,7 @@
             @endif
             <div><strong>Date:</strong> {{ optional($first?->created_at)->format('d/m/Y H:i') }}</div>
             @if($orders->count() === 1)
-                <div class="wrap"><strong>Order:</strong> {{ $first->invoice_number ?? 'ORD-'.$first->id }}</div>
+                <div class="wrap"><strong>Invoice:</strong> {{ $first->invoice_number ?? 'ORD-'.$first->id }}</div>
             @else
                 <div><strong>Orders:</strong> {{ $orders->count() }}
                     ({{ $orders->map(fn ($o) => $o->invoice_number ?? 'ORD-'.$o->id)->implode(', ') }})

@@ -159,12 +159,17 @@
                 <div class="side-app">
                     <div class="main-container container-fluid">
                         <div class="page-header">
-                            <h1 class="page-title">Order {{ $order->tracking_number }}</h1>
+                            <h1 class="page-title">
+                                Order
+                                <a href="{{ route('orders.receipt', ['order' => $order, 'single' => 1]) }}" class="text-primary text-decoration-underline" title="Print this invoice only">
+                                    {{ $order->invoice_number ?? $order->tracking_number }}
+                                </a>
+                            </h1>
                             <div>
                                 <ol class="breadcrumb">
                                     <li class="breadcrumb-item"><a href="{{ url('/') }}">Home</a></li>
                                     <li class="breadcrumb-item"><a href="{{ route('orders.index') }}">My Orders</a></li>
-                                    <li class="breadcrumb-item active" aria-current="page">Order {{ $order->tracking_number }}</li>
+                                    <li class="breadcrumb-item active" aria-current="page">{{ $order->invoice_number ?? $order->tracking_number }}</li>
                                 </ol>
                             </div>
                         </div>
@@ -227,6 +232,13 @@
                                     <div class="card-body">
                                         <p class="mb-2"><strong>KD NO</strong><br>{{ $order->kd_id ?? '—' }}</p>
                                         <p class="mb-2"><strong>Customer Name</strong><br>{{ $order->customer_name ?? '—' }}</p>
+                                        <p class="mb-2"><strong>Invoice number</strong></p>
+                                        <p class="mb-3">
+                                            <a href="{{ route('orders.receipt', ['order' => $order, 'single' => 1]) }}" class="bg-light px-3 py-2 rounded d-inline-block fs-16 text-decoration-none" title="Print this invoice only">
+                                                <code>{{ $order->invoice_number ?? $order->tracking_number }}</code>
+                                            </a>
+                                            <span class="d-block small text-muted mt-1">Click to open and print this invoice only</span>
+                                        </p>
                                         <p class="mb-2"><strong>Tracking number</strong></p>
                                         <p class="mb-3"><code class="bg-light px-3 py-2 rounded d-inline-block fs-16">{{ $order->tracking_number }}</code></p>
                                         <p class="mb-2"><strong>Delivery status</strong></p>
@@ -259,8 +271,9 @@
                                         <p class="mb-1"><strong>Subtotal</strong><span class="float-end">₦{{ number_format($order->subtotal, 0) }}</span></p>
                                         <p class="mb-0 small text-muted">BV: {{ number_format($order->total_bv ?? 0, 1) }} &nbsp; PV: {{ number_format($order->total_pv ?? 0, 1) }}</p>
                                         <hr class="my-3">
+                                        <a href="{{ route('orders.receipt', ['order' => $order, 'single' => 1]) }}" class="btn btn-outline-primary w-100"><i class="fe fe-printer me-1"></i> Print this invoice</a>
                                         @if($order->status !== 'draft')
-                                        <a href="{{ route('orders.receipt.pdf', $order) }}" class="btn btn-outline-secondary w-100" target="_blank"><i class="fe fe-download me-1"></i> Download Receipt (PDF)</a>
+                                        <a href="{{ route('orders.receipt.pdf', $order) }}" class="btn btn-outline-secondary w-100 mt-2" target="_blank"><i class="fe fe-download me-1"></i> Download Receipt (PDF)</a>
                                         @endif
                                         <a href="{{ route('orders.index') }}" class="btn btn-outline-primary w-100 mt-2"><i class="fe fe-arrow-left me-1"></i> Back to My Orders</a>
                                         <a href="{{ url('/') }}" class="btn btn-primary w-100 mt-2"><i class="fe fe-shopping-bag me-1"></i> Continue Shopping</a>
