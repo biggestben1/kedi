@@ -308,3 +308,156 @@ a, .text-primary {
         color: #fff !important;
     }
 }
+.kedi-shop-app { background: #faf8ff; }
+.kedi-shop-app .app-content,
+.kedi-shop-app .page,
+.kedi-shop-app .page-main { background: #faf8ff; }
+.kedi-shop-app .app-sidebar {
+    background: #f4f6fb;
+    border-right: 0;
+    box-shadow: 8px 0 24px rgba(19, 27, 46, 0.04);
+}
+.kedi-shop-app .side-header {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+}
+.kedi-shop-mark {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.35rem 0.85rem 0.15rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 0.85rem;
+    background: #00652c;
+    color: #fff;
+}
+.kedi-shop-mark span {
+    background: #95f8a7;
+    color: #00210a;
+    border-radius: 999px;
+    padding: 0.12rem 0.5rem;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.kedi-shop-mark strong { font-size: 14px; }
+.kedi-shop-app .slide-left,
+.kedi-shop-app .slide-right { display: none !important; }
+.kedi-shop-app .side-menu { padding: 0.25rem 0.7rem 1rem; }
+.kedi-shop-app .side-menu .sub-category {
+    border: 0;
+    margin: 0.85rem 0.2rem 0.25rem;
+    padding: 0.15rem 0.45rem 0;
+}
+.kedi-shop-app .side-menu .sub-category h3 {
+    color: #556158;
+    font-family: Manrope, sans-serif;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+.kedi-shop-app .side-menu__item {
+    border-radius: 0.85rem;
+    margin: 6px 0;
+    padding: 0.55rem 0.65rem;
+    background: #fff;
+    color: #131b2e;
+    font-family: Manrope, sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: 0 1px 4px rgba(19, 27, 46, 0.05);
+}
+.kedi-shop-app .side-menu__item:hover,
+.kedi-shop-app .side-menu__item:focus {
+    background: #fff;
+    color: #131b2e;
+}
+.kedi-shop-app .side-menu__item.active,
+.kedi-shop-app .side-menu__item.active:hover,
+.kedi-shop-app .side-menu__item.active:focus {
+    background: #d9e6da !important;
+    color: #00652c !important;
+    box-shadow: none;
+}
+.kedi-shop-app .side-menu__icon {
+    width: 34px;
+    height: 34px;
+    margin-right: 0.7rem;
+    border-radius: 0.65rem;
+    background: #e7f6ec;
+    color: #15803d !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 4px rgba(19, 27, 46, 0.06);
+}
+.kedi-shop-app .side-menu__item.active .side-menu__icon {
+    background: #00652c;
+    color: #fff !important;
+}
+.kedi-shop-app .kedi-categories-heading {
+    margin: 0 0 0.7rem;
+    color: #556158;
+    font-family: Manrope, sans-serif;
+    font-size: 11px !important;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.kedi-shop-app .kedi-categories-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.kedi-shop-app .kedi-categories-list a {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.75rem;
+    background: #f4f6fb;
+    color: #131b2e !important;
+    font-family: Manrope, sans-serif;
+    font-size: 14px !important;
+    font-weight: 700;
+    text-decoration: none;
+}
+.kedi-shop-app .kedi-categories-list a img {
+    width: 28px;
+    height: 28px;
+    border-radius: 0.45rem;
+    object-fit: contain;
+    background: #fff;
+}
+.kedi-shop-app .kedi-categories-list a:hover {
+    background: #e7f6ec;
+    color: #00652c !important;
+}
+.kedi-shop-app .kedi-categories-list a.is-active {
+    background: #00652c;
+    color: #fff !important;
+}
+@media (min-width: 992px) {
+    .kedi-shop-app.sidebar-mini.sidenav-toggled .kedi-shop-mark strong,
+    .kedi-shop-app.sidebar-mini.sidenav-toggled .side-menu .sub-category { display: none !important; }
+    .kedi-shop-app.sidebar-mini.sidenav-toggled .kedi-shop-mark {
+        margin: 0.35rem;
+        padding: 0.35rem 0.15rem;
+        justify-content: center;
+    }
+    .kedi-shop-app.sidebar-mini.sidenav-toggled .side-menu { padding: 0.2rem 0.35rem 1rem; }
+    .kedi-shop-app.sidebar-mini.sidenav-toggled .side-menu__item {
+        justify-content: center;
+        padding: 6px !important;
+    }
+    .kedi-shop-app.sidebar-mini.sidenav-toggled .side-menu .side-menu__icon {
+        margin: 0 !important;
+        background: #e7f6ec !important;
+        color: #15803d !important;
+    }
+}

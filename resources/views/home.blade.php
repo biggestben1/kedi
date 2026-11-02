@@ -37,9 +37,7 @@
             visibility: visible !important;
             background-color: #fff !important;
         }
-        /* Slightly bigger font for Categories block on shop home */
-        .kedi-categories-heading { font-size: 1.1rem !important; }
-        .kedi-categories-list, .kedi-categories-list a { font-size: 1rem !important; }
+        .kedi-categories-list a { font-size: 14px !important; }
         /* Fix cart dropdown scrolling */
         .shopping-cart .header-dropdown-list.message-menu {
             overflow-y: auto !important;
@@ -75,7 +73,7 @@
         }
     </style>
 </head>
-<body class="app sidebar-mini ltr">
+<body class="app sidebar-mini ltr kedi-shop-app">
     <div class="page">
         <div class="page-main">
             <!-- app-Header -->
@@ -222,12 +220,16 @@
                             <img src="{{ asset('images/logo.png') }}?v=3" class="header-brand-img light-logo1" alt="{{ config('app.name') }}" onerror="this.onerror=null;this.src='{{ asset('sash/assets/images/brand/logo.png') }}?v=3';">
                         </a>
                     </div>
+                    <div class="kedi-shop-mark">
+                        <span>Shop</span>
+                        <strong>Products</strong>
+                    </div>
                     <div class="main-sidemenu">
                         <div class="slide-left disabled" id="slide-left"><svg xmlns="http://www.w3.org/2000/svg" fill="#7b8191" width="24" height="24" viewBox="0 0 24 24"><path d="M13.293 6.293 7.586 12l5.707 5.707 1.414-1.414L10.414 12l4.293-4.293z"/></svg></div>
                         <ul class="side-menu">
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
-                                <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
+                                <a class="side-menu__item active" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
                             </li>
                             @auth
                             @php
@@ -555,17 +557,19 @@
                                             </div>
                                             <div class="card-body">
                                                 <p class="text-muted small mb-3">Browse and add items to your cart. Use the search above to filter by code, name, or pack size.</p>
-                                                <p class="fw-semibold mb-2 kedi-categories-heading">Categories</p>
-                                                <ul class="list-unstyled mb-0 kedi-categories-list">
-                                                    <li class="mb-1">
-                                                        <a href="{{ url('/') }}" class="{{ !request()->filled('category_id') ? 'fw-semibold text-primary' : 'text-muted' }}">All</a>
+                                                <p class="kedi-categories-heading">Categories</p>
+                                                <ul class="kedi-categories-list">
+                                                    <li>
+                                                        <a href="{{ route('shop') }}" class="{{ !request()->filled('category_id') ? 'is-active' : '' }}">All</a>
                                                     </li>
                                                     @foreach($categories ?? [] as $cat)
-                                                    <li class="mb-1 d-flex align-items-center gap-2">
-                                                        @if($cat->image_url)
-                                                            <img src="{{ $cat->image_url }}" alt="{{ $cat->name }}" class="img-thumbnail" style="max-height: 32px; max-width: 48px; object-fit: contain;">
-                                                        @endif
-                                                        <a href="{{ url('/') }}?category_id={{ $cat->id }}" class="{{ (request()->query('category_id') == $cat->id) ? 'fw-semibold text-primary' : 'text-muted' }}">{{ $cat->name }}</a>
+                                                    <li>
+                                                        <a href="{{ route('shop', ['category_id' => $cat->id]) }}" class="{{ (string) request()->query('category_id') === (string) $cat->id ? 'is-active' : '' }}">
+                                                            @if($cat->image_url)
+                                                                <img src="{{ $cat->image_url }}" alt="">
+                                                            @endif
+                                                            <span>{{ $cat->name }}</span>
+                                                        </a>
                                                     </li>
                                                     @endforeach
                                                 </ul>
