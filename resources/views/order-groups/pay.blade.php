@@ -274,10 +274,6 @@
                             <div class="col-md-6" id="pos_amount_wrap" style="{{ old('pos_machine_id') ? '' : 'display:none;' }}">
                                 <label class="form-label small">POS amount</label>
                                 <input type="text" inputmode="decimal" class="form-control money-field" data-target="pos_amount_paid" id="pos_amount_display" value="{{ old('pos_amount_paid') }}" placeholder="e.g. 1,000,000">
-                                <label class="form-label small mt-2" for="pos_payment_proof">Upload proof</label>
-                                <input type="file" name="pos_payment_proof" id="pos_payment_proof" class="form-control @error('pos_payment_proof') is-invalid @enderror" accept="image/*,.pdf">
-                                <div class="form-text">Upload receipt/screenshot (JPG/PNG/PDF).</div>
-                                @error('pos_payment_proof')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small">Bank account</label>
@@ -540,8 +536,6 @@
             syncHidden(posDisplay);
             updateSum();
         }
-        var posProof = document.getElementById('pos_payment_proof');
-        if (!on && posProof) posProof.value = '';
     }
 
     function syncBankAccount() {

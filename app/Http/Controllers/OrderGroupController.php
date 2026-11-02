@@ -529,7 +529,7 @@ class OrderGroupController extends Controller
 
         $user = $request->user();
         $user->load(['role', 'createdBy.role']);
-        $drafts = $orderGroup->orders()->where('status', Order::STATUS_DRAFT)->with('items')->get();
+        $drafts = $orderGroup->orders()->where('status', Order::STATUS_DRAFT)->with(['items', 'collectionInvoice'])->get();
 
         if ($drafts->isEmpty()) {
             return redirect()->route('order-groups.show', $orderGroup)->with('error', 'No draft orders in this group to pay.');
@@ -544,7 +544,6 @@ class OrderGroupController extends Controller
             'bank_amount_paid' => 'nullable|numeric|min:0',
             'pos_machine_id' => 'nullable|integer',
             'bank_account_id' => 'nullable|integer',
-            'pos_payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
             'bank_payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
             'split_wallet_amount' => 'nullable|numeric|min:0',
             'split_kd_credit_amount' => 'nullable|numeric|min:0',
@@ -555,13 +554,10 @@ class OrderGroupController extends Controller
             'coupon_code' => 'nullable|string|max:100',
         ]);
 
-        $posProofPath = $request->hasFile('pos_payment_proof')
-            ? $request->file('pos_payment_proof')->store('payment-proofs', 'public')
-            : null;
         $bankProofPath = $request->hasFile('bank_payment_proof')
             ? $request->file('bank_payment_proof')->store('payment-proofs', 'public')
             : null;
-        $paymentProofPath = $bankProofPath ?: $posProofPath;
+        $paymentProofPath = $bankProofPath;
 
         $coupon = null;
         $discountAmount = 0.0;
@@ -663,7 +659,6 @@ class OrderGroupController extends Controller
                 'gross_total' => $grossTotal,
                 'pos_machine' => $posMachine ? trim(($posMachine->bank_name ?: 'POS').($posMachine->account_number ? ' • '.$posMachine->account_number : '')) : null,
                 'bank_account' => $bankAccount ? trim(($bankAccount->name ?: 'Bank').($bankAccount->account_number ? ' • '.$bankAccount->account_number : '')) : null,
-                'pos_proof' => $posProofPath,
                 'bank_proof' => $bankProofPath,
                 'total' => $totalAmount,
                 'order_group_id' => $orderGroup->id,
@@ -708,6 +703,10 @@ class OrderGroupController extends Controller
         [$roleName, $stockOwner, $stockUserId, $isHeadquarters, $branchUserId] = $this->resolveStockContext($user);
 
         foreach ($drafts as $order) {
+            // Purchase / collection invoices skip stock here; the collection center deducts on collect.
+            if ($order->collectionInvoice || $order->collection_branch_id) {
+                continue;
+            }
             foreach ($order->items as $item) {
                 $product = Product::where('item_code', $item->item_code)->first();
                 if (! $product) {
@@ -782,7 +781,7 @@ class OrderGroupController extends Controller
                     'discount_amount' => $orderDiscount,
                 ]);
 
-                if ($paymentCompleted) {
+                if ($paymentCompleted && ! $order->collectionInvoice && ! $order->collection_branch_id) {
                     $order->load('items');
                     $this->deductStockForCompletedPayment($order->items, $isHeadquarters, $stockUserId, $roleName, (int) $stockOwner->id);
                     $order->update(['stock_deducted_at' => now()]);
