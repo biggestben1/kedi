@@ -126,7 +126,7 @@ it('adds a kedi number and holds the invoice in a group until the group is paid'
             'collection_branch_id' => $this->branch->id,
             'items' => [['item_name' => 'Vitamin C', 'quantity' => 1, 'unit_price' => 1000]],
         ])
-        ->assertRedirect(route('order-groups.show', $group));
+        ->assertRedirect(route('collection-invoices.create', ['order_group_id' => $group->id]));
 
     $order = CollectionInvoice::sole()->order;
     expect($order->kd_id)->toBe('KD-200')

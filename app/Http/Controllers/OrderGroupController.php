@@ -544,6 +544,8 @@ class OrderGroupController extends Controller
             'bank_amount_paid' => 'nullable|numeric|min:0',
             'pos_machine_id' => 'nullable|integer',
             'bank_account_id' => 'nullable|integer',
+            'pos_payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
+            'bank_payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
             'split_wallet_amount' => 'nullable|numeric|min:0',
             'split_kd_credit_amount' => 'nullable|numeric|min:0',
             'split_cash_amount' => 'nullable|numeric|min:0',
@@ -552,6 +554,14 @@ class OrderGroupController extends Controller
             'kd_id' => 'nullable|string|max:100',
             'coupon_code' => 'nullable|string|max:100',
         ]);
+
+        $posProofPath = $request->hasFile('pos_payment_proof')
+            ? $request->file('pos_payment_proof')->store('payment-proofs', 'public')
+            : null;
+        $bankProofPath = $request->hasFile('bank_payment_proof')
+            ? $request->file('bank_payment_proof')->store('payment-proofs', 'public')
+            : null;
+        $paymentProofPath = $bankProofPath ?: $posProofPath;
 
         $coupon = null;
         $discountAmount = 0.0;
@@ -653,6 +663,8 @@ class OrderGroupController extends Controller
                 'gross_total' => $grossTotal,
                 'pos_machine' => $posMachine ? trim(($posMachine->bank_name ?: 'POS').($posMachine->account_number ? ' • '.$posMachine->account_number : '')) : null,
                 'bank_account' => $bankAccount ? trim(($bankAccount->name ?: 'Bank').($bankAccount->account_number ? ' • '.$bankAccount->account_number : '')) : null,
+                'pos_proof' => $posProofPath,
+                'bank_proof' => $bankProofPath,
                 'total' => $totalAmount,
                 'order_group_id' => $orderGroup->id,
             ];
@@ -726,6 +738,7 @@ class OrderGroupController extends Controller
             $orderGroup,
             $paymentMethod,
             $paymentBreakdown,
+            $paymentProofPath,
             $walletAmt,
             $kdAmt,
             $dpbvAmt,
@@ -759,6 +772,7 @@ class OrderGroupController extends Controller
                 $order->update([
                     'payment_method' => $paymentMethod,
                     'payment_breakdown' => $paymentBreakdown,
+                    'payment_proof' => $paymentProofPath,
                     'status' => $status,
                     'branch_user_id' => $branchUserId ?? $order->branch_user_id,
                     'kd_id' => $order->kd_id ?: ($kdId !== '' ? $kdId : null),

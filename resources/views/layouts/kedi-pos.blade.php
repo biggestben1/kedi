@@ -10,10 +10,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
-    <link href="{{ asset('css/kedi-pos.css') }}?v=3" rel="stylesheet">
+    <link href="{{ asset('css/kedi-pos.css') }}?v=4" rel="stylesheet">
 </head>
 <body class="kedi-pos">
     @yield('content')
-    <script src="{{ asset('js/kedi-invoices.js') }}?v=2"></script>
+    <script src="{{ asset('js/kedi-invoices.js') }}?v=3"></script>
 </body>
 </html>

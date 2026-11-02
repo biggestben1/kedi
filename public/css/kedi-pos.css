@@ -118,6 +118,33 @@ table.kedi-table tbody tr:hover { background: rgba(242,243,255,0.7); }
 .kedi-banner .mark { width: 36px; height: 36px; border-radius: 0.5rem; background: var(--primary-container); color: #d3ffd5; display: grid; place-items: center; flex: none; }
 .kedi-banner b { color: var(--primary); font-size: 11px; letter-spacing: 0.05em; }
 .kedi-grid { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 1.5rem; }
+.kedi-create-stack { display: flex; flex-direction: column; gap: 1rem; max-width: 960px; }
+.kedi-item-rows { display: flex; flex-direction: column; gap: 0.65rem; }
+.kedi-item-head, .kedi-item-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 2.4fr) 5rem 8rem 7rem 3rem;
+    gap: 0.55rem;
+    align-items: start;
+}
+.kedi-item-head {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0 0.15rem;
+}
+.kedi-item-name { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.kedi-item-name .kedi-select,
+.kedi-item-name .kedi-input {
+    width: 100%;
+    white-space: normal;
+}
+.kedi-item-total {
+    text-align: right;
+    font-weight: 700;
+    padding-top: 0.7rem;
+}
 .kedi-section h2 { font-family: "Space Grotesk", sans-serif; font-size: 20px; margin: 0; }
 .kedi-section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
 .kedi-bar { width: 6px; height: 20px; border-radius: 99px; background: var(--primary); display: inline-block; margin-right: 0.5rem; }
@@ -141,6 +168,9 @@ table.kedi-table tbody tr:hover { background: rgba(242,243,255,0.7); }
 .warn { color: var(--tertiary); font-size: 11px; }
 @media (max-width: 1100px) {
     .kedi-grid, .kedi-cards, .kedi-filters, .kedi-notes, .kedi-form-grid { grid-template-columns: 1fr; }
+    .kedi-item-head, .kedi-item-row { grid-template-columns: 1fr 1fr; }
+    .kedi-item-name { grid-column: 1 / -1; }
+    .kedi-item-total { text-align: left; padding-top: 0.35rem; }
     .kedi-stats { display: none; }
     .kedi-sidebar { position: relative; width: 100%; height: auto; }
     .kedi-main { margin-left: 0; }

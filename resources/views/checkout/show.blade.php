@@ -106,6 +106,9 @@
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('dashboard') }}"><i class="side-menu__icon fe fe-grid"></i><span class="side-menu__label">Dashboard</span></a>
                             </li>
                             <li class="slide">
@@ -119,9 +122,6 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Wallet</span></a>

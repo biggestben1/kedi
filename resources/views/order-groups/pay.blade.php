@@ -158,7 +158,7 @@
                     <small>{{ $drafts->count() }} order(s){{ ($discountAmount ?? 0) > 0 ? ' · after coupon' : '' }}</small>
                 </div>
 
-                <form method="POST" action="{{ route('order-groups.pay', $group) }}" id="group-pay-form">
+                <form method="POST" action="{{ route('order-groups.pay', $group) }}" id="group-pay-form" enctype="multipart/form-data">
                     @csrf
                     <input type="hidden" name="split_payment" id="split_payment" value="{{ old('split_payment') ? '1' : '0' }}">
                     <input type="hidden" name="split_wallet_amount" id="split_wallet_amount" value="{{ old('split_wallet_amount', 0) }}">
@@ -274,6 +274,10 @@
                             <div class="col-md-6" id="pos_amount_wrap" style="{{ old('pos_machine_id') ? '' : 'display:none;' }}">
                                 <label class="form-label small">POS amount</label>
                                 <input type="text" inputmode="decimal" class="form-control money-field" data-target="pos_amount_paid" id="pos_amount_display" value="{{ old('pos_amount_paid') }}" placeholder="e.g. 1,000,000">
+                                <label class="form-label small mt-2" for="pos_payment_proof">Upload proof</label>
+                                <input type="file" name="pos_payment_proof" id="pos_payment_proof" class="form-control @error('pos_payment_proof') is-invalid @enderror" accept="image/*,.pdf">
+                                <div class="form-text">Upload receipt/screenshot (JPG/PNG/PDF).</div>
+                                @error('pos_payment_proof')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small">Bank account</label>
@@ -294,6 +298,10 @@
                             <div class="col-md-6" id="bank_amount_wrap" style="{{ old('bank_account_id') ? '' : 'display:none;' }}">
                                 <label class="form-label small">Bank amount</label>
                                 <input type="text" inputmode="decimal" class="form-control money-field" data-target="bank_amount_paid" id="bank_amount_display" value="{{ old('bank_amount_paid') }}" placeholder="e.g. 1,000,000">
+                                <label class="form-label small mt-2" for="bank_payment_proof">Upload proof</label>
+                                <input type="file" name="bank_payment_proof" id="bank_payment_proof" class="form-control @error('bank_payment_proof') is-invalid @enderror" accept="image/*,.pdf">
+                                <div class="form-text">Upload receipt/screenshot (JPG/PNG/PDF).</div>
+                                @error('bank_payment_proof')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                             </div>
                         </div>
                         <p class="small mt-2 mb-0">Entered: ₦<span id="split_sum">0.00</span> / Due: ₦{{ number_format($amountDue ?? $draftTotal, 2) }}</p>
@@ -532,6 +540,8 @@
             syncHidden(posDisplay);
             updateSum();
         }
+        var posProof = document.getElementById('pos_payment_proof');
+        if (!on && posProof) posProof.value = '';
     }
 
     function syncBankAccount() {
@@ -544,6 +554,8 @@
             syncHidden(bankDisplay);
             updateSum();
         }
+        var bankProof = document.getElementById('bank_payment_proof');
+        if (!on && bankProof) bankProof.value = '';
     }
 
     posSelect?.addEventListener('change', syncPosMachine);

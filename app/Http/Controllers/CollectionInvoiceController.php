@@ -124,7 +124,7 @@ class CollectionInvoiceController extends Controller
 
         $branch = $this->branchesQuery()->find($data['collection_branch_id']);
         if (! $branch) {
-            return back()->withErrors(['collection_branch_id' => 'Choose a valid collection center.'])->withInput();
+            return $this->storeError($request, ['collection_branch_id' => 'Choose a valid collection center.']);
         }
 
         $kdId = strtoupper(trim((string) ($data['kd_id'] ?? '')));
@@ -136,10 +136,10 @@ class CollectionInvoiceController extends Controller
                 ->where('status', OrderGroup::STATUS_OPEN)
                 ->first();
             if (! $group) {
-                return back()->withErrors(['order_group_id' => 'Choose an open order group.'])->withInput();
+                return $this->storeError($request, ['order_group_id' => 'Choose an open order group.']);
             }
             if ($kdId === '') {
-                return back()->withErrors(['kd_id' => 'Enter a Kedi number before adding this invoice to a group.'])->withInput();
+                return $this->storeError($request, ['kd_id' => 'Enter a Kedi number before adding this invoice to a group.']);
             }
         }
         if ($kdId !== '') {
@@ -251,9 +251,21 @@ class CollectionInvoiceController extends Controller
         });
 
         if ($group) {
+            $message = 'Invoice '.$invoice->invoice_number.' saved in group "'.$group->displayName().'". Open Order Groups to check out. It goes to '.$branch->name.' when the group is paid.';
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => true,
+                    'invoice_number' => $invoice->invoice_number,
+                    'group_id' => $group->id,
+                    'group_name' => $group->displayName(),
+                    'group_url' => route('order-groups.show', $group),
+                    'message' => $message,
+                ]);
+            }
+
             return redirect()
-                ->route('order-groups.show', $group)
-                ->with('success', 'Invoice '.$invoice->invoice_number.' added to group "'.$group->displayName().'". It goes to '.$branch->name.' when the group is paid.');
+                ->route('collection-invoices.create', ['order_group_id' => $group->id])
+                ->with('success', $message);
         }
 
         return redirect()
@@ -290,6 +302,15 @@ class CollectionInvoiceController extends Controller
             ->with('success', 'Invoice '.$collectionInvoice->invoice_number.' deleted and removed from the collection center.');
     }
 
+    private function storeError(Request $request, array $errors)
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['message' => reset($errors), 'errors' => $errors], 422);
+        }
+
+        return back()->withErrors($errors)->withInput();
+    }
+
     private function viewData(Request $request, string $title, array $data): array
     {
         $user = $request->user();
@@ -300,6 +321,7 @@ class CollectionInvoiceController extends Controller
 
         $nav = [
             ['label' => 'Shop', 'href' => route('shop'), 'icon' => 'storefront'],
+            ['label' => 'Purchase', 'href' => route('collection-invoices.index'), 'icon' => 'description', 'active' => true],
         ];
         if ($canRegisterKd) {
             $nav[] = ['label' => 'Register KD NO', 'href' => route('admin.kd.registration.create'), 'icon' => 'person_add'];
@@ -313,7 +335,6 @@ class CollectionInvoiceController extends Controller
             ['label' => 'My Orders', 'href' => route('orders.index'), 'icon' => 'receipt_long'],
             ['label' => 'Order Groups', 'href' => route('order-groups.index'), 'icon' => 'group_work'],
             ['label' => 'Special Sales', 'href' => route('invoices.index'), 'icon' => 'loyalty'],
-            ['label' => 'Invoice', 'href' => route('collection-invoices.index'), 'icon' => 'description', 'active' => true],
             ['label' => 'My Blog', 'href' => route('my-blog.index'), 'icon' => 'article'],
             ['label' => 'Wallet', 'href' => route('wallet.index'), 'icon' => 'account_balance_wallet'],
         );

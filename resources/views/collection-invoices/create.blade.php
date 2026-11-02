@@ -31,6 +31,7 @@
                 'store' => route('collection-invoices.store'),
                 'kdSearch' => route('kd-info.search'),
                 'groupStore' => route('order-groups.store'),
+                'groupsIndex' => route('order-groups.index'),
             ],
         ];
     @endphp

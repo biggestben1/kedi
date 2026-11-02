@@ -6,6 +6,9 @@
     <li class="slide">
         <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-home"></i><span class="side-menu__label">Shop</span></a>
     </li>
+    <li class="slide">
+        <a class="side-menu__item {{ $active === 'collection-invoices' ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+    </li>
     @php
         $canRegisterKd = auth()->user()->isSuperAdmin()
             || in_array(auth()->user()->role?->name, ['headquarters', 'branch', 'annex', 'accountant', 'cashier', 'distributor'], true);
@@ -38,9 +41,6 @@
     @endif
     <li class="slide">
         <a class="side-menu__item {{ $active === 'invoices' ? 'active' : '' }}" href="{{ route('invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
-    </li>
-    <li class="slide">
-        <a class="side-menu__item {{ $active === 'collection-invoices' ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
     </li>
     <li class="slide">
         <a class="side-menu__item {{ $active === 'blog' ? 'active' : '' }}" href="{{ route('my-blog.index') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">My Blog</span></a>

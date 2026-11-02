@@ -250,6 +250,9 @@
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin') && !request()->routeIs('admin.*') ? 'active' : '' }}" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="slide">
@@ -264,9 +267,6 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Invoices</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             
                             <li class="slide">
@@ -305,13 +305,13 @@
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.dispatch.orders*') ? 'active' : '' }}" href="{{ route('admin.dispatch.orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">Orders</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.products.index') ? 'active' : '' }}" href="{{ route('admin.products.index') }}"><i class="side-menu__icon fe fe-grid"></i><span class="side-menu__label">Products (Stock)</span></a>
@@ -347,13 +347,13 @@
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('wallet.*') ? 'active' : '' }}" href="{{ route('wallet.index') }}"><i class="side-menu__icon fe fe-credit-card"></i><span class="side-menu__label">Wallet</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.kd.registration*') ? 'active' : '' }}" href="{{ route('admin.kd.registration.create') }}"><i class="side-menu__icon fe fe-edit"></i><span class="side-menu__label">Register KD NO</span></a>
@@ -366,6 +366,9 @@
                             <li class="sub-category"><h3>Main</h3></li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
+                            </li>
+                            <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
@@ -382,9 +385,6 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Invoices</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
@@ -472,6 +472,9 @@
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="slide">
@@ -495,9 +498,6 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Invoices</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.financial') ? 'active' : '' }}" href="{{ route('admin.pharmacy.financial') }}"><i class="side-menu__icon fe fe-dollar-sign"></i><span class="side-menu__label">Financial Report</span></a>
@@ -574,6 +574,9 @@
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="sub-category"><h3>Service Center</h3></li>
@@ -588,9 +591,6 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Invoices</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.referred-orders*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Referred Orders</span></a>
@@ -643,6 +643,9 @@
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="sub-category"><h3>Annex</h3></li>
@@ -660,9 +663,6 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Special Sales</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.back_orders*') ? 'active' : '' }}" href="{{ route('admin.back_orders.index') }}"><i class="side-menu__icon fe fe-package"></i><span class="side-menu__label">Back Orders</span></a>
@@ -703,6 +703,9 @@
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="sub-category"><h3>Accountant</h3></li>
@@ -717,9 +720,6 @@
                             </li>
                             <li class="slide">
                                 <a class="side-menu__item {{ request()->routeIs('admin.invoices*') ? 'active' : '' }}" href="{{ route('admin.invoices.index') }}"><i class="side-menu__icon fe fe-file-text"></i><span class="side-menu__label">Invoices</span></a>
-                            </li>
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
                             </li>
                             <li class="slide {{ request()->routeIs('admin.users*') ? 'is-expanded' : '' }}">
                                 <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Cashiers</span><i class="angle fe fe-chevron-right"></i></a>
@@ -746,6 +746,9 @@
                                 <a class="side-menu__item" href="{{ route('shop') }}"><i class="side-menu__icon fe fe-shopping-bag"></i><span class="side-menu__label">Back to Shop</span></a>
                             </li>
                             <li class="slide">
+                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Purchase</span></a>
+                            </li>
+                            <li class="slide">
                                 <a class="side-menu__item" href="{{ route('admin') }}"><i class="side-menu__icon fe fe-settings"></i><span class="side-menu__label">Admin</span></a>
                             </li>
                             <li class="slide">
@@ -765,9 +768,6 @@
                                 <a class="side-menu__item {{ request()->routeIs('admin.pharmacy.referred-orders*') ? 'active' : '' }}" href="{{ route('admin.pharmacy.referred-orders') }}"><i class="side-menu__icon fe fe-users"></i><span class="side-menu__label">Referred Orders</span></a>
                             </li>
                             @endif
-                            <li class="slide">
-                                <a class="side-menu__item {{ request()->routeIs('collection-invoices*') ? 'active' : '' }}" href="{{ route('collection-invoices.index') }}"><i class="side-menu__icon fe fe-file-plus"></i><span class="side-menu__label">Invoice</span></a>
-                            </li>
                             @if(auth()->user()->isSuperAdmin())
                             <li class="slide {{ request()->routeIs('admin.dispatch.orders*') ? 'is-expanded' : '' }}">
                                 <a class="side-menu__item" data-bs-toggle="slide" href="javascript:void(0)"><i class="side-menu__icon fe fe-truck"></i><span class="side-menu__label">Dispatch</span><i class="angle fe fe-chevron-right"></i></a>
