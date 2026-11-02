@@ -25,6 +25,9 @@
     <div>
         <p class="text-muted mb-0">
             Status: <span class="badge bg-{{ $group->status === 'open' ? 'info' : ($group->status === 'paid' ? 'success' : 'secondary') }}">{{ ucfirst($group->status) }}</span>
+            @if($group->isOpen() && ($group->amount_paid ?? 0) > 0)
+                <span class="badge bg-warning text-dark ms-1">Installment · paid ₦{{ number_format($group->amount_paid, 0) }}</span>
+            @endif
             @if($isActive)<span class="badge bg-success ms-1">Session active</span>@endif
         </p>
     </div>
@@ -32,7 +35,15 @@
         <a href="{{ route('order-groups.index') }}" class="btn btn-outline-secondary">All groups</a>
         <a href="{{ route('order-groups.edit', $group) }}" class="btn btn-outline-secondary">Edit</a>
         @if($group->isOpen() && $drafts->isNotEmpty())
-            <a href="{{ route('order-groups.pay-form', $group) }}" class="btn btn-success"><i class="fe fe-credit-card me-1"></i>Pay all (₦{{ number_format($draftTotal, 0) }})</a>
+            @php $balanceDue = max(0, round((float) $draftTotal - (float) ($group->amount_paid ?? 0), 2)); @endphp
+            <a href="{{ route('order-groups.pay-form', $group) }}" class="btn btn-success">
+                <i class="fe fe-credit-card me-1"></i>
+                @if(($group->amount_paid ?? 0) > 0)
+                    Pay balance (₦{{ number_format($balanceDue, 0) }})
+                @else
+                    Pay all (₦{{ number_format($draftTotal, 0) }})
+                @endif
+            </a>
         @endif
         <a href="{{ route('shop') }}" class="btn btn-outline-primary">Continue shopping</a>
         @if($group->isOpen() && !$isActive)

@@ -3,193 +3,299 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
-    <title>Order Receipt – {{ $order->invoice_number ?? 'ORD-' . $order->id }}</title>
+    <title>Receipt – {{ $order->invoice_number ?? 'ORD-' . $order->id }}</title>
     <link rel="shortcut icon" type="image/x-icon" href="{{ asset('images/logo.png') . '?v=3' }}" />
     @include('partials.pwa-head')
-    <link href="{{ asset('sash/assets/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" />
-    <link href="{{ asset('sash/assets/css/style.css') }}" rel="stylesheet" />
-    <link href="{{ asset('sash/assets/css/icons.css') }}" rel="stylesheet" />
     <style>
-        .receipt-paper { max-width: 800px; margin: 0 auto; padding: 24px; }
-        .receipt-page { page-break-after: always; }
-        .receipt-page:last-child { page-break-after: auto; }
-        @media print { .no-print { display: none !important; } .receipt-paper { padding: 0; } }
+        :root {
+            --slip-width: 72mm;
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #e8e8e8;
+            font-family: "Courier New", Courier, monospace;
+            color: #111;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .no-print-bar {
+            max-width: var(--slip-width);
+            margin: 12px auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+        .no-print-bar a, .no-print-bar button {
+            font-family: system-ui, sans-serif;
+            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: #fff;
+            color: #222;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .no-print-bar .btn-primary {
+            background: #0d6efd;
+            border-color: #0d6efd;
+            color: #fff;
+        }
+        .alert-success {
+            max-width: var(--slip-width);
+            margin: 0 auto 10px;
+            padding: 8px 10px;
+            background: #d1e7dd;
+            border: 1px solid #a3cfbb;
+            border-radius: 6px;
+            font-family: system-ui, sans-serif;
+            font-size: 13px;
+        }
+        .pos-slip {
+            width: var(--slip-width);
+            max-width: 100%;
+            margin: 0 auto 24px;
+            background: #fff;
+            padding: 6px 4px 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.12);
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .pos-slip .center { text-align: center; }
+        .pos-slip .brand {
+            font-weight: 700;
+            font-size: 13px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            line-height: 1.2;
+        }
+        .pos-slip .muted {
+            font-size: 10px;
+            line-height: 1.3;
+            overflow-wrap: anywhere;
+            word-break: break-all;
+        }
+        .pos-slip .line {
+            border: 0;
+            border-top: 1px dashed #333;
+            margin: 5px 0;
+        }
+        .pos-slip .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 4px;
+            font-size: 10px;
+            line-height: 1.3;
+        }
+        .pos-slip .row .left {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .pos-slip .row .amt {
+            flex: 0 0 auto;
+            text-align: right;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+        .pos-slip .item {
+            margin-top: 5px;
+        }
+        .pos-slip .item:first-of-type { margin-top: 0; }
+        .pos-slip .item-name {
+            font-size: 11px;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .pos-slip .item-line {
+            display: flex;
+            justify-content: space-between;
+            gap: 4px;
+            font-size: 10px;
+            line-height: 1.3;
+            margin-top: 1px;
+        }
+        .pos-slip .item-line .detail {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+        .pos-slip .item-line .amt {
+            flex: 0 0 auto;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .pos-slip .total-row {
+            font-size: 12px;
+            font-weight: 700;
+            margin-top: 3px;
+        }
+        .pos-slip .section-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            margin: 4px 0 2px;
+            font-weight: 700;
+        }
+        .pos-slip .wrap {
+            overflow-wrap: anywhere;
+            word-break: break-all;
+        }
+        @media print {
+            @page {
+                margin: 0;
+            }
+            html, body {
+                width: 100%;
+                background: #fff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .no-print { display: none !important; }
+            .pos-slip {
+                width: 100%;
+                max-width: 72mm;
+                margin: 0;
+                box-shadow: none;
+                padding: 1.5mm 1.5mm 3mm;
+            }
+        }
     </style>
 </head>
-<body class="app">
-    <div class="page">
-        <div class="page-main">
-            <div class="app-header header sticky no-print">
-                <div class="container-fluid main-container">
-                    <div class="d-flex align-items-center">
-                        <a class="header-brand1" href="{{ url('/') }}">
-                            <img src="{{ asset('images/logo.png') . '?v=3' }}" class="header-brand-img" alt="{{ config('app.name') }}" style="max-height: 36px;">
-                        </a>
-                        <div class="ms-auto">
-                            <a href="{{ route('orders.receipt.pdf', $order) }}" class="btn btn-sm btn-primary" target="_blank"><i class="fe fe-download me-1"></i>Download PDF</a>
-                            <a href="{{ route('orders.receipt.pdf', $order) }}" class="btn btn-sm btn-outline-secondary" onclick="window.print(); return false;"><i class="fe fe-printer me-1"></i>Print</a>
-                            <a href="{{ route('orders.index') }}" class="btn btn-sm btn-outline-secondary">My Orders</a>
-                        </div>
+<body>
+@php
+    $appName = config('app.name');
+    $orders = ($placedOrdersFull ?? collect())->isNotEmpty()
+        ? $placedOrdersFull
+        : collect([$order]);
+    $first = $orders->first();
+    $group = $first?->orderGroup;
+    $breakdown = $first?->payment_breakdown ?? [];
+    $grandSubtotal = (float) $orders->sum('subtotal');
+    $discount = (float) ($breakdown['discount'] ?? $orders->sum('discount_amount'));
+    $grandTotal = isset($breakdown['total'])
+        ? (float) $breakdown['total']
+        : max(0, $grandSubtotal - $discount);
+
+    $money = static function (float $amount): string {
+        return 'N'.number_format($amount, 2, '.', ',');
+    };
+
+    $paymentParts = [];
+    foreach (['wallet' => 'Wallet', 'kd_credit' => 'KD Credit', 'dpbv' => 'DPBV', 'cash' => 'Cash', 'cheque' => 'Cheque', 'pos' => 'POS', 'bank' => 'Bank'] as $key => $label) {
+        $amt = (float) ($breakdown[$key] ?? 0);
+        if ($amt > 0) {
+            $paymentParts[] = $label.': '.$money($amt);
+        }
+    }
+    if ($paymentParts === []) {
+        $paymentParts[] = $first?->paymentLabel() ?? '—';
+    }
+@endphp
+
+    <div class="no-print no-print-bar">
+        <button type="button" class="btn-primary" onclick="window.print()">Print</button>
+        <a href="{{ route('orders.index') }}">My Orders</a>
+        @if($group)
+            <a href="{{ route('order-groups.show', $group) }}">Order Group</a>
+        @endif
+    </div>
+
+    @if(session('success'))
+        <div class="alert-success no-print">{{ session('success') }}</div>
+    @endif
+
+    <div class="pos-slip" id="pos-receipt">
+        <div class="center">
+            <div class="brand">{{ $appName }}</div>
+            <div class="muted">Sales receipt</div>
+        </div>
+        <hr class="line">
+
+        <div class="muted">
+            @if($group)
+                <div class="wrap"><strong>Group:</strong> {{ $group->displayName() }}</div>
+            @endif
+            <div><strong>Date:</strong> {{ optional($first?->created_at)->format('d/m/Y H:i') }}</div>
+            @if($orders->count() === 1)
+                <div class="wrap"><strong>Order:</strong> {{ $first->invoice_number ?? 'ORD-'.$first->id }}</div>
+            @else
+                <div><strong>Orders:</strong> {{ $orders->count() }}
+                    ({{ $orders->map(fn ($o) => $o->invoice_number ?? 'ORD-'.$o->id)->implode(', ') }})
+                </div>
+            @endif
+            <div class="wrap"><strong>KD:</strong> {{ $first->kd_id ?? '—' }}</div>
+            <div class="wrap"><strong>Cust:</strong> {{ $first->customer_name ?? $first->user?->name ?? '—' }}</div>
+            @if(!empty($breakdown['pos_machine']))
+                <div class="wrap"><strong>POS:</strong> {{ $breakdown['pos_machine'] }}</div>
+            @endif
+            @if(!empty($breakdown['bank_account']))
+                <div class="wrap"><strong>Bank:</strong> {{ $breakdown['bank_account'] }}</div>
+            @endif
+        </div>
+
+        <hr class="line">
+
+        @foreach($orders as $ord)
+            @if($orders->count() > 1)
+                <div class="section-label">{{ $ord->invoice_number ?? 'ORD-'.$ord->id }}</div>
+            @endif
+            @foreach($ord->items as $item)
+                <div class="item">
+                    <div class="item-name">{{ $item->product_name }}</div>
+                    <div class="item-line">
+                        <div class="detail">{{ $item->quantity }} x {{ $money((float) $item->unit_price) }} ({{ $item->item_code }})</div>
+                        <div class="amt">{{ $money((float) $item->line_total) }}</div>
                     </div>
                 </div>
+            @endforeach
+        @endforeach
+
+        <hr class="line">
+        <div class="row">
+            <div class="left">Subtotal</div>
+            <div class="amt">{{ $money($grandSubtotal) }}</div>
+        </div>
+        @if($discount > 0)
+            <div class="row">
+                <div class="left wrap">Disc{{ !empty($breakdown['coupon_code']) ? ' '.$breakdown['coupon_code'] : '' }}</div>
+                <div class="amt">-{{ $money($discount) }}</div>
             </div>
+        @endif
+        <div class="row total-row">
+            <div class="left">TOTAL</div>
+            <div class="amt">{{ $money($grandTotal) }}</div>
+        </div>
 
-            <div class="main-content app-content mt-0">
-                <div class="side-app">
-                    <div class="main-container container-fluid">
-                        @if(session('success'))
-                            <div class="alert alert-success alert-dismissible fade show no-print" role="alert">
-                                {{ session('success') }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            </div>
-                        @endif
-                        @php
-                            $placedOrdersFull = $placedOrdersFull ?? collect();
-                            $appName = config('app.name');
-                        @endphp
-                        @if($placedOrdersFull->isNotEmpty())
-                            <p class="no-print mb-3"><strong>{{ $placedOrdersFull->count() }} orders placed.</strong> Scroll down to see each receipt. <a href="{{ route('orders.index') }}">View all orders</a>.</p>
-                        @endif
+        <hr class="line">
+        <div class="section-label">Payment</div>
+        @foreach($paymentParts as $part)
+            <div class="muted wrap">{{ $part }}</div>
+        @endforeach
 
-                        @if($placedOrdersFull->isNotEmpty())
-                            @foreach($placedOrdersFull as $idx => $ord)
-                            <div class="card shadow receipt-paper receipt-page">
-                                <div class="card-body">
-                                    <div class="no-print mb-2 d-flex justify-content-between align-items-center">
-                                        <span class="badge bg-primary">Receipt {{ $idx + 1 }} of {{ $placedOrdersFull->count() }}</span>
-                                        <a href="{{ route('orders.receipt.pdf', $ord) }}" class="btn btn-sm btn-outline-primary" target="_blank"><i class="fe fe-download me-1"></i>Download PDF</a>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
-                                        <div>
-                                            <h2 class="mb-0">Order Receipt</h2>
-                                            <p class="text-muted mb-0"><strong>Order #:</strong> {{ $ord->invoice_number ?? 'ORD-' . $ord->id }}</p>
-                                            <p class="text-muted mb-0"><strong>Date:</strong> {{ $ord->created_at->format('M d, Y H:i') }}</p>
-                                            <p class="text-muted mb-0"><strong>Payment:</strong> {{ $ord->paymentLabel() }}</p>
-                                            <p class="text-muted mb-0 mt-2"><strong>KD NO:</strong> {{ $ord->kd_id ?? '—' }}</p>
-                                            <p class="text-muted mb-0"><strong>Customer Name:</strong> {{ $ord->customer_name ?? '—' }}</p>
-                                        </div>
-                                        <div class="text-end">
-                                            <strong>{{ $appName }}</strong>
-                                        </div>
-                                    </div>
-
-                                    <div class="row mb-3">
-                                        <div class="col-md-6">
-                                            <p class="mb-1"><strong>Customer (Account)</strong></p>
-                                            <p class="mb-0">{{ $ord->user?->name }}<br>{{ $ord->user?->email }}</p>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <p class="mb-1"><strong>Delivery</strong></p>
-                                            <p class="mb-0">
-                                                @if($ord->shipping_address){{ $ord->shipping_address }}<br>@endif
-                                                {{ $ord->shipping_city }}{{ $ord->shipping_state ? ', ' . $ord->shipping_state : '' }} {{ $ord->shipping_postal_code ?? '' }}<br>
-                                                @if($ord->shipping_phone){{ $ord->shipping_phone }}@endif
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <table class="table table-bordered">
-                                        <thead>
-                                            <tr>
-                                                <th>Item</th>
-                                                <th class="text-end">Qty</th>
-                                                <th class="text-end">Unit price</th>
-                                                <th class="text-end">Total</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($ord->items as $item)
-                                            <tr>
-                                                <td>{{ $item->product_name }} ({{ $item->item_code }})</td>
-                                                <td class="text-end">{{ $item->quantity }}</td>
-                                                <td class="text-end">₦{{ number_format($item->unit_price, 2) }}</td>
-                                                <td class="text-end">₦{{ number_format($item->line_total, 2) }}</td>
-                                            </tr>
-                                            @endforeach
-                                        </tbody>
-                                        <tfoot>
-                                            <tr>
-                                                <td colspan="3" class="text-end"><strong>Subtotal</strong></td>
-                                                <td class="text-end"><strong>₦{{ number_format($ord->subtotal, 2) }}</strong></td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-
-                                    <p class="text-muted small mb-0 mt-3">Thank you for your order.</p>
-                                </div>
-                            </div>
-                            @endforeach
-                        @else
-                        <div class="card shadow receipt-paper">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
-                                    <div>
-                                        <h2 class="mb-0">Order Receipt</h2>
-                                        <p class="text-muted mb-0"><strong>Order #:</strong> {{ $order->invoice_number ?? 'ORD-' . $order->id }}</p>
-                                        <p class="text-muted mb-0"><strong>Date:</strong> {{ $order->created_at->format('M d, Y H:i') }}</p>
-                                        <p class="text-muted mb-0"><strong>Payment:</strong> {{ $order->paymentLabel() }}</p>
-                                        <p class="text-muted mb-0 mt-2"><strong>KD NO:</strong> {{ $order->kd_id ?? '—' }}</p>
-                                        <p class="text-muted mb-0"><strong>Customer Name:</strong> {{ $order->customer_name ?? '—' }}</p>
-                                    </div>
-                                    <div class="text-end">
-                                        <strong>{{ $appName }}</strong>
-                                    </div>
-                                </div>
-
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <p class="mb-1"><strong>Customer (Account)</strong></p>
-                                        <p class="mb-0">{{ $order->user?->name }}<br>{{ $order->user?->email }}</p>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <p class="mb-1"><strong>Delivery</strong></p>
-                                        <p class="mb-0">
-                                            @if($order->shipping_address){{ $order->shipping_address }}<br>@endif
-                                            {{ $order->shipping_city }}{{ $order->shipping_state ? ', ' . $order->shipping_state : '' }} {{ $order->shipping_postal_code ?? '' }}<br>
-                                            @if($order->shipping_phone){{ $order->shipping_phone }}@endif
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <table class="table table-bordered">
-                                    <thead>
-                                        <tr>
-                                            <th>Item</th>
-                                            <th class="text-end">Qty</th>
-                                            <th class="text-end">Unit price</th>
-                                            <th class="text-end">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($order->items as $item)
-                                        <tr>
-                                            <td>{{ $item->product_name }} ({{ $item->item_code }})</td>
-                                            <td class="text-end">{{ $item->quantity }}</td>
-                                            <td class="text-end">₦{{ number_format($item->unit_price, 2) }}</td>
-                                            <td class="text-end">₦{{ number_format($item->line_total, 2) }}</td>
-                                        </tr>
-                                        @endforeach
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <td colspan="3" class="text-end"><strong>Subtotal</strong></td>
-                                            <td class="text-end"><strong>₦{{ number_format($order->subtotal, 2) }}</strong></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-
-                                <p class="text-muted small mb-0 mt-3">Thank you for your order.</p>
-                            </div>
-                        </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
+        <hr class="line">
+        <div class="center muted">
+            Thank you<br>
+            {{ now()->format('d/m/Y H:i') }}
         </div>
     </div>
 
-    <script src="{{ asset('sash/assets/js/jquery.min.js') }}"></script>
-    <script src="{{ asset('sash/assets/plugins/bootstrap/js/bootstrap.min.js') }}"></script>
     @include('partials.pwa-scripts')
+    <script>
+        (function () {
+            var params = new URLSearchParams(window.location.search);
+            if (params.get('autoprint') === '1') {
+                window.addEventListener('load', function () {
+                    setTimeout(function () { window.print(); }, 300);
+                });
+            }
+        })();
+    </script>
 </body>
 </html>

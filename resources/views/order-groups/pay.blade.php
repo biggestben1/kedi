@@ -112,13 +112,29 @@
                             <th class="text-end">-₦{{ number_format($discountAmount, 0) }}</th>
                         </tr>
                         @endif
+                        @if(($amountPaid ?? 0) > 0)
+                        <tr class="text-success">
+                            <th colspan="2">Already paid (installments)</th>
+                            <th class="text-end">-₦{{ number_format($amountPaid, 0) }}</th>
+                        </tr>
+                        @endif
                         <tr>
-                            <th colspan="2">Amount due</th>
+                            <th colspan="2">Balance due</th>
                             <th class="text-end">₦{{ number_format($amountDue ?? $draftTotal, 0) }}</th>
                         </tr>
                         </tfoot>
                     </table>
                 </div>
+                @if(!empty($installments))
+                    <div class="mt-3">
+                        <div class="small fw-semibold mb-1">Installment history</div>
+                        <ul class="small text-muted mb-0 ps-3">
+                            @foreach($installments as $i => $row)
+                                <li>#{{ $i + 1 }} — ₦{{ number_format((float) ($row['amount'] ?? 0), 0) }} @if(!empty($row['at'])) · {{ $row['at'] }}@endif</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
                 <p class="small text-muted mt-3 mb-0">
                     Wallet: ₦{{ number_format($walletBalance, 2) }} ·
                     DPBV: ₦{{ number_format($dpbvNairaEquivalent, 2) }} ·
@@ -153,14 +169,20 @@
                 </div>
 
                 <div class="p-3 bg-primary text-white rounded mb-4 text-center">
-                    <div class="opacity-75">Pay once for the whole group</div>
+                    <div class="opacity-75">{{ ($amountPaid ?? 0) > 0 ? 'Remaining balance' : 'Pay for the whole group' }}</div>
                     <h2 class="mb-0">₦{{ number_format($amountDue ?? $draftTotal, 0) }}</h2>
-                    <small>{{ $drafts->count() }} order(s){{ ($discountAmount ?? 0) > 0 ? ' · after coupon' : '' }}</small>
+                    <small>
+                        {{ $drafts->count() }} order(s){{ ($discountAmount ?? 0) > 0 ? ' · after coupon' : '' }}
+                        @if(($amountPaid ?? 0) > 0)
+                            · paid ₦{{ number_format($amountPaid, 0) }} of ₦{{ number_format($grossDue ?? ($amountDue + $amountPaid), 0) }}
+                        @endif
+                    </small>
                 </div>
 
-                <form method="POST" action="{{ route('order-groups.pay', $group) }}" id="group-pay-form" enctype="multipart/form-data">
+                <form method="POST" action="{{ route('order-groups.pay', $group) }}" id="group-pay-form">
                     @csrf
-                    <input type="hidden" name="split_payment" id="split_payment" value="{{ old('split_payment') ? '1' : '0' }}">
+                    <input type="hidden" name="split_payment" id="split_payment" value="{{ old('split_payment') || old('installment') || ($amountPaid ?? 0) > 0 ? '1' : '0' }}">
+                    <input type="hidden" name="installment" id="installment" value="{{ old('installment') ? '1' : '0' }}">
                     <input type="hidden" name="split_wallet_amount" id="split_wallet_amount" value="{{ old('split_wallet_amount', 0) }}">
                     <input type="hidden" name="split_kd_credit_amount" id="split_kd_credit_amount" value="{{ old('split_kd_credit_amount', 0) }}">
                     <input type="hidden" name="split_dpbv_amount" id="split_dpbv_amount" value="{{ old('split_dpbv_amount', 0) }}">
@@ -228,12 +250,20 @@
                         </div>
                     </div>
 
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="installment_toggle" {{ old('installment') || ($amountPaid ?? 0) > 0 ? 'checked' : '' }}>
+                        <label class="form-check-label" for="installment_toggle">
+                            <strong>Pay in installments</strong>
+                            <span class="d-block small text-muted">Pay part now and save the rest as draft. Orders stay unpaid until the balance is cleared.</span>
+                        </label>
+                    </div>
+
                     <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="split_toggle" {{ old('split_payment') ? 'checked' : '' }}>
+                        <input class="form-check-input" type="checkbox" id="split_toggle" {{ old('split_payment') || old('installment') || ($amountPaid ?? 0) > 0 ? 'checked' : '' }}>
                         <label class="form-check-label" for="split_toggle">Split payment</label>
                     </div>
 
-                    <div id="split_box" class="border rounded p-3 mb-3" style="{{ old('split_payment') ? '' : 'display:none;' }}">
+                    <div id="split_box" class="border rounded p-3 mb-3" style="{{ old('split_payment') || old('installment') || ($amountPaid ?? 0) > 0 ? '' : 'display:none;' }}">
                         <div class="row g-2">
                             <div class="col-md-4">
                                 <label class="form-label small">Wallet</label>
@@ -294,17 +324,16 @@
                             <div class="col-md-6" id="bank_amount_wrap" style="{{ old('bank_account_id') ? '' : 'display:none;' }}">
                                 <label class="form-label small">Bank amount</label>
                                 <input type="text" inputmode="decimal" class="form-control money-field" data-target="bank_amount_paid" id="bank_amount_display" value="{{ old('bank_amount_paid') }}" placeholder="e.g. 1,000,000">
-                                <label class="form-label small mt-2" for="bank_payment_proof">Upload proof</label>
-                                <input type="file" name="bank_payment_proof" id="bank_payment_proof" class="form-control @error('bank_payment_proof') is-invalid @enderror" accept="image/*,.pdf">
-                                <div class="form-text">Upload receipt/screenshot (JPG/PNG/PDF).</div>
-                                @error('bank_payment_proof')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                             </div>
                         </div>
-                        <p class="small mt-2 mb-0">Entered: ₦<span id="split_sum">0.00</span> / Due: ₦{{ number_format($amountDue ?? $draftTotal, 2) }}</p>
+                        <p class="small mt-2 mb-0">Entered: ₦<span id="split_sum">0.00</span> / Balance due: ₦{{ number_format($amountDue ?? $draftTotal, 2) }}</p>
+                        <p class="small text-muted mb-0" id="installment_hint" style="{{ old('installment') || ($amountPaid ?? 0) > 0 ? '' : 'display:none;' }}">
+                            If you enter less than the balance, this payment is saved as an installment and the group stays in draft.
+                        </p>
                     </div>
 
                     <button type="submit" class="btn btn-success btn-lg w-100" id="group-pay-submit">
-                        <i class="fe fe-credit-card me-1"></i>Pay all ₦{{ number_format($amountDue ?? $draftTotal, 0) }}
+                        <i class="fe fe-credit-card me-1"></i><span id="group-pay-submit-label">Pay ₦{{ number_format($amountDue ?? $draftTotal, 0) }}</span>
                     </button>
                 </form>
             </div>
@@ -499,22 +528,58 @@
             el.value = String(el.value || '').replace(/[^0-9.,]/g, '');
             syncHidden(el);
             updateSum();
+            refreshPayLabel();
         });
         el.addEventListener('blur', function () {
             if ((el.value || '').trim() === '') {
                 syncHidden(el);
                 updateSum();
+                refreshPayLabel();
                 return;
             }
             el.value = fmt(parseMoney(el.value));
             syncHidden(el);
             updateSum();
+            refreshPayLabel();
         });
+    }
+
+    var installmentToggle = document.getElementById('installment_toggle');
+    var splitToggle = document.getElementById('split_toggle');
+    var installmentHint = document.getElementById('installment_hint');
+    var submitLabel = document.getElementById('group-pay-submit-label');
+
+    function refreshPayLabel() {
+        var sum = updateSum();
+        var installmentOn = !!installmentToggle?.checked;
+        if (submitLabel) {
+            if (installmentOn && sum > 0 && sum + 0.009 < due) {
+                submitLabel.textContent = 'Save installment ₦' + fmt(sum) + ' (keep draft)';
+            } else if (installmentOn) {
+                submitLabel.textContent = 'Pay balance ₦' + fmt(due);
+            } else {
+                submitLabel.textContent = 'Pay ₦' + fmt(due);
+            }
+        }
+        if (installmentHint) {
+            installmentHint.style.display = installmentOn ? '' : 'none';
+        }
     }
 
     document.getElementById('split_toggle')?.addEventListener('change', function () {
         document.getElementById('split_box').style.display = this.checked ? '' : 'none';
         document.getElementById('split_payment').value = this.checked ? '1' : '0';
+        refreshPayLabel();
+    });
+
+    installmentToggle?.addEventListener('change', function () {
+        document.getElementById('installment').value = this.checked ? '1' : '0';
+        if (this.checked) {
+            if (splitToggle) splitToggle.checked = true;
+            document.getElementById('split_box').style.display = '';
+            document.getElementById('split_payment').value = '1';
+        }
+        refreshPayLabel();
     });
 
     document.querySelectorAll('.money-field').forEach(wireMoney);
@@ -548,8 +613,6 @@
             syncHidden(bankDisplay);
             updateSum();
         }
-        var bankProof = document.getElementById('bank_payment_proof');
-        if (!on && bankProof) bankProof.value = '';
     }
 
     posSelect?.addEventListener('change', syncPosMachine);
@@ -557,6 +620,7 @@
     syncPosMachine();
     syncBankAccount();
     updateSum();
+    refreshPayLabel();
 
     document.getElementById('group-pay-form')?.addEventListener('submit', function (e) {
         var submitter = e.submitter;
@@ -567,17 +631,31 @@
         document.querySelectorAll('.money-field').forEach(syncHidden);
 
         var splitOn = document.getElementById('split_payment')?.value === '1';
+        var installmentOn = document.getElementById('installment')?.value === '1';
+        var sum = updateSum();
+
         if (splitOn) {
-            var sum = updateSum();
-            var rem = due - sum;
-            if (Math.abs(rem) > 0.009) {
+            if (sum <= 0) {
                 e.preventDefault();
-                alert('Payment amounts must add up to the amount due. Remaining: ₦' + fmt(rem));
+                alert('Enter at least one payment amount.');
+                return;
+            }
+            if (sum - due > 0.009) {
+                e.preventDefault();
+                alert('Payment cannot exceed the balance due (₦' + fmt(due) + ').');
+                return;
+            }
+            if (!installmentOn && Math.abs(due - sum) > 0.009) {
+                e.preventDefault();
+                alert('Payment amounts must add up to the amount due. Remaining: ₦' + fmt(due - sum) + '. Or turn on Pay in installments to save a partial payment as draft.');
                 return;
             }
         }
 
-        if (!confirm('Pay ₦' + fmt(due) + ' for all orders in this group?')) {
+        var msg = installmentOn && sum + 0.009 < due
+            ? 'Save installment of ₦' + fmt(sum) + ' and keep orders as draft? Remaining will be ₦' + fmt(due - sum) + '.'
+            : 'Pay ₦' + fmt(splitOn ? sum : due) + ' for this group?';
+        if (!confirm(msg)) {
             e.preventDefault();
         }
     });

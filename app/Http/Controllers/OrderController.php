@@ -88,14 +88,23 @@ class OrderController extends Controller
             return redirect()->route('orders.index')->with('error', 'Draft orders do not have a receipt.');
         }
 
-        $order->load('user', 'items');
+        $order->load(['user', 'items', 'orderGroup']);
 
         $placedOrdersFull = collect();
         $placedOrderIds = session('placed_order_ids', []);
-        if (count($placedOrderIds) > 1) {
-            $placedOrdersFull = Order::with('user', 'items')
+        if (count($placedOrderIds) > 0) {
+            $placedOrdersFull = Order::with(['user', 'items', 'orderGroup'])
                 ->whereIn('id', $placedOrderIds)
                 ->where('user_id', $request->user()->id)
+                ->where('status', '!=', Order::STATUS_DRAFT)
+                ->orderBy('id')
+                ->get();
+        } elseif ($order->order_group_id) {
+            // Reprint: one combined POS slip for the whole paid group.
+            $placedOrdersFull = Order::with(['user', 'items', 'orderGroup'])
+                ->where('order_group_id', $order->order_group_id)
+                ->where('user_id', $request->user()->id)
+                ->where('status', '!=', Order::STATUS_DRAFT)
                 ->orderBy('id')
                 ->get();
         }

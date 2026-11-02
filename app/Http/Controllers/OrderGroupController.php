@@ -537,14 +537,15 @@ class OrderGroupController extends Controller
 
         $grossTotal = round((float) $drafts->sum('subtotal'), 2);
         $splitPayment = $request->boolean('split_payment');
+        $installment = $request->boolean('installment');
         $request->validate([
             'payment_method' => 'nullable|in:wallet,pay_on_delivery,dpbv,kd_credit,split',
             'split_payment' => 'nullable',
+            'installment' => 'nullable',
             'pos_amount_paid' => 'nullable|numeric|min:0',
             'bank_amount_paid' => 'nullable|numeric|min:0',
             'pos_machine_id' => 'nullable|integer',
             'bank_account_id' => 'nullable|integer',
-            'bank_payment_proof' => 'nullable|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
             'split_wallet_amount' => 'nullable|numeric|min:0',
             'split_kd_credit_amount' => 'nullable|numeric|min:0',
             'split_cash_amount' => 'nullable|numeric|min:0',
@@ -553,11 +554,6 @@ class OrderGroupController extends Controller
             'kd_id' => 'nullable|string|max:100',
             'coupon_code' => 'nullable|string|max:100',
         ]);
-
-        $bankProofPath = $request->hasFile('bank_payment_proof')
-            ? $request->file('bank_payment_proof')->store('payment-proofs', 'public')
-            : null;
-        $paymentProofPath = $bankProofPath;
 
         $coupon = null;
         $discountAmount = 0.0;
@@ -572,6 +568,12 @@ class OrderGroupController extends Controller
         }
 
         $totalAmount = max(0, round($grossTotal - $discountAmount, 2));
+        $alreadyPaid = $orderGroup->amountPaid();
+        $remainingDue = max(0, round($totalAmount - $alreadyPaid, 2));
+
+        if ($installment) {
+            $splitPayment = true;
+        }
 
         $paymentMethod = $splitPayment ? 'split' : ($request->input('payment_method') ?: Order::PAYMENT_WALLET);
         $walletOwner = $user->walletOwnerForShopping();
@@ -587,6 +589,10 @@ class OrderGroupController extends Controller
         $walletAmt = 0.0;
         $kdAmt = 0.0;
         $dpbvAmt = 0.0;
+        $cashAmt = 0.0;
+        $chequeAmt = 0.0;
+        $posAmt = 0.0;
+        $bankAmt = 0.0;
         $paymentCompleted = in_array($paymentMethod, ['wallet', 'dpbv', 'kd_credit', 'split'], true)
             || ($paymentMethod === Order::PAYMENT_PAY_ON_DELIVERY ? false : true);
 
@@ -604,12 +610,17 @@ class OrderGroupController extends Controller
             $dpbvAmt = round((float) $request->input('split_dpbv_amount', 0), 2);
             $sum = round($walletAmt + $kdAmt + $cashAmt + $chequeAmt + $posAmt + $bankAmt + $dpbvAmt, 2);
 
-            if ($sum <= 0 && $totalAmount > 0) {
+            if ($sum <= 0 && $remainingDue > 0) {
                 return back()->withErrors(['split_payment' => 'Enter at least one payment amount.'])->withInput();
             }
-            if ($totalAmount > 0 && $sum !== $totalAmount) {
+            if ($sum > $remainingDue + 0.009) {
                 return back()->withErrors([
-                    'split_payment' => 'Payment amounts must add up to the amount due (₦'.number_format($totalAmount, 2).').',
+                    'split_payment' => 'Payment cannot exceed the remaining balance (₦'.number_format($remainingDue, 2).').',
+                ])->withInput();
+            }
+            if (! $installment && $remainingDue > 0 && $sum !== $remainingDue) {
+                return back()->withErrors([
+                    'split_payment' => 'Payment amounts must add up to the amount due (₦'.number_format($remainingDue, 2).'). Or enable Pay in installments to save a partial payment as draft.',
                 ])->withInput();
             }
 
@@ -659,16 +670,15 @@ class OrderGroupController extends Controller
                 'gross_total' => $grossTotal,
                 'pos_machine' => $posMachine ? trim(($posMachine->bank_name ?: 'POS').($posMachine->account_number ? ' • '.$posMachine->account_number : '')) : null,
                 'bank_account' => $bankAccount ? trim(($bankAccount->name ?: 'Bank').($bankAccount->account_number ? ' • '.$bankAccount->account_number : '')) : null,
-                'bank_proof' => $bankProofPath,
                 'total' => $totalAmount,
                 'order_group_id' => $orderGroup->id,
             ];
-            $paymentCompleted = $totalAmount <= 0 || ($walletAmt + $kdAmt + $dpbvAmt + $cashAmt + $chequeAmt + $posAmt + $bankAmt) >= $totalAmount;
+            $paymentCompleted = $remainingDue <= 0 || $sum >= $remainingDue;
         } elseif ($paymentMethod === 'wallet') {
-            if ($totalAmount > 0 && (float) ($walletOwner->wallet_balance ?? 0) < $totalAmount) {
+            if ($remainingDue > 0 && (float) ($walletOwner->wallet_balance ?? 0) < $remainingDue) {
                 return back()->with('error', 'Insufficient wallet balance.');
             }
-            $walletAmt = $totalAmount;
+            $walletAmt = $remainingDue;
             $paymentCompleted = true;
         } elseif ($paymentMethod === 'kd_credit') {
             if ($kdId === '') {
@@ -679,25 +689,50 @@ class OrderGroupController extends Controller
                 return back()->with('error', 'KD Registration not found for that credit code.');
             }
             $kdCreditBalance = (float) $kdRegistration->credits()->sum(DB::raw("CASE WHEN type = 'credit' THEN amount ELSE -amount END"));
-            if ($totalAmount > 0 && $kdCreditBalance < $totalAmount) {
+            if ($remainingDue > 0 && $kdCreditBalance < $remainingDue) {
                 return back()->with('error', 'Insufficient KD credit balance.');
             }
-            $kdAmt = $totalAmount;
+            $kdAmt = $remainingDue;
             $paymentCompleted = true;
         } elseif ($paymentMethod === 'dpbv') {
             $totalDpbv = (float) $this->effectiveDpbvQuery($user)->sum('dpbv');
             $dpbvNairaEquivalent = ($totalDpbv * 0.95) * 990;
-            if ($totalAmount > 0 && round($dpbvNairaEquivalent, 2) < $totalAmount) {
+            if ($remainingDue > 0 && round($dpbvNairaEquivalent, 2) < $remainingDue) {
                 return back()->with('error', 'Insufficient DPBV balance.');
             }
             $blocked = $this->dpbvBlockedProductNames($drafts);
             if ($blocked !== []) {
                 return back()->with('error', 'These products cannot use DPBV: '.implode(', ', $blocked).'.');
             }
-            $dpbvAmt = $totalAmount;
+            $dpbvAmt = $remainingDue;
             $paymentCompleted = true;
         } elseif ($paymentMethod === Order::PAYMENT_PAY_ON_DELIVERY) {
             $paymentCompleted = false;
+        }
+
+        // Partial installment: take payment now, keep orders as draft, leave group open.
+        if ($installment && $splitPayment && ! $paymentCompleted && $sum > 0) {
+            return $this->saveInstallmentDraft(
+                $request,
+                $orderGroup,
+                $user,
+                $walletOwner,
+                $walletAmt,
+                $kdAmt,
+                $dpbvAmt,
+                $cashAmt,
+                $chequeAmt,
+                $posAmt,
+                $bankAmt,
+                $sum,
+                $kdId,
+                $customerName,
+                $grossTotal,
+                $totalAmount,
+                $discountAmount,
+                $coupon,
+                $paymentBreakdown ?? []
+            );
         }
 
         [$roleName, $stockOwner, $stockUserId, $isHeadquarters, $branchUserId] = $this->resolveStockContext($user);
@@ -737,7 +772,6 @@ class OrderGroupController extends Controller
             $orderGroup,
             $paymentMethod,
             $paymentBreakdown,
-            $paymentProofPath,
             $walletAmt,
             $kdAmt,
             $dpbvAmt,
@@ -771,7 +805,6 @@ class OrderGroupController extends Controller
                 $order->update([
                     'payment_method' => $paymentMethod,
                     'payment_breakdown' => $paymentBreakdown,
-                    'payment_proof' => $paymentProofPath,
                     'status' => $status,
                     'branch_user_id' => $branchUserId ?? $order->branch_user_id,
                     'kd_id' => $order->kd_id ?: ($kdId !== '' ? $kdId : null),
@@ -834,19 +867,52 @@ class OrderGroupController extends Controller
                 ]);
             }
 
+            $priorBreakdown = (array) ($orderGroup->payment_breakdown ?? []);
+            $finalBreakdown = $paymentBreakdown ?: [
+                'gross_total' => $grossTotal,
+                'discount' => $discountAmount,
+                'coupon_code' => $coupon?->code,
+                'total' => $totalAmount,
+                'wallet' => $walletAmt,
+                'kd_credit' => $kdAmt,
+                'dpbv' => $dpbvAmt,
+            ];
+            foreach (['wallet', 'kd_credit', 'dpbv', 'cash', 'cheque', 'pos', 'bank'] as $key) {
+                $finalBreakdown[$key] = round((float) ($priorBreakdown[$key] ?? 0) + (float) ($finalBreakdown[$key] ?? 0), 2);
+            }
+            if (! empty($priorBreakdown['installments'])) {
+                $finalBreakdown['installments'] = $priorBreakdown['installments'];
+                $finalBreakdown['installments'][] = [
+                    'amount' => round(
+                        (float) ($finalBreakdown['wallet'] ?? 0)
+                        + (float) ($finalBreakdown['kd_credit'] ?? 0)
+                        + (float) ($finalBreakdown['dpbv'] ?? 0)
+                        + (float) ($finalBreakdown['cash'] ?? 0)
+                        + (float) ($finalBreakdown['cheque'] ?? 0)
+                        + (float) ($finalBreakdown['pos'] ?? 0)
+                        + (float) ($finalBreakdown['bank'] ?? 0)
+                        - (float) ($priorBreakdown['wallet'] ?? 0)
+                        - (float) ($priorBreakdown['kd_credit'] ?? 0)
+                        - (float) ($priorBreakdown['dpbv'] ?? 0)
+                        - (float) ($priorBreakdown['cash'] ?? 0)
+                        - (float) ($priorBreakdown['cheque'] ?? 0)
+                        - (float) ($priorBreakdown['pos'] ?? 0)
+                        - (float) ($priorBreakdown['bank'] ?? 0),
+                        2
+                    ),
+                    'at' => now()->toDateTimeString(),
+                    'final' => true,
+                ];
+            }
+            $finalBreakdown['amount_paid'] = $totalAmount;
+            $finalBreakdown['total'] = $totalAmount;
+
             $orderGroup->update([
                 'status' => OrderGroup::STATUS_PAID,
                 'payment_method' => $paymentMethod,
-                'payment_breakdown' => $paymentBreakdown ?: [
-                    'gross_total' => $grossTotal,
-                    'discount' => $discountAmount,
-                    'coupon_code' => $coupon?->code,
-                    'total' => $totalAmount,
-                    'wallet' => $walletAmt,
-                    'kd_credit' => $kdAmt,
-                    'dpbv' => $dpbvAmt,
-                ],
+                'payment_breakdown' => $finalBreakdown,
                 'total_amount' => $totalAmount,
+                'amount_paid' => $totalAmount,
                 'completed_at' => now(),
             ]);
 
@@ -868,7 +934,9 @@ class OrderGroupController extends Controller
             ? 'Group paid successfully. '.$drafts->count().' order(s) for ₦'.number_format($totalAmount, 0).'.'
             : 'Group orders placed as pay on delivery. '.$drafts->count().' order(s).';
 
-        return redirect()->route('orders.receipt', $first)->with('success', $msg);
+        return redirect()
+            ->route('orders.receipt', ['order' => $first, 'autoprint' => 1])
+            ->with('success', $msg);
     }
 
     private function authorizeGroup(Request $request, OrderGroup $orderGroup): void
@@ -876,6 +944,144 @@ class OrderGroupController extends Controller
         if ((int) $orderGroup->user_id !== (int) $request->user()->id) {
             abort(404);
         }
+    }
+
+    /**
+     * Record a partial installment and keep the group's orders as drafts.
+     */
+    private function saveInstallmentDraft(
+        Request $request,
+        OrderGroup $orderGroup,
+        $user,
+        $walletOwner,
+        float $walletAmt,
+        float $kdAmt,
+        float $dpbvAmt,
+        float $cashAmt,
+        float $chequeAmt,
+        float $posAmt,
+        float $bankAmt,
+        float $sum,
+        string $kdId,
+        string $customerName,
+        float $grossTotal,
+        float $totalAmount,
+        float $discountAmount,
+        $coupon,
+        array $paymentBreakdown
+    ) {
+        DB::transaction(function () use (
+            $orderGroup,
+            $user,
+            $walletOwner,
+            $walletAmt,
+            $kdAmt,
+            $dpbvAmt,
+            $sum,
+            $kdId,
+            $customerName,
+            $grossTotal,
+            $totalAmount,
+            $discountAmount,
+            $coupon,
+            $paymentBreakdown,
+            $cashAmt,
+            $chequeAmt,
+            $posAmt,
+            $bankAmt
+        ) {
+            if ($walletAmt > 0 && $walletOwner) {
+                $walletOwner->decrement('wallet_balance', $walletAmt);
+                $balanceAfter = (float) $walletOwner->fresh()->wallet_balance;
+                WalletTransaction::create([
+                    'user_id' => $walletOwner->id,
+                    'type' => WalletTransaction::TYPE_DEBIT,
+                    'amount' => $walletAmt,
+                    'balance_after' => $balanceAfter,
+                    'reference' => 'Order group #'.$orderGroup->id.' installment',
+                ]);
+            }
+
+            if ($kdAmt > 0 && $kdId !== '') {
+                $kdRegistration = KdRegistration::where('kd_no', $kdId)->first();
+                if ($kdRegistration) {
+                    $currentBalance = $kdRegistration->credits()->sum(DB::raw("CASE WHEN type = 'credit' THEN amount ELSE -amount END"));
+                    KdRegistrationCredit::create([
+                        'kd_registration_id' => $kdRegistration->id,
+                        'type' => KdRegistrationCredit::TYPE_DEBIT,
+                        'amount' => $kdAmt,
+                        'balance_after' => $currentBalance - $kdAmt,
+                        'reference' => 'Order group #'.$orderGroup->id.' installment',
+                        'notes' => 'Installment payment for order group',
+                        'created_by_user_id' => $user->id,
+                    ]);
+                }
+            }
+
+            if ($dpbvAmt > 0) {
+                $dpbvToDeduct = $dpbvAmt / 990 / 0.95;
+                DpbvCollection::create([
+                    'no' => null,
+                    'code' => $kdId !== '' ? $kdId : 'USED',
+                    'name' => $customerName !== '' ? $customerName : $user->name,
+                    'record_date' => now(),
+                    'sc' => 'GROUP',
+                    'dpbv' => -$dpbvToDeduct,
+                    'user_id' => $user->id,
+                ]);
+            }
+
+            $prior = (array) ($orderGroup->payment_breakdown ?? []);
+            $installments = (array) ($prior['installments'] ?? []);
+            $installments[] = [
+                'amount' => $sum,
+                'at' => now()->toDateTimeString(),
+                'wallet' => $walletAmt,
+                'kd_credit' => $kdAmt,
+                'dpbv' => $dpbvAmt,
+                'cash' => $cashAmt,
+                'cheque' => $chequeAmt,
+                'pos' => $posAmt,
+                'bank' => $bankAmt,
+                'pos_machine' => $paymentBreakdown['pos_machine'] ?? null,
+                'bank_account' => $paymentBreakdown['bank_account'] ?? null,
+            ];
+
+            $newPaid = round($orderGroup->amountPaid() + $sum, 2);
+            $merged = $prior;
+            foreach (['wallet', 'kd_credit', 'dpbv', 'cash', 'cheque', 'pos', 'bank'] as $key) {
+                $merged[$key] = round((float) ($prior[$key] ?? 0) + (float) ($paymentBreakdown[$key] ?? 0), 2);
+            }
+            $merged['installments'] = $installments;
+            $merged['amount_paid'] = $newPaid;
+            $merged['total'] = $totalAmount;
+            $merged['gross_total'] = $grossTotal;
+            $merged['discount'] = $discountAmount;
+            $merged['coupon_code'] = $coupon?->code ?? ($prior['coupon_code'] ?? null);
+            $merged['order_group_id'] = $orderGroup->id;
+            if (! empty($paymentBreakdown['pos_machine'])) {
+                $merged['pos_machine'] = $paymentBreakdown['pos_machine'];
+            }
+            if (! empty($paymentBreakdown['bank_account'])) {
+                $merged['bank_account'] = $paymentBreakdown['bank_account'];
+            }
+
+            $orderGroup->update([
+                'status' => OrderGroup::STATUS_OPEN,
+                'payment_method' => 'installment',
+                'payment_breakdown' => $merged,
+                'total_amount' => $totalAmount,
+                'amount_paid' => $newPaid,
+                'kd_id' => $kdId !== '' ? $kdId : $orderGroup->kd_id,
+                'customer_name' => $customerName !== '' ? $customerName : $orderGroup->customer_name,
+            ]);
+        });
+
+        $remaining = max(0, round($totalAmount - ($orderGroup->fresh()->amountPaid()), 2));
+
+        return redirect()
+            ->route('order-groups.show', $orderGroup)
+            ->with('success', 'Installment of ₦'.number_format($sum, 0).' saved. Orders stay as draft. Remaining balance: ₦'.number_format($remaining, 0).'.');
     }
 
     /**
@@ -940,7 +1146,10 @@ class OrderGroupController extends Controller
                 $couponCode = null;
             }
         }
-        $amountDue = max(0, round($draftTotal - $discountAmount, 2));
+        $grossDue = max(0, round($draftTotal - $discountAmount, 2));
+        $amountPaid = $orderGroup->amountPaid();
+        $amountDue = max(0, round($grossDue - $amountPaid, 2));
+        $installments = (array) (($orderGroup->payment_breakdown['installments'] ?? []));
 
         $user = $request->user();
         $user->load(['role', 'createdBy.role']);
@@ -975,7 +1184,10 @@ class OrderGroupController extends Controller
             'draftTotal' => $draftTotal,
             'coupon' => $coupon,
             'discountAmount' => $discountAmount,
+            'grossDue' => $grossDue,
+            'amountPaid' => $amountPaid,
             'amountDue' => $amountDue,
+            'installments' => $installments,
             'walletBalance' => $walletBalance,
             'canPayWithWallet' => $walletBalance >= $amountDue && $amountDue > 0,
             'totalDpbv' => $totalDpbv,

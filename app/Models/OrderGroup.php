@@ -22,6 +22,7 @@ class OrderGroup extends Model
         'payment_method',
         'payment_breakdown',
         'total_amount',
+        'amount_paid',
         'started_at',
         'completed_at',
     ];
@@ -31,6 +32,7 @@ class OrderGroup extends Model
         return [
             'payment_breakdown' => 'array',
             'total_amount' => 'decimal:2',
+            'amount_paid' => 'decimal:2',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
@@ -69,6 +71,23 @@ class OrderGroup extends Model
     public function draftTotal(): float
     {
         return (float) $this->draftOrders()->sum('subtotal');
+    }
+
+    public function amountPaid(): float
+    {
+        return round((float) ($this->amount_paid ?? 0), 2);
+    }
+
+    public function amountRemaining(?float $totalDue = null): float
+    {
+        $due = $totalDue !== null ? $totalDue : (float) ($this->total_amount ?: $this->draftTotal());
+
+        return max(0, round($due - $this->amountPaid(), 2));
+    }
+
+    public function hasInstallments(): bool
+    {
+        return $this->amountPaid() > 0 && $this->isOpen();
     }
 
     public function displayName(): string
