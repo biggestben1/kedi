@@ -84,6 +84,11 @@
             letter-spacing: 2px;
         }
 
+        .nav-links {
+            display: flex;
+            align-items: center;
+        }
+
         .nav-links a {
             text-decoration: none;
             color: var(--text-dark);
@@ -389,20 +394,25 @@
 <body>
 
     <nav>
-        <div class="container" id="kedi-landing-nav"></div>
+        <div class="container" id="kedi-landing-nav">
+            <div class="nav-content">
+                <a class="logo" href="{{ url('/') }}">Optimal Consult</a>
+                <button type="button" class="nav-toggle" aria-label="Open menu" onclick="this.nextElementSibling.classList.toggle('is-open')">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="nav-links">
+                    <a href="{{ route('shop') }}">Shop Products</a>
+                    <a href="{{ route('blog.index') }}">Blog</a>
+                    <a href="#services">Services</a>
+                    <a href="#about">About</a>
+                    <a href="#contact">Contact</a>
+                    <a href="{{ route('login') }}">Patient Login</a>
+                </div>
+            </div>
+        </div>
     </nav>
-    @php
-        $landingNav = [
-            ['label' => 'Shop Products', 'href' => route('shop')],
-            ['label' => 'Blog', 'href' => route('blog.index')],
-            ['label' => 'Services', 'href' => '#services'],
-            ['label' => 'About', 'href' => '#about'],
-            ['label' => 'Contact', 'href' => '#contact'],
-            ['label' => 'Patient Login', 'href' => route('login'), 'mobileOnly' => true],
-        ];
-    @endphp
-    <script>window.__KEDI_LANDING_NAV__ = @json($landingNav);</script>
-    <script src="{{ asset('js/kedi-landing.js') }}?v=1"></script>
 
     <header class="hero">
         <div class="swiper myHeroSwiper">
